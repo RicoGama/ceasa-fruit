@@ -2,7 +2,7 @@
 -include .env
 export
 
-.PHONY: help tools db-up db-down run build test test-integration sqlc migration promote-admin fmt lint
+.PHONY: help tools db-setup-local db-up db-down run build test test-integration sqlc migration promote-admin fmt lint
 
 help: ## Mostra os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-17s\033[0m %s\n", $$1, $$2}'
@@ -11,7 +11,10 @@ tools: ## Instala as CLIs de desenvolvimento (sqlc, goose)
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	go install github.com/pressly/goose/v3/cmd/goose@latest
 
-db-up: ## Sobe o PostgreSQL (docker compose)
+db-setup-local: ## Cria usuário e bancos num Postgres instalado na máquina (sem Docker)
+	sudo -u postgres psql < ../scripts/db-setup-local.sql
+
+db-up: ## Sobe o PostgreSQL via Docker (alternativa ao db-setup-local)
 	docker compose -f ../docker-compose.yml up -d
 
 db-down: ## Para o PostgreSQL

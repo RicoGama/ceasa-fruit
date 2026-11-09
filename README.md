@@ -30,13 +30,14 @@ Convenção: **código em inglês** (identificadores, banco, rotas, JSON); **com
 ceasa-fruit/
 ├── api/                # API em Go (ver api/README.md)
 ├── web/                # (a fazer) Nuxt
-├── docker/             # scripts de inicialização do Postgres
+├── docker/             # inicialização do Postgres no Docker
+├── scripts/            # db-setup-local.sql (Postgres sem Docker)
 └── docker-compose.yml  # PostgreSQL de desenvolvimento (+ banco ceasa_test)
 ```
 
 ## Rodando
 
-Pré-requisitos: Go 1.26+, Docker.
+Pré-requisitos: Go 1.26+ e PostgreSQL 14+ (instalado na máquina **ou** via Docker).
 
 ```bash
 cd api
@@ -46,13 +47,30 @@ cd api
 make tools   # instala sqlc e goose (uma vez)
 ```
 
+### Banco: Postgres instalado na máquina
+
+Cria o usuário `ceasa` (senha `ceasa`) e os bancos `ceasa` e `ceasa_test`. Pode rodar de novo sem problema.
+
 ```bash
-make db-up   # sobe o PostgreSQL
+make db-setup-local
 ```
+
+A busca sem acento usa a extensão `unaccent`, que vem no pacote *contrib* do
+Postgres. No Ubuntu/Debian ela já vem junto; no Fedora instale `postgresql-contrib`.
+
+### Banco: via Docker (alternativa)
+
+```bash
+make db-up
+```
+
+### Subindo a API
 
 ```bash
 make run     # aplica migrations e sobe a API em :8080
 ```
+
+Se o seu Postgres não estiver em `localhost:5432`, copie `.env.example` para `.env` e ajuste `DATABASE_URL`.
 
 Depois abra:
 
