@@ -70,7 +70,14 @@ make db-up
 Todo e-mail do sistema sai por **SMTP**. Em desenvolvimento usamos o
 [Mailpit](https://mailpit.axllent.org): um SMTP de mentira que captura os
 e-mails e mostra numa página, sem enviar nada para a internet.
-O `make tools` já instala; para rodar (em outro terminal):
+Instale o binário oficial (uma vez). Não use `go install`: essa versão vem sem a
+interface web e a página fica em branco.
+
+```bash
+sudo bash < <(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)
+```
+
+Para rodar (em outro terminal, dentro de `api/`):
 
 ```bash
 make mailpit

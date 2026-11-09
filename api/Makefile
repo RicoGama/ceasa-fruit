@@ -7,10 +7,9 @@ export
 help: ## Mostra os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-17s\033[0m %s\n", $$1, $$2}'
 
-tools: ## Instala as CLIs de desenvolvimento (sqlc, goose, mailpit)
+tools: ## Instala as CLIs de desenvolvimento (sqlc, goose)
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	go install github.com/pressly/goose/v3/cmd/goose@latest
-	go install github.com/axllent/mailpit@latest
 
 db-setup-local: ## Cria usuário e bancos num Postgres instalado na máquina (sem Docker)
 	sudo -u postgres psql < ../scripts/db-setup-local.sql
@@ -46,7 +45,19 @@ promote-admin: ## Torna um usuário admin da plataforma: make promote-admin emai
 worker: ## Roda só os workers da fila (opcional: a API já roda os workers)
 	go run ./cmd/worker
 
+# O Mailpit NÃO pode ser instalado com "go install": essa versão ("dev") vem
+# sem a interface web e a página fica em branco. Use o binário oficial.
+MAILPIT_INSTALL = sudo bash < <(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)
+
 mailpit: ## SMTP de desenvolvimento: e-mails em http://localhost:8025
+	@if ! command -v mailpit >/dev/null; then \
+		echo "Mailpit não encontrado. Instale com:"; \
+		echo '  $(MAILPIT_INSTALL)'; exit 1; \
+	elif mailpit version 2>/dev/null | grep -q " dev "; then \
+		echo "Este Mailpit foi instalado com 'go install' e vem sem a interface web."; \
+		echo "Apague o binário (veja onde está com: which mailpit) e instale o oficial:"; \
+		echo '  $(MAILPIT_INSTALL)'; exit 1; \
+	fi
 	mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025
 
 openapi: ## Gera openapi.json (o front gera os tipos TypeScript a partir dele)
