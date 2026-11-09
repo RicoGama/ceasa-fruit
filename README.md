@@ -32,7 +32,7 @@ ceasa-fruit/
 ├── web/                # front em Nuxt (ver web/README.md)
 ├── docker/             # inicialização do Postgres no Docker
 ├── scripts/            # db-setup-local.sql (Postgres sem Docker)
-├── Caddyfile           # vhosts locais: ceasa-fruit.test e api.ceasa-fruit.test
+├── Caddyfile           # vhosts locais: ceasa-fruit.test:6240 e api.ceasa-fruit.test:6240
 └── docker-compose.yml  # PostgreSQL de desenvolvimento (+ banco ceasa_test)
 ```
 
@@ -83,11 +83,12 @@ cd web && npm install && npm run dev
 
 Abra http://localhost:3000, crie uma conta e use o sistema.
 
-### URL local com vhost (opcional): http://ceasa-fruit.test
+### URL local com vhost (opcional): http://ceasa-fruit.test:6240
 
-Em vez de `localhost:3000`, dá para usar `http://ceasa-fruit.test` (front) e
-`http://api.ceasa-fruit.test/docs` (API). Um proxy, o [Caddy](https://caddyserver.com),
-atende na porta 80 e repassa para o Nuxt e para o Go (veja o `Caddyfile` na raiz).
+Em vez de `localhost:3000`, dá para usar `http://ceasa-fruit.test:6240` (front) e
+`http://api.ceasa-fruit.test:6240/docs` (API). Um proxy, o [Caddy](https://caddyserver.com),
+atende na porta 6240 e repassa para o Nuxt e para o Go (veja o `Caddyfile` na raiz).
+A porta 6240 convive com um Nginx/Apache na porta 80 e não precisa de `sudo`.
 
 **1. Apontar os nomes para a sua máquina** (uma vez):
 
@@ -101,17 +102,11 @@ echo "127.0.0.1 ceasa-fruit.test api.ceasa-fruit.test" | sudo tee -a /etc/hosts
 sudo apt install caddy
 ```
 
-O pacote do Ubuntu já sobe um Caddy próprio como serviço, ocupando a porta 80.
-Desligue-o, porque vamos usar o do projeto:
+O pacote do Ubuntu sobe um Caddy como serviço do sistema. Não precisamos dele
+(usamos o do projeto), então pode desligar:
 
 ```bash
 sudo systemctl disable --now caddy
-```
-
-Permita que o Caddy use a porta 80 sem `sudo`:
-
-```bash
-sudo setcap cap_net_bind_service=+ep "$(which caddy)"
 ```
 
 **3. Rodar** (na raiz do projeto, com API e front já rodando em outros terminais):
@@ -120,7 +115,7 @@ sudo setcap cap_net_bind_service=+ep "$(which caddy)"
 caddy run
 ```
 
-Abra http://ceasa-fruit.test. O hot reload do Nuxt funciona pelo vhost também.
+Abra http://ceasa-fruit.test:6240. O hot reload do Nuxt funciona pelo vhost também.
 
 > Por que `.test` e não `.local`? O `.local` é reservado para descoberta de
 > dispositivos na rede (mDNS) e pode demorar ou falhar para resolver. O `.test`
