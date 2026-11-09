@@ -1,0 +1,19 @@
+# Vhosts locais de desenvolvimento (Caddy: https://caddyserver.com).
+#
+#   http://ceasa-fruit.test      -> front (Nuxt, :3000), que repassa /api para o Go
+#   http://api.ceasa-fruit.test  -> API em Go (:8080), para abrir o /docs
+#
+# Os nomes precisam apontar para 127.0.0.1 no /etc/hosts (ver README).
+# Uso, na raiz do projeto: caddy run
+#
+# ".test" é um domínio reservado para testes (RFC 2606): nunca existirá na
+# internet. "http://" no início desliga o HTTPS automático do Caddy, porque o
+# cookie de sessão em desenvolvimento já é configurado sem Secure.
+
+http://ceasa-fruit.test {
+	reverse_proxy localhost:3000
+}
+
+http://api.ceasa-fruit.test {
+	reverse_proxy localhost:8080
+}

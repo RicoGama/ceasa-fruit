@@ -14,7 +14,7 @@ npm install
 npm run dev
 ```
 
-Abra http://localhost:3000.
+Abra http://localhost:3000 (ou http://ceasa-fruit.test, se configurou o vhost; ver README da raiz).
 
 ## Como o front fala com a API
 

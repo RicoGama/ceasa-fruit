@@ -44,5 +44,12 @@ export default defineNuxtConfig({
     '/api/**': { proxy: `${process.env.NUXT_API_URL ?? 'http://localhost:8080'}/**` },
   },
 
+  devServer: {
+    // O servidor de desenvolvimento só aceita "localhost" por segurança
+    // (páginas e a conexão de hot reload). Liberamos o vhost local servido
+    // pelo Caddy (ver Caddyfile na raiz do projeto).
+    allowedHosts: ['ceasa-fruit.test'],
+  },
+
   compatibilityDate: '2026-11-01',
 })

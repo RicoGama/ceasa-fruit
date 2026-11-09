@@ -32,6 +32,7 @@ ceasa-fruit/
 ├── web/                # front em Nuxt (ver web/README.md)
 ├── docker/             # inicialização do Postgres no Docker
 ├── scripts/            # db-setup-local.sql (Postgres sem Docker)
+├── Caddyfile           # vhosts locais: ceasa-fruit.test e api.ceasa-fruit.test
 └── docker-compose.yml  # PostgreSQL de desenvolvimento (+ banco ceasa_test)
 ```
 
@@ -81,6 +82,49 @@ cd web && npm install && npm run dev
 ```
 
 Abra http://localhost:3000, crie uma conta e use o sistema.
+
+### URL local com vhost (opcional): http://ceasa-fruit.test
+
+Em vez de `localhost:3000`, dá para usar `http://ceasa-fruit.test` (front) e
+`http://api.ceasa-fruit.test/docs` (API). Um proxy, o [Caddy](https://caddyserver.com),
+atende na porta 80 e repassa para o Nuxt e para o Go (veja o `Caddyfile` na raiz).
+
+**1. Apontar os nomes para a sua máquina** (uma vez):
+
+```bash
+echo "127.0.0.1 ceasa-fruit.test api.ceasa-fruit.test" | sudo tee -a /etc/hosts
+```
+
+**2. Instalar o Caddy** (uma vez). No Ubuntu/Debian:
+
+```bash
+sudo apt install caddy
+```
+
+O pacote do Ubuntu já sobe um Caddy próprio como serviço, ocupando a porta 80.
+Desligue-o, porque vamos usar o do projeto:
+
+```bash
+sudo systemctl disable --now caddy
+```
+
+Permita que o Caddy use a porta 80 sem `sudo`:
+
+```bash
+sudo setcap cap_net_bind_service=+ep "$(which caddy)"
+```
+
+**3. Rodar** (na raiz do projeto, com API e front já rodando em outros terminais):
+
+```bash
+caddy run
+```
+
+Abra http://ceasa-fruit.test. O hot reload do Nuxt funciona pelo vhost também.
+
+> Por que `.test` e não `.local`? O `.local` é reservado para descoberta de
+> dispositivos na rede (mDNS) e pode demorar ou falhar para resolver. O `.test`
+> é reservado para testes e nunca vai existir na internet.
 
 ### Endereços da API
 
