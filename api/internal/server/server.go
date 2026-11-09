@@ -14,8 +14,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
-	"github.com/RicoGama/seasa-fruit/api/internal/db"
-	"github.com/RicoGama/seasa-fruit/api/internal/supplier"
+	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
 )
 
 // Pinger is anything that can check the database connection.
@@ -55,7 +55,7 @@ func New(d Deps) http.Handler {
 	// Huma sits on top of the same chi router. It also serves:
 	//   /docs          -> interactive API documentation
 	//   /openapi.json  -> the OpenAPI spec (used to generate the Nuxt client)
-	api := humachi.New(r, huma.DefaultConfig("SEASA Fruit API", "0.1.0"))
+	api := humachi.New(r, huma.DefaultConfig("CEASA Fruit API", "0.1.0"))
 
 	supplier.Register(api, db.New(d.DB))
 

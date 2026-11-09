@@ -1,4 +1,4 @@
-# SEASA Fruit
+# CEASA Fruit
 
 Sistema de controle de vendas de LFV (Legumes, Frutas e Verduras).
 
@@ -25,7 +25,7 @@ Convenção: **todo o código (identificadores, banco, rotas, JSON, comentários
 ## Estrutura
 
 ```
-seasa-fruit/
+ceasa-fruit/
 ├── api/                # API em Go (ver api/README.md)
 ├── web/                # (a fazer) Nuxt
 └── docker-compose.yml  # PostgreSQL de desenvolvimento

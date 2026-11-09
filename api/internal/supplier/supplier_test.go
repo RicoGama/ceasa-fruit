@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/RicoGama/seasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 )
 
 // fakeStore is an in-memory Store. Because the handlers depend on the Store

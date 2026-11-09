@@ -20,8 +20,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/RicoGama/seasa-fruit/api/internal/db"
-	"github.com/RicoGama/seasa-fruit/api/internal/document"
+	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/document"
 )
 
 // Store is what the handlers need from the database.

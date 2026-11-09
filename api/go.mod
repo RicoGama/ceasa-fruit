@@ -1,4 +1,4 @@
-module github.com/RicoGama/seasa-fruit/api
+module github.com/RicoGama/ceasa-fruit/api
 
 go 1.26.0
 

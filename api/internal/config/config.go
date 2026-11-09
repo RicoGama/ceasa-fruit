@@ -21,7 +21,7 @@ type Config struct {
 func Load() Config {
 	return Config{
 		Port:        getEnv("PORT", "8080"),
-		DatabaseURL: getEnv("DATABASE_URL", "postgres://seasa:seasa@localhost:5432/seasa?sslmode=disable"),
+		DatabaseURL: getEnv("DATABASE_URL", "postgres://ceasa:ceasa@localhost:5432/ceasa?sslmode=disable"),
 		CORSOrigins: strings.Split(getEnv("CORS_ORIGINS", "http://localhost:3000"), ","),
 	}
 }

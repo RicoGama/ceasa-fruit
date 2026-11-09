@@ -3,17 +3,17 @@
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: seasa-postgres
+    container_name: ceasa-postgres
     environment:
-      POSTGRES_USER: seasa
-      POSTGRES_PASSWORD: seasa
-      POSTGRES_DB: seasa
+      POSTGRES_USER: ceasa
+      POSTGRES_PASSWORD: ceasa
+      POSTGRES_DB: ceasa
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U seasa -d seasa"]
+      test: ["CMD-SHELL", "pg_isready -U ceasa -d ceasa"]
       interval: 5s
       timeout: 3s
       retries: 10
