@@ -1,7 +1,7 @@
-// Package config loads application settings from environment variables.
+// Package config carrega as configurações da aplicação a partir de variáveis de ambiente.
 //
-// Go projects usually avoid configuration frameworks: os.LookupEnv plus
-// defaults covers most needs and keeps everything explicit.
+// Em Go é comum evitar frameworks de configuração: os.LookupEnv + valores
+// padrão resolvem a maioria dos casos e deixam tudo explícito.
 package config
 
 import (
@@ -9,15 +9,15 @@ import (
 	"strings"
 )
 
-// Config holds everything the API needs to start.
-// Capitalized fields are "exported" (visible outside this package).
+// Config reúne tudo o que a API precisa para subir.
+// Campos com letra maiúscula são "exportados" (visíveis fora deste pacote).
 type Config struct {
 	Port        string
 	DatabaseURL string
 	CORSOrigins []string
 }
 
-// Load builds a Config from the environment, falling back to dev defaults.
+// Load monta uma Config a partir do ambiente, com padrões de desenvolvimento.
 func Load() Config {
 	return Config{
 		Port:        getEnv("PORT", "8080"),
@@ -26,7 +26,7 @@ func Load() Config {
 	}
 }
 
-// getEnv starts with a lowercase letter, so it is private to this package.
+// getEnv começa com letra minúscula, então é privada deste pacote.
 func getEnv(key, fallback string) string {
 	if v, ok := os.LookupEnv(key); ok && v != "" {
 		return v

@@ -4,16 +4,16 @@
 *.out
 coverage.*
 
-# Environment
+# Ambiente
 .env
 .env.local
 
-# Editors / OS
+# Editores / SO
 .idea/
 .vscode/
 .DS_Store
 
-# Frontend (Nuxt) - future
+# Front (Nuxt) - futuro
 node_modules/
 .nuxt/
 .output/

@@ -1,5 +1,5 @@
-# PostgreSQL for local development.
-# Usage: docker compose up -d
+# PostgreSQL para desenvolvimento local.
+# Uso: docker compose up -d
 services:
   postgres:
     image: postgres:17-alpine

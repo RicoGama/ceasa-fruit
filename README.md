@@ -20,7 +20,7 @@ Sistema de controle de vendas de LFV (Legumes, Frutas e Verduras).
 | Banco | PostgreSQL + [sqlc](https://sqlc.dev) (SQL → Go tipado) + [goose](https://github.com/pressly/goose) (migrations) |
 | Front | Nuxt 4 (SPA + PWA) + Nuxt UI / Tailwind — *a fazer* |
 
-Convenção: **todo o código (identificadores, banco, rotas, JSON, comentários) em inglês**; documentação de estudo em português.
+Convenção: **código em inglês** (identificadores, banco, rotas, JSON); **comentários e documentação em português**.
 
 ## Estrutura
 

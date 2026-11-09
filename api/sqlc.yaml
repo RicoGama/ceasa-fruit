@@ -1,7 +1,7 @@
-# sqlc reads the schema (migrations) + queries and generates type-safe Go code.
-# Each "-- name: X :kind" block in internal/db/queries becomes a Go method:
-#   :one = single row, :many = slice, :exec = nothing, :execrows = affected rows.
-# sqlc.narg('x') marks a nullable parameter (becomes a pointer in Go).
+# O sqlc lê o schema (migrations) + queries e gera código Go tipado.
+# Cada bloco "-- name: X :tipo" em internal/db/queries vira um método Go:
+#   :one = uma linha, :many = lista, :exec = nada, :execrows = linhas afetadas.
+# sqlc.narg('x') marca um parâmetro que pode ser NULL (vira ponteiro em Go).
 version: "2"
 sql:
   - engine: postgresql
@@ -12,8 +12,8 @@ sql:
         package: db
         out: internal/db
         sql_package: pgx/v5
-        emit_pointers_for_null_types: true # NULL columns become *string, *bool...
-        emit_interface: true               # generates the Querier interface (handy for tests)
+        emit_pointers_for_null_types: true # coluna NULL vira *string, *bool...
+        emit_interface: true               # gera a interface Querier (útil para testes)
         overrides:
           - db_type: timestamptz
             go_type: time.Time

@@ -1,4 +1,4 @@
-// Package server wires the HTTP router, middlewares and all API routes.
+// Package server monta o roteador HTTP, os middlewares e todas as rotas da API.
 package server
 
 import (
@@ -18,30 +18,30 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
 )
 
-// Pinger is anything that can check the database connection.
-// *pgxpool.Pool implements it; tests can use a fake.
+// Pinger é qualquer coisa capaz de testar a conexão com o banco.
+// *pgxpool.Pool implementa; os testes podem usar um falso.
 type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// Deps groups what the server needs. Passing dependencies explicitly
-// (instead of globals) makes the code easier to follow and to test.
+// Deps agrupa o que o servidor precisa. Passar dependências explicitamente
+// (em vez de variáveis globais) deixa o código mais fácil de seguir e testar.
 type Deps struct {
 	Logger      *slog.Logger
-	DB          db.DBTX // the connection pool, used by the sqlc queries
+	DB          db.DBTX // o pool de conexões, usado pelas queries do sqlc
 	Pinger      Pinger
 	CORSOrigins []string
 }
 
-// New returns the root http.Handler of the application.
+// New devolve o http.Handler raiz da aplicação.
 func New(d Deps) http.Handler {
 	r := chi.NewRouter()
 
-	// Middlewares wrap every request, in the order they are added.
-	r.Use(middleware.RequestID) // adds an X-Request-Id to each request
-	r.Use(middleware.RealIP)    // uses X-Forwarded-For when behind a proxy
+	// Middlewares envolvem cada requisição, na ordem em que são adicionados.
+	r.Use(middleware.RequestID) // adiciona um X-Request-Id em cada requisição
+	r.Use(middleware.RealIP)    // usa o X-Forwarded-For quando atrás de um proxy
 	r.Use(requestLogger(d.Logger))
-	r.Use(middleware.Recoverer) // turns a panic into a 500 instead of crashing
+	r.Use(middleware.Recoverer) // transforma um panic em 500 em vez de derrubar o servidor
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: d.CORSOrigins,
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -49,12 +49,12 @@ func New(d Deps) http.Handler {
 		MaxAge:         300,
 	}))
 
-	// Plain chi + net/http route, written by hand on purpose (see healthHandler).
+	// Rota com chi + net/http puro, escrita à mão de propósito (ver healthHandler).
 	r.Get("/health", healthHandler(d.Pinger))
 
-	// Huma sits on top of the same chi router. It also serves:
-	//   /docs          -> interactive API documentation
-	//   /openapi.json  -> the OpenAPI spec (used to generate the Nuxt client)
+	// O Huma fica por cima do mesmo roteador chi. Ele também serve:
+	//   /docs          -> documentação interativa da API
+	//   /openapi.json  -> a especificação OpenAPI (usada para gerar o cliente do Nuxt)
 	api := humachi.New(r, huma.DefaultConfig("CEASA Fruit API", "0.1.0"))
 
 	supplier.Register(api, db.New(d.DB))
@@ -62,10 +62,10 @@ func New(d Deps) http.Handler {
 	return r
 }
 
-// healthHandler shows what a handler looks like WITHOUT Huma:
-// you receive the raw ResponseWriter and Request and do everything yourself.
+// healthHandler mostra como é um handler SEM o Huma:
+// você recebe o ResponseWriter e o Request crus e faz tudo sozinho.
 //
-// It returns a function (a closure) that "captures" the pinger variable.
+// Ele devolve uma função (uma closure) que "captura" a variável p.
 func healthHandler(p Pinger) http.HandlerFunc {
 	type response struct {
 		Status   string `json:"status"`
@@ -84,18 +84,18 @@ func healthHandler(p Pinger) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(status) // headers must be set BEFORE WriteHeader
+		w.WriteHeader(status) // headers precisam ser definidos ANTES do WriteHeader
 		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 
-// requestLogger is a middleware: a function that takes the next handler and
-// returns a new handler that does something before/after calling it.
+// requestLogger é um middleware: uma função que recebe o próximo handler e
+// devolve um novo handler que faz algo antes/depois de chamá-lo.
 func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			// Wrap the writer so we can read the status code afterwards.
+			// Envolve o writer para conseguirmos ler o status code depois.
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
 			next.ServeHTTP(ww, r)

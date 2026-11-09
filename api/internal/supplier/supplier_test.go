@@ -15,8 +15,8 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 )
 
-// fakeStore is an in-memory Store. Because the handlers depend on the Store
-// interface (not on Postgres), these tests run without a database.
+// fakeStore é um Store em memória. Como os handlers dependem da interface
+// Store (e não do Postgres), estes testes rodam sem banco de dados.
 type fakeStore struct {
 	rows   map[int64]db.Supplier
 	nextID int64
@@ -85,7 +85,7 @@ func (f *fakeStore) DeactivateSupplier(_ context.Context, id int64) (int64, erro
 	return 1, nil
 }
 
-// newTestAPI spins up an in-memory Huma API with only the supplier routes.
+// newTestAPI sobe uma API Huma em memória só com as rotas de fornecedor.
 func newTestAPI(t *testing.T) (humatest.TestAPI, *fakeStore) {
 	_, api := humatest.New(t)
 	store := newFakeStore()
@@ -132,7 +132,7 @@ func TestCreateSupplierValidation(t *testing.T) {
 	cases := []struct {
 		name string
 		body map[string]any
-		want string // fragment expected in the error response
+		want string // trecho esperado na resposta de erro
 	}{
 		{"invalid cnpj", map[string]any{"name": "Abc", "document": "11.222.333/0001-80"}, "invalid CPF or CNPJ"},
 		{"name too short", map[string]any{"name": "A", "document": "52998224725"}, "body.name"},
@@ -181,7 +181,7 @@ func TestDeactivateAndList(t *testing.T) {
 		t.Fatalf("delete status = %d", resp.Code)
 	}
 
-	// Default status filter is "active", so the list must now be empty ([] not null).
+	// O filtro padrão de status é "active", então a lista agora deve vir vazia ([] e não null).
 	resp := api.Get("/suppliers")
 	if !strings.Contains(resp.Body.String(), `"items":[]`) {
 		t.Errorf("expected empty items, got %s", resp.Body.String())

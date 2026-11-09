@@ -1,12 +1,12 @@
-// Package supplier exposes the supplier CRUD endpoints using Huma.
+// Package supplier expõe os endpoints de CRUD de fornecedores usando o Huma.
 //
-// How Huma works, in short: every endpoint is a plain Go function
+// Como o Huma funciona, resumindo: cada endpoint é uma função Go comum
 //
-//	func(ctx context.Context, in *SomeInput) (*SomeOutput, error)
+//	func(ctx context.Context, in *AlgumInput) (*AlgumOutput, error)
 //
-// Huma reads path/query/header/body into SomeInput (using struct tags),
-// validates it, calls the function, and serializes SomeOutput back to JSON.
-// The same tags are used to generate the OpenAPI document at /openapi.json.
+// O Huma lê path/query/header/body para dentro de AlgumInput (usando as struct
+// tags), valida, chama a função e serializa AlgumOutput de volta para JSON.
+// As mesmas tags geram o documento OpenAPI em /openapi.json.
 package supplier
 
 import (
@@ -24,10 +24,10 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/document"
 )
 
-// Store is what the handlers need from the database.
-// Declaring a small interface on the consumer side is idiomatic Go
-// ("accept interfaces, return structs"): *db.Queries satisfies it in
-// production, and tests can pass a fake implementation.
+// Store é o que os handlers precisam do banco de dados.
+// Declarar uma interface pequena do lado de quem USA é Go idiomático
+// ("aceite interfaces, retorne structs"): *db.Queries satisfaz essa interface
+// em produção, e os testes podem passar uma implementação falsa.
 type Store interface {
 	CreateSupplier(ctx context.Context, arg db.CreateSupplierParams) (db.Supplier, error)
 	GetSupplier(ctx context.Context, id int64) (db.Supplier, error)
@@ -38,11 +38,11 @@ type Store interface {
 }
 
 // ---------------------------------------------------------------------------
-// API types (what goes over the wire). Kept separate from db.Supplier so the
-// database schema and the public JSON contract can evolve independently.
+// Tipos da API (o que trafega no HTTP). Ficam separados de db.Supplier para
+// que o schema do banco e o contrato JSON público possam evoluir independentes.
 // ---------------------------------------------------------------------------
 
-// Supplier is the JSON representation returned by the API.
+// Supplier é a representação JSON devolvida pela API.
 type Supplier struct {
 	ID        int64     `json:"id" example:"1"`
 	Name      string    `json:"name" example:"Sítio Boa Colheita"`
@@ -57,12 +57,12 @@ type Supplier struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// SupplierFields are the editable fields, shared by create and update.
+// SupplierFields são os campos editáveis, compartilhados entre criar e atualizar.
 //
-// Tag cheat sheet:
-//   - json:"x,omitempty"  -> field is optional in the request
-//   - minLength/maxLength/pattern/format -> validated by Huma automatically
-//   - doc/example         -> show up in the generated docs
+// Colinha das tags:
+//   - json:"x,omitempty"  -> campo opcional na requisição
+//   - minLength/maxLength/pattern/format -> o Huma valida automaticamente
+//   - doc/example         -> aparecem na documentação gerada
 type SupplierFields struct {
 	Name     string  `json:"name" minLength:"2" maxLength:"120"`
 	Document string  `json:"document" maxLength:"18" doc:"CPF or CNPJ (numeric or alphanumeric), with or without mask" example:"11.222.333/0001-81"`
@@ -73,8 +73,8 @@ type SupplierFields struct {
 	Notes    *string `json:"notes,omitempty" maxLength:"1000"`
 }
 
-// normalize cleans the input before it hits the database and returns
-// validation errors that struct tags cannot express (CPF/CNPJ check digits).
+// normalize limpa a entrada antes de ir para o banco e devolve os erros de
+// validação que as struct tags não conseguem expressar (dígitos do CPF/CNPJ).
 func (f *SupplierFields) normalize() []error {
 	f.Name = strings.TrimSpace(f.Name)
 	f.Document = document.Normalize(f.Document)
@@ -99,7 +99,7 @@ func (f *SupplierFields) normalize() []error {
 	return nil
 }
 
-// cleanOptional trims spaces and turns "" into nil (stored as NULL).
+// cleanOptional tira espaços das pontas e transforma "" em nil (gravado como NULL).
 func cleanOptional(s *string) *string {
 	if s == nil {
 		return nil
@@ -111,7 +111,7 @@ func cleanOptional(s *string) *string {
 	return &v
 }
 
-// --- Inputs and outputs for each operation -----------------------------------
+// --- Entradas e saídas de cada operação --------------------------------------
 
 type listSuppliersInput struct {
 	Search string `query:"search" maxLength:"100" doc:"Filter by name (contains, accent-insensitive) or document (prefix)"`
@@ -141,8 +141,8 @@ type createInput struct {
 	Body SupplierFields
 }
 
-// Resolve is called by Huma after tag validation (it implements huma.Resolver).
-// The pointer receiver (*createInput) lets us modify the input in place.
+// Resolve é chamado pelo Huma depois da validação das tags (implementa huma.Resolver).
+// O receiver ponteiro (*createInput) permite alterar a entrada no lugar.
 func (in *createInput) Resolve(huma.Context) []error {
 	return in.Body.normalize()
 }
@@ -150,7 +150,7 @@ func (in *createInput) Resolve(huma.Context) []error {
 type updateInput struct {
 	ID   int64 `path:"id" minimum:"1"`
 	Body struct {
-		SupplierFields      // embedded struct: its fields are "promoted" (flattened in JSON)
+		SupplierFields      // struct embutida: os campos dela são "promovidos" (achatados no JSON)
 		Active         bool `json:"active"`
 	}
 }
@@ -167,7 +167,7 @@ type handler struct {
 	store Store
 }
 
-// Register adds all supplier routes to the Huma API.
+// Register adiciona todas as rotas de fornecedor na API do Huma.
 func Register(api huma.API, store Store) {
 	h := &handler{store: store}
 	tags := []string{"Suppliers"}
@@ -216,17 +216,17 @@ func Register(api huma.API, store Store) {
 	}, h.deactivate)
 }
 
-// list is a *method* on handler: (h *handler) is the receiver, like "this".
+// list é um *método* de handler: (h *handler) é o receiver, parecido com o "this".
 func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppliersOutput, error) {
 	var search *string
 	if s := strings.TrimSpace(in.Search); s != "" {
 		search = &s
 	}
 
-	var active *bool // nil = no filter ("all")
+	var active *bool // nil = sem filtro ("all")
 	switch in.Status {
 	case "active":
-		active = new(true) // Go 1.26+: new(expr) returns a pointer to the value
+		active = new(true) // Go 1.26+: new(expr) devolve um ponteiro para o valor
 	case "inactive":
 		active = new(false)
 	}
@@ -243,7 +243,7 @@ func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppli
 	}
 
 	out := &listSuppliersOutput{}
-	// make with length 0 so an empty result is encoded as [] instead of null.
+	// make com tamanho 0 para que um resultado vazio vire [] no JSON, e não null.
 	out.Body.Items = make([]Supplier, 0, len(rows))
 	for _, r := range rows {
 		out.Body.Items = append(out.Body.Items, toAPI(r))
@@ -286,7 +286,7 @@ func (h *handler) update(ctx context.Context, in *updateInput) (*supplierOutput,
 	return &supplierOutput{Body: toAPI(s)}, nil
 }
 
-// deactivate returns *struct{}: an empty output, i.e. no response body.
+// deactivate devolve *struct{}: uma saída vazia, ou seja, resposta sem corpo.
 func (h *handler) deactivate(ctx context.Context, in *idInput) (*struct{}, error) {
 	n, err := h.store.DeactivateSupplier(ctx, in.ID)
 	if err != nil {
@@ -299,14 +299,14 @@ func (h *handler) deactivate(ctx context.Context, in *idInput) (*struct{}, error
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Funções auxiliares
 // ---------------------------------------------------------------------------
 
-// uniqueViolation is the PostgreSQL error code for a UNIQUE constraint failure.
+// uniqueViolation é o código de erro do PostgreSQL quando uma constraint UNIQUE falha.
 const uniqueViolation = "23505"
 
-// mapError translates database errors into HTTP errors.
-// Anything unexpected is returned as-is and Huma answers 500.
+// mapError traduz erros do banco em erros HTTP.
+// Qualquer coisa inesperada volta como está e o Huma responde 500.
 func mapError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return huma.Error404NotFound("supplier not found")

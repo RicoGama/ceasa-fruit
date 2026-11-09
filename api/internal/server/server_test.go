@@ -9,12 +9,12 @@ import (
 	"testing"
 )
 
-// fakePinger lets us simulate a healthy or broken database.
+// fakePinger permite simular um banco saudável ou fora do ar.
 type fakePinger struct{ err error }
 
 func (f fakePinger) Ping(context.Context) error { return f.err }
 
-// Testing a plain net/http handler: build a request, record the response.
+// Testando um handler net/http puro: monta a requisição e grava a resposta.
 func TestHealthHandler(t *testing.T) {
 	cases := []struct {
 		name       string

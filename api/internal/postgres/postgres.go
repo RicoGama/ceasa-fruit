@@ -1,4 +1,4 @@
-// Package postgres handles the database connection and migrations.
+// Package postgres cuida da conexão com o banco e das migrations.
 package postgres
 
 import (
@@ -12,23 +12,23 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-// The //go:embed directive copies the .sql files INTO the binary at compile time,
-// so the final executable does not need the migrations folder on the server.
+// A diretiva //go:embed copia os arquivos .sql para DENTRO do binário na compilação,
+// então o executável final não precisa da pasta migrations no servidor.
 //
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
-// Connect opens a connection pool (connections are reused across requests).
+// Connect abre um pool de conexões (as conexões são reaproveitadas entre requisições).
 func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
-		// %w wraps the original error so callers can inspect it with errors.Is/As.
+		// %w "embrulha" o erro original: quem chamar pode inspecioná-lo com errors.Is/As.
 		return nil, fmt.Errorf("creating pool: %w", err)
 	}
 
-	// pgxpool.New does not actually connect; Ping makes sure the database is reachable.
+	// pgxpool.New não conecta de fato; o Ping garante que o banco está acessível.
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel() // defer runs when the function returns, no matter how.
+	defer cancel() // defer roda quando a função retornar, aconteça o que acontecer.
 
 	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
@@ -37,15 +37,15 @@ func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// Migrate applies pending migrations (goose tracks applied ones in the
-// goose_db_version table).
+// Migrate aplica as migrations pendentes (o goose registra as já aplicadas
+// na tabela goose_db_version).
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	goose.SetBaseFS(migrationsFS)
 	if err := goose.SetDialect("postgres"); err != nil {
 		return err
 	}
 
-	// goose works with database/sql; pgx's stdlib package bridges the two.
+	// O goose trabalha com database/sql; o pacote stdlib do pgx faz essa ponte.
 	db := stdlib.OpenDBFromPool(pool)
 	defer db.Close()
 

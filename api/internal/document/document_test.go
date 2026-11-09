@@ -2,7 +2,7 @@ package document
 
 import "testing"
 
-// A "table-driven" test: the most common pattern in Go. A slice of cases and a loop.
+// Teste "table-driven": o padrão mais comum em Go. Uma lista de casos e um loop.
 func TestIsValid(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -24,7 +24,7 @@ func TestIsValid(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		// t.Run creates a named subtest, shown separately in `go test -v`.
+		// t.Run cria um subteste com nome, mostrado separado no `go test -v`.
 		t.Run(c.name, func(t *testing.T) {
 			got := IsValid(Normalize(c.doc))
 			if got != c.valid {

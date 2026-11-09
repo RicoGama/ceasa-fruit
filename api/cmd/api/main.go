@@ -1,7 +1,7 @@
-// Command api starts the CEASA Fruit HTTP API.
+// Command api sobe a API HTTP do CEASA Fruit.
 //
-// Convention: executables live in cmd/<name>/main.go and the rest of the code
-// in internal/ (packages under internal/ cannot be imported by other modules).
+// Convenção: executáveis ficam em cmd/<nome>/main.go e o resto do código em
+// internal/ (pacotes dentro de internal/ não podem ser importados por outros módulos).
 package main
 
 import (
@@ -22,8 +22,8 @@ import (
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// main stays tiny: the real work happens in run, which returns an error.
-	// That makes error handling uniform (no os.Exit scattered around).
+	// O main fica pequeno: o trabalho de verdade acontece em run, que devolve um erro.
+	// Assim o tratamento de erro fica uniforme (sem os.Exit espalhado pelo código).
 	if err := run(logger); err != nil {
 		logger.Error("api stopped with error", "error", err)
 		os.Exit(1)
@@ -33,8 +33,8 @@ func main() {
 func run(logger *slog.Logger) error {
 	cfg := config.Load()
 
-	// ctx is canceled when the process receives Ctrl+C (SIGINT) or SIGTERM
-	// (what Docker/Kubernetes send on shutdown).
+	// ctx é cancelado quando o processo recebe Ctrl+C (SIGINT) ou SIGTERM
+	// (o que o Docker/Kubernetes enviam ao desligar).
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -57,22 +57,22 @@ func run(logger *slog.Logger) error {
 			Pinger:      pool,
 			CORSOrigins: cfg.CORSOrigins,
 		}),
-		// Timeouts protect the server from slow or stuck clients.
+		// Timeouts protegem o servidor de clientes lentos ou travados.
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 
-	// ListenAndServe blocks, so it runs in a goroutine (a lightweight thread).
-	// Errors come back through a channel.
+	// ListenAndServe bloqueia, então roda numa goroutine (uma "thread" leve).
+	// Os erros voltam por um channel.
 	errCh := make(chan error, 1)
 	go func() {
 		logger.Info("listening", "addr", srv.Addr, "docs", "http://localhost:"+cfg.Port+"/docs")
 		errCh <- srv.ListenAndServe()
 	}()
 
-	// select waits for whichever happens first.
+	// select espera o que acontecer primeiro.
 	select {
 	case err := <-errCh:
 		if !errors.Is(err, http.ErrServerClosed) {
@@ -82,8 +82,8 @@ func run(logger *slog.Logger) error {
 		logger.Info("shutting down...")
 	}
 
-	// Graceful shutdown: stop accepting new requests and wait up to 10s
-	// for the in-flight ones to finish.
+	// Graceful shutdown: para de aceitar novas requisições e espera até 10s
+	// para as que estão em andamento terminarem.
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
