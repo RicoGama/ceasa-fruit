@@ -65,6 +65,19 @@ Postgres. No Ubuntu/Debian ela já vem junto; no Fedora instale `postgresql-cont
 make db-up
 ```
 
+### E-mail em desenvolvimento (Mailpit)
+
+Todo e-mail do sistema sai por **SMTP**. Em desenvolvimento usamos o
+[Mailpit](https://mailpit.axllent.org): um SMTP de mentira que captura os
+e-mails e mostra numa página, sem enviar nada para a internet.
+O `make tools` já instala; para rodar (em outro terminal):
+
+```bash
+make mailpit
+```
+
+Os e-mails aparecem em http://localhost:8025. (Com Docker, o `make db-up` já sobe o Mailpit.)
+
 ### Subindo a API
 
 ```bash
@@ -122,6 +135,8 @@ Abra http://ceasa-fruit.test:6240. O hot reload do Nuxt funciona pelo vhost tamb
 > é reservado para testes e nunca vai existir na internet.
 
 ### Endereços da API
+
+- http://localhost:3000/admin/queues — painel das filas (River UI), só para o admin da plataforma
 
 - http://localhost:8080/docs — documentação interativa (dá para testar os endpoints)
 - http://localhost:8080/health — health check

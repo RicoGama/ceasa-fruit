@@ -62,3 +62,36 @@ WHERE token_hash = @token_hash;
 -- name: DeleteSession :exec
 DELETE FROM sessions
 WHERE token_hash = @token_hash;
+
+-- name: CreatePasswordResetToken :exec
+INSERT INTO password_reset_tokens (token_hash, user_id, expires_at)
+VALUES (@token_hash, @user_id, @expires_at);
+
+-- Marca o token como usado e devolve o usuário, numa operação só: dois
+-- pedidos simultâneos com o mesmo link não conseguem usá-lo duas vezes.
+-- name: ConsumePasswordResetToken :one
+UPDATE password_reset_tokens t
+SET used_at = now()
+FROM users u
+WHERE t.token_hash = @token_hash
+  AND t.used_at IS NULL
+  AND t.expires_at > now()
+  AND u.id = t.user_id
+  AND u.active
+RETURNING t.user_id;
+
+-- Depois de redefinir, os outros links pendentes deixam de valer.
+-- name: InvalidatePasswordResetTokens :exec
+UPDATE password_reset_tokens
+SET used_at = now()
+WHERE user_id = @user_id AND used_at IS NULL;
+
+-- name: UpdateUserPassword :exec
+UPDATE users
+SET password_hash = @password_hash, updated_at = now()
+WHERE id = @id;
+
+-- Encerra todas as sessões do usuário (ex.: depois de trocar a senha).
+-- name: DeleteUserSessions :exec
+DELETE FROM sessions
+WHERE user_id = @user_id;

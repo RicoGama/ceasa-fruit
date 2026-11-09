@@ -14,8 +14,12 @@ import (
 	"syscall"
 	"time"
 
+	"riverqueue.com/riverui"
+
 	"github.com/RicoGama/ceasa-fruit/api/internal/config"
+	"github.com/RicoGama/ceasa-fruit/api/internal/mail"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
+	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
 	"github.com/RicoGama/ceasa-fruit/api/internal/server"
 )
 
@@ -47,7 +51,43 @@ func run(logger *slog.Logger) error {
 	if err := postgres.Migrate(ctx, pool); err != nil {
 		return err
 	}
+	if err := queue.Migrate(ctx, pool); err != nil {
+		return err
+	}
 	logger.Info("database ready")
+
+	// Fila de jobs. Com WORKERS_ENABLED=true (padrão) este mesmo processo
+	// executa os jobs; senão ele só enfileira e o cmd/worker executa.
+	mailer, err := mail.NewSMTPMailer(cfg.SMTP)
+	if err != nil {
+		return err
+	}
+	q, err := queue.New(pool, queue.Options{Mailer: mailer, Logger: logger, RunWorkers: cfg.WorkersEnabled})
+	if err != nil {
+		return err
+	}
+	if cfg.WorkersEnabled {
+		if err := q.Start(ctx); err != nil {
+			return err
+		}
+		logger.Info("queue workers started", "smtp", cfg.SMTP.Host)
+	}
+
+	// Painel das filas (River UI), servido pela própria API em /admin/queues.
+	queueUI, err := riverui.NewHandler(&riverui.HandlerOpts{
+		Endpoints: riverui.NewEndpoints(q.Client, nil),
+		Logger:    logger,
+		Prefix:    "/admin/queues",
+		// Os argumentos dos jobs podem ter dados sensíveis (ex.: o link de
+		// redefinição de senha dentro do e-mail): ficam escondidos por padrão.
+		JobListHideArgsByDefault: true,
+	})
+	if err != nil {
+		return err
+	}
+	if err := queueUI.Start(ctx); err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
@@ -56,6 +96,9 @@ func run(logger *slog.Logger) error {
 			Pool:         pool,
 			CORSOrigins:  cfg.CORSOrigins,
 			CookieSecure: cfg.CookieSecure,
+			AppURL:       cfg.AppURL,
+			Queue:        q,
+			QueueUI:      queueUI,
 		}),
 		// Timeouts protegem o servidor de clientes lentos ou travados.
 		ReadHeaderTimeout: 5 * time.Second,
@@ -86,5 +129,12 @@ func run(logger *slog.Logger) error {
 	// para as que estão em andamento terminarem.
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return srv.Shutdown(shutdownCtx)
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		return err
+	}
+	// Depois do HTTP, a fila: espera os jobs em andamento terminarem.
+	if cfg.WorkersEnabled {
+		return q.Stop(shutdownCtx)
+	}
+	return nil
 }

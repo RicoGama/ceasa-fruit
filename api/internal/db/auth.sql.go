@@ -10,6 +10,27 @@ import (
 	"time"
 )
 
+const consumePasswordResetToken = `-- name: ConsumePasswordResetToken :one
+UPDATE password_reset_tokens t
+SET used_at = now()
+FROM users u
+WHERE t.token_hash = $1
+  AND t.used_at IS NULL
+  AND t.expires_at > now()
+  AND u.id = t.user_id
+  AND u.active
+RETURNING t.user_id
+`
+
+// Marca o token como usado e devolve o usuário, numa operação só: dois
+// pedidos simultâneos com o mesmo link não conseguem usá-lo duas vezes.
+func (q *Queries) ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) (int64, error) {
+	row := q.db.QueryRow(ctx, consumePasswordResetToken, tokenHash)
+	var user_id int64
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
 const createMembership = `-- name: CreateMembership :exec
 INSERT INTO memberships (organization_id, user_id, role)
 VALUES ($1, $2, $3)
@@ -43,6 +64,22 @@ func (q *Queries) CreateOrganization(ctx context.Context, name string) (Organiza
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const createPasswordResetToken = `-- name: CreatePasswordResetToken :exec
+INSERT INTO password_reset_tokens (token_hash, user_id, expires_at)
+VALUES ($1, $2, $3)
+`
+
+type CreatePasswordResetTokenParams struct {
+	TokenHash []byte
+	UserID    int64
+	ExpiresAt time.Time
+}
+
+func (q *Queries) CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) error {
+	_, err := q.db.Exec(ctx, createPasswordResetToken, arg.TokenHash, arg.UserID, arg.ExpiresAt)
+	return err
 }
 
 const createSession = `-- name: CreateSession :exec
@@ -105,6 +142,17 @@ WHERE token_hash = $1
 
 func (q *Queries) DeleteSession(ctx context.Context, tokenHash []byte) error {
 	_, err := q.db.Exec(ctx, deleteSession, tokenHash)
+	return err
+}
+
+const deleteUserSessions = `-- name: DeleteUserSessions :exec
+DELETE FROM sessions
+WHERE user_id = $1
+`
+
+// Encerra todas as sessões do usuário (ex.: depois de trocar a senha).
+func (q *Queries) DeleteUserSessions(ctx context.Context, userID int64) error {
+	_, err := q.db.Exec(ctx, deleteUserSessions, userID)
 	return err
 }
 
@@ -197,6 +245,18 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	return i, err
 }
 
+const invalidatePasswordResetTokens = `-- name: InvalidatePasswordResetTokens :exec
+UPDATE password_reset_tokens
+SET used_at = now()
+WHERE user_id = $1 AND used_at IS NULL
+`
+
+// Depois de redefinir, os outros links pendentes deixam de valer.
+func (q *Queries) InvalidatePasswordResetTokens(ctx context.Context, userID int64) error {
+	_, err := q.db.Exec(ctx, invalidatePasswordResetTokens, userID)
+	return err
+}
+
 const listUserOrganizations = `-- name: ListUserOrganizations :many
 SELECT o.id, o.name, o.status, m.role
 FROM memberships m
@@ -250,5 +310,21 @@ type SetSessionOrganizationParams struct {
 
 func (q *Queries) SetSessionOrganization(ctx context.Context, arg SetSessionOrganizationParams) error {
 	_, err := q.db.Exec(ctx, setSessionOrganization, arg.OrganizationID, arg.TokenHash)
+	return err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :exec
+UPDATE users
+SET password_hash = $1, updated_at = now()
+WHERE id = $2
+`
+
+type UpdateUserPasswordParams struct {
+	PasswordHash string
+	ID           int64
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
+	_, err := q.db.Exec(ctx, updateUserPassword, arg.PasswordHash, arg.ID)
 	return err
 }

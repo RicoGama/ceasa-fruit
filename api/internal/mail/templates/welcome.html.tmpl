@@ -1,0 +1,6 @@
+{{define "welcome.html"}}{{template "layout.header" .}}
+<p>Olá, {{.Data.Name}}!</p>
+<p>Sua conta foi criada e a empresa <strong>{{.Data.OrganizationName}}</strong> já está pronta para usar o CEASA Fruit.</p>
+<p>Comece cadastrando seus fornecedores.</p>
+{{template "layout.button" (dict "URL" (print .Data.AppURL "/app") "Label" "Acessar o sistema")}}
+{{template "layout.footer" .}}{{end}}

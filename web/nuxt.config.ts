@@ -38,10 +38,16 @@ export default defineNuxtConfig({
     '/': { prerender: true },
     '/login': { ssr: false },
     '/signup': { ssr: false },
+    '/forgot-password': { ssr: false },
+    '/reset-password': { ssr: false },
     '/app/**': { ssr: false },
     // Tudo que começa com /api vai para a API em Go. Como o navegador fala só
     // com o Nuxt (mesma origem), o cookie de sessão funciona sem CORS.
     '/api/**': { proxy: `${process.env.NUXT_API_URL ?? 'http://localhost:8080'}/**` },
+    // Painel das filas (River UI), servido pela API em Go. Passa pelo mesmo
+    // proxy para usar o cookie de sessão (só o admin da plataforma entra).
+    '/admin/queues': { proxy: `${process.env.NUXT_API_URL ?? 'http://localhost:8080'}/admin/queues` },
+    '/admin/queues/**': { proxy: `${process.env.NUXT_API_URL ?? 'http://localhost:8080'}/admin/queues/**` },
   },
 
   devServer: {

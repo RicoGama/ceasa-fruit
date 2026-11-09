@@ -48,6 +48,9 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     <template #validation>
       <UAlert v-if="errorMessage" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="errorMessage" />
     </template>
+    <template #password-hint>
+      <ULink to="/forgot-password" class="text-primary font-medium" tabindex="-1">Esqueci minha senha</ULink>
+    </template>
     <template #footer>
       Ainda não tem conta?
       <ULink to="/signup" class="text-primary font-medium">Criar conta</ULink>

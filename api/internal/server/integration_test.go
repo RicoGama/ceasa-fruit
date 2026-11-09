@@ -11,6 +11,9 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"os"
+	"regexp"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,14 +21,74 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/mail"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
+	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
 )
 
 // Teste de integração: sobe a API inteira contra um PostgreSQL de verdade.
 // Só roda com TEST_DATABASE_URL definida (ver `make test-integration`);
 // sem ela é pulado, então `go test ./...` continua funcionando sem banco.
 
+// fakeMailer é o "carteiro" dos testes: em vez de enviar por SMTP, guarda as
+// mensagens. O mutex protege a lista, porque os workers da fila rodam em
+// outras goroutines ao mesmo tempo que o teste lê.
+type fakeMailer struct {
+	mu   sync.Mutex
+	msgs []mail.Message
+}
+
+func (f *fakeMailer) Send(_ context.Context, m mail.Message) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.msgs = append(f.msgs, m)
+	return nil
+}
+
+// waitFor espera (até 15s) chegar um e-mail para `to` com `subject` no assunto.
+func (f *fakeMailer) waitFor(t *testing.T, to, subject string) mail.Message {
+	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		f.mu.Lock()
+		for _, m := range f.msgs {
+			if m.To == to && strings.Contains(m.Subject, subject) {
+				f.mu.Unlock()
+				return m
+			}
+		}
+		f.mu.Unlock()
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("no email %q to %s", subject, to)
+	return mail.Message{}
+}
+
+func (f *fakeMailer) count(to string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, m := range f.msgs {
+		if m.To == to {
+			n++
+		}
+	}
+	return n
+}
+
+type integrationEnv struct {
+	srv    *httptest.Server
+	pool   *pgxpool.Pool
+	queue  *queue.Queue
+	mailer *fakeMailer
+}
+
 func setupIntegration(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
+	env := setupIntegrationEnv(t)
+	return env.srv, env.pool
+}
+
+func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	t.Helper() // erros apontam para a linha de quem chamou, não para cá
 
 	url := os.Getenv("TEST_DATABASE_URL")
@@ -43,11 +106,30 @@ func setupIntegration(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
 	if err := postgres.Migrate(ctx, pool); err != nil {
 		t.Fatal(err)
 	}
+	if err := queue.Migrate(ctx, pool); err != nil {
+		t.Fatal(err)
+	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	srv := httptest.NewServer(New(Deps{Logger: logger, Pool: pool}))
+
+	// Fila de verdade (River no Postgres), com o carteiro falso.
+	mailer := &fakeMailer{}
+	q, err := queue.New(pool, queue.Options{Mailer: mailer, Logger: logger, RunWorkers: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = q.Stop(stopCtx)
+	})
+
+	srv := httptest.NewServer(New(Deps{Logger: logger, Pool: pool, Queue: q, AppURL: "http://app.test"}))
 	t.Cleanup(srv.Close)
-	return srv, pool
+	return &integrationEnv{srv: srv, pool: pool, queue: q, mailer: mailer}
 }
 
 // client simula um navegador: guarda os cookies entre requisições.
@@ -275,4 +357,81 @@ func TestIntegrationMultiTenancy(t *testing.T) {
 	// --- Logout --------------------------------------------------------------
 	alice.expect(http.StatusNoContent, "POST", "/auth/logout", nil, nil)
 	alice.expect(http.StatusUnauthorized, "GET", "/auth/me", nil, nil)
+}
+
+// tokenInLink pega o token do link de redefinição (rand.Text usa A-Z e 2-7).
+var tokenInLink = regexp.MustCompile(`reset-password\?token=([A-Z2-7]+)`)
+
+func TestIntegrationEmailQueue(t *testing.T) {
+	env := setupIntegrationEnv(t)
+	ctx := context.Background()
+	email := fmt.Sprintf("carla-%d@test.com", time.Now().UnixNano())
+
+	// --- Cadastro: e-mail de boas-vindas pela fila ---------------------------
+	carla := newClient(t, env.srv.URL)
+	carla.expect(http.StatusCreated, "POST", "/auth/signup", map[string]any{
+		"name": "Carla", "email": email, "password": "senha-antiga-1", "organizationName": "Hortifruti Carla",
+	}, nil)
+	welcome := env.mailer.waitFor(t, email, "Bem-vindo")
+	if !strings.Contains(welcome.Text, "Hortifruti Carla") || !strings.Contains(welcome.HTML, "http://app.test/app") {
+		t.Errorf("welcome email content: %s", welcome.Text)
+	}
+
+	// --- Esqueci a senha: e-mail desconhecido responde igual, sem enviar nada -
+	anon := newClient(t, env.srv.URL)
+	anon.expect(http.StatusAccepted, "POST", "/auth/password/forgot", map[string]any{"email": "ninguem@test.com"}, nil)
+	anon.expect(http.StatusAccepted, "POST", "/auth/password/forgot", map[string]any{"email": strings.ToUpper(email)}, nil)
+	reset := env.mailer.waitFor(t, email, "Redefinição de senha")
+	m := tokenInLink.FindStringSubmatch(reset.Text)
+	if m == nil {
+		t.Fatalf("no token link in email: %s", reset.Text)
+	}
+	token := m[1]
+	if env.mailer.count("ninguem@test.com") != 0 {
+		t.Error("email sent to unknown address")
+	}
+
+	// --- Redefinir ------------------------------------------------------------
+	anon.expect(http.StatusBadRequest, "POST", "/auth/password/reset",
+		map[string]any{"token": "TOKENINVALIDO234", "password": "senha-nova-123"}, nil)
+	anon.expect(http.StatusNoContent, "POST", "/auth/password/reset",
+		map[string]any{"token": token, "password": "senha-nova-123"}, nil)
+	// Uso único.
+	anon.expect(http.StatusBadRequest, "POST", "/auth/password/reset",
+		map[string]any{"token": token, "password": "outra-senha-123"}, nil)
+
+	// A sessão aberta antes da troca foi encerrada.
+	carla.expect(http.StatusUnauthorized, "GET", "/auth/me", nil, nil)
+	// Senha antiga não entra mais; a nova entra.
+	anon.expect(http.StatusUnauthorized, "POST", "/auth/login", map[string]any{"email": email, "password": "senha-antiga-1"}, nil)
+	anon.expect(http.StatusOK, "POST", "/auth/login", map[string]any{"email": email, "password": "senha-nova-123"}, nil)
+
+	// --- Enfileirar de dentro de uma transação de organização (RLS) ---------
+	var orgID int64
+	if err := env.pool.QueryRow(ctx, "SELECT id FROM organizations WHERE name = 'Hortifruti Carla' ORDER BY id DESC LIMIT 1").Scan(&orgID); err != nil {
+		t.Fatal(err)
+	}
+	err := postgres.InTenantTx(ctx, env.pool, orgID, func(tx pgx.Tx) error {
+		return env.queue.EnqueueEmail(ctx, tx, mail.Message{To: email, Subject: "Teste dentro do tenant", Text: "x", HTML: "x"})
+	})
+	if err != nil {
+		t.Fatalf("enqueue inside tenant transaction: %v", err)
+	}
+	env.mailer.waitFor(t, email, "Teste dentro do tenant")
+
+	// --- Rollback: o job some junto com a transação --------------------------
+	_ = postgres.InTenantTx(ctx, env.pool, orgID, func(tx pgx.Tx) error {
+		if err := env.queue.EnqueueEmail(ctx, tx, mail.Message{To: email, Subject: "Nunca deve chegar", Text: "x", HTML: "x"}); err != nil {
+			return err
+		}
+		return fmt.Errorf("simulated failure") // força o ROLLBACK
+	})
+	time.Sleep(2 * time.Second)
+	env.mailer.mu.Lock()
+	for _, msg := range env.mailer.msgs {
+		if msg.Subject == "Nunca deve chegar" {
+			t.Error("job from rolled back transaction was executed")
+		}
+	}
+	env.mailer.mu.Unlock()
 }

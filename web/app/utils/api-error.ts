@@ -17,6 +17,7 @@ const translations: Record<string, string> = {
   'commission is required for consignment': 'Informe a comissão da consignação',
   'reason is required when blocked': 'Informe o motivo do bloqueio',
   'city not found': 'Município não encontrado',
+  'invalid or expired token': 'Este link é inválido ou expirou. Peça um novo.',
   'supplier not found': 'Fornecedor não encontrado',
   'email already registered': 'Este e-mail já está cadastrado',
   'invalid email or password': 'E-mail ou senha inválidos',

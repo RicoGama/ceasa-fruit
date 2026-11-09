@@ -2,14 +2,15 @@
 -include .env
 export
 
-.PHONY: help tools db-setup-local db-up db-down run build test test-integration sqlc migration promote-admin openapi fmt lint
+.PHONY: help tools db-setup-local db-up db-down run build test test-integration sqlc migration promote-admin openapi worker mailpit fmt lint
 
 help: ## Mostra os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-17s\033[0m %s\n", $$1, $$2}'
 
-tools: ## Instala as CLIs de desenvolvimento (sqlc, goose)
+tools: ## Instala as CLIs de desenvolvimento (sqlc, goose, mailpit)
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	go install github.com/pressly/goose/v3/cmd/goose@latest
+	go install github.com/axllent/mailpit@latest
 
 db-setup-local: ## Cria usuário e bancos num Postgres instalado na máquina (sem Docker)
 	sudo -u postgres psql < ../scripts/db-setup-local.sql
@@ -41,6 +42,12 @@ migration: ## Cria uma migration nova: make migration name=create_customers
 
 promote-admin: ## Torna um usuário admin da plataforma: make promote-admin email=voce@exemplo.com
 	go run ./cmd/promote-admin -email $(email)
+
+worker: ## Roda só os workers da fila (opcional: a API já roda os workers)
+	go run ./cmd/worker
+
+mailpit: ## SMTP de desenvolvimento: e-mails em http://localhost:8025
+	mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025
 
 openapi: ## Gera openapi.json (o front gera os tipos TypeScript a partir dele)
 	go run ./cmd/openapi > openapi.json

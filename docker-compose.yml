@@ -19,5 +19,13 @@ services:
       timeout: 3s
       retries: 10
 
+  # SMTP de desenvolvimento: captura os e-mails (http://localhost:8025).
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ceasa-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
 volumes:
   postgres-data:

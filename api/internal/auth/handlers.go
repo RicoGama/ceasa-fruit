@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/mail"
 )
 
 // ---------------------------------------------------------------------------
@@ -90,17 +91,37 @@ type switchOrganizationInput struct {
 // Registro das rotas
 // ---------------------------------------------------------------------------
 
+// EmailQueue é o que as rotas de autenticação precisam da fila: colocar um
+// e-mail para envio dentro de uma transação (*queue.Queue satisfaz).
+type EmailQueue interface {
+	EnqueueEmail(ctx context.Context, tx pgx.Tx, msg mail.Message) error
+}
+
+// Options agrupa as dependências das rotas de autenticação.
+type Options struct {
+	Pool    *pgxpool.Pool
+	Cookies Cookies
+	Emails  EmailQueue
+	// AppURL é o endereço do front, usado nos links dos e-mails.
+	AppURL string
+}
+
 type handler struct {
 	pool    *pgxpool.Pool
 	q       *db.Queries
 	cookies Cookies
+	emails  EmailQueue
+	appURL  string
 }
 
 // Register adiciona as rotas de autenticação.
-//   - public: rotas sem login (cadastro, login, logout)
+//   - public: rotas sem login (cadastro, login, logout, recuperação de senha)
 //   - authed: rotas que exigem login, mas não organização (me, trocar organização)
-func Register(public, authed huma.API, pool *pgxpool.Pool, cookies Cookies) {
-	h := &handler{pool: pool, q: db.New(pool), cookies: cookies}
+func Register(public, authed huma.API, opts Options) {
+	h := &handler{
+		pool: opts.Pool, q: db.New(opts.Pool), cookies: opts.Cookies,
+		emails: opts.Emails, appURL: opts.AppURL,
+	}
 	tags := []string{"Auth"}
 
 	huma.Register(public, huma.Operation{
@@ -128,6 +149,26 @@ func Register(public, authed huma.API, pool *pgxpool.Pool, cookies Cookies) {
 		Tags:          tags,
 		DefaultStatus: http.StatusNoContent,
 	}, h.logout)
+
+	huma.Register(public, huma.Operation{
+		OperationID:   "forgot-password",
+		Method:        http.MethodPost,
+		Path:          "/auth/password/forgot",
+		Summary:       "Request a password reset link by email",
+		Description:   "Always answers 202, whether the email exists or not, so it cannot be used to discover accounts.",
+		Tags:          tags,
+		DefaultStatus: http.StatusAccepted,
+	}, h.forgotPassword)
+
+	huma.Register(public, huma.Operation{
+		OperationID:   "reset-password",
+		Method:        http.MethodPost,
+		Path:          "/auth/password/reset",
+		Summary:       "Set a new password using the emailed token",
+		Description:   "Ends every session of the user; they must log in again.",
+		Tags:          tags,
+		DefaultStatus: http.StatusNoContent,
+	}, h.resetPassword)
 
 	huma.Register(authed, huma.Operation{
 		OperationID: "get-me",
@@ -185,9 +226,22 @@ func (h *handler) signup(ctx context.Context, in *signupInput) (*meWithCookieOut
 		if err != nil {
 			return err
 		}
-		return q.CreateSession(ctx, db.CreateSessionParams{
+		err = q.CreateSession(ctx, db.CreateSessionParams{
 			TokenHash: tokenHash, UserID: user.ID, OrganizationID: &org.ID, ExpiresAt: expires,
 		})
+		if err != nil {
+			return err
+		}
+
+		// E-mail de boas-vindas: entra na fila NA MESMA transação. A resposta
+		// não espera o SMTP, e se o cadastro falhar o e-mail some junto.
+		msg, err := mail.Render("welcome", user.Email, user.Name, map[string]any{
+			"Name": user.Name, "OrganizationName": org.Name, "AppURL": h.appURL,
+		})
+		if err != nil {
+			return err
+		}
+		return h.emails.EnqueueEmail(ctx, tx, msg)
 	})
 	if isUniqueViolation(err) {
 		return nil, huma.Error409Conflict("email already registered")
@@ -331,4 +385,85 @@ func normalizeEmail(email string) string {
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// ---------------------------------------------------------------------------
+// Recuperação de senha
+// ---------------------------------------------------------------------------
+
+// passwordResetTTL é quanto tempo o link de redefinição vale.
+const passwordResetTTL = time.Hour
+
+type forgotPasswordInput struct {
+	Body struct {
+		Email string `json:"email" maxLength:"254"`
+	}
+}
+
+type resetPasswordInput struct {
+	Body struct {
+		Token    string `json:"token" minLength:"10" maxLength:"100"`
+		Password string `json:"password" minLength:"8" maxLength:"128"`
+	}
+}
+
+// forgotPassword responde sempre 202, exista o e-mail ou não. Se a resposta
+// mudasse, qualquer um descobriria quais e-mails têm conta no sistema.
+func (h *handler) forgotPassword(ctx context.Context, in *forgotPasswordInput) (*struct{}, error) {
+	user, err := h.q.GetUserByEmail(ctx, normalizeEmail(in.Body.Email))
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !user.Active) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	token, tokenHash := NewToken()
+	err = pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
+		err := h.q.WithTx(tx).CreatePasswordResetToken(ctx, db.CreatePasswordResetTokenParams{
+			TokenHash: tokenHash, UserID: user.ID, ExpiresAt: time.Now().Add(passwordResetTTL),
+		})
+		if err != nil {
+			return err
+		}
+		msg, err := mail.Render("password_reset", user.Email, user.Name, map[string]any{
+			"Name":             user.Name,
+			"ResetURL":         h.appURL + "/reset-password?token=" + token,
+			"ExpiresInMinutes": int(passwordResetTTL.Minutes()),
+		})
+		if err != nil {
+			return err
+		}
+		return h.emails.EnqueueEmail(ctx, tx, msg)
+	})
+	return nil, err
+}
+
+// resetPassword troca a senha usando o token do e-mail. O token é de uso
+// único, e todas as sessões abertas do usuário são encerradas: se alguém
+// tinha entrado com a senha antiga, perde o acesso.
+func (h *handler) resetPassword(ctx context.Context, in *resetPasswordInput) (*struct{}, error) {
+	hash, err := HashPassword(in.Body.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	err = pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
+		q := h.q.WithTx(tx)
+		userID, err := q.ConsumePasswordResetToken(ctx, HashToken(strings.TrimSpace(in.Body.Token)))
+		if err != nil {
+			return err
+		}
+		if err := q.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{ID: userID, PasswordHash: hash}); err != nil {
+			return err
+		}
+		if err := q.InvalidatePasswordResetTokens(ctx, userID); err != nil {
+			return err
+		}
+		return q.DeleteUserSessions(ctx, userID)
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, huma.Error400BadRequest("invalid or expired token")
+	}
+	return nil, err
 }

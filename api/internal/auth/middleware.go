@@ -69,3 +69,20 @@ func RequirePlatformAdmin(api huma.API) func(huma.Context, func(huma.Context)) {
 func RequireSecurity(op *huma.Operation) {
 	op.Security = []map[string][]string{{SecuritySchemeName: {}}}
 }
+
+// RequirePlatformAdminHTTP é a mesma regra de RequirePlatformAdmin, mas como
+// middleware net/http comum, para proteger handlers que não são do Huma
+// (ex.: o painel das filas).
+func RequirePlatformAdminHTTP(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s, ok := FromContext(r.Context())
+		switch {
+		case !ok:
+			http.Error(w, "authentication required", http.StatusUnauthorized)
+		case !s.IsPlatformAdmin:
+			http.Error(w, "platform admin only", http.StatusForbidden)
+		default:
+			next.ServeHTTP(w, r)
+		}
+	})
+}

@@ -6,6 +6,8 @@ package db
 
 import (
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type City struct {
@@ -85,6 +87,14 @@ type PartyContact struct {
 	IsWhatsapp     bool
 	Email          *string
 	Position       int32
+}
+
+type PasswordResetToken struct {
+	TokenHash []byte
+	UserID    int64
+	ExpiresAt time.Time
+	UsedAt    pgtype.Timestamptz
+	CreatedAt time.Time
 }
 
 type Session struct {

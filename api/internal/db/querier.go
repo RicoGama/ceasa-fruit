@@ -13,6 +13,9 @@ type Querier interface {
 	// Queries do painel do administrador da plataforma (o dono do SaaS).
 	AdminListOrganizations(ctx context.Context, arg AdminListOrganizationsParams) ([]AdminListOrganizationsRow, error)
 	AdminSetOrganizationStatus(ctx context.Context, arg AdminSetOrganizationStatusParams) (Organization, error)
+	// Marca o token como usado e devolve o usuário, numa operação só: dois
+	// pedidos simultâneos com o mesmo link não conseguem usá-lo duas vezes.
+	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) (int64, error)
 	CountSuppliers(ctx context.Context, arg CountSuppliersParams) (int64, error)
 	CreateMembership(ctx context.Context, arg CreateMembershipParams) error
 	CreateOrganization(ctx context.Context, name string) (Organization, error)
@@ -20,6 +23,7 @@ type Querier interface {
 	// @nome é atalho do sqlc para sqlc.arg('nome'); sqlc.narg = pode ser NULL.
 	CreateParty(ctx context.Context, arg CreatePartyParams) (int64, error)
 	CreatePartyContact(ctx context.Context, arg CreatePartyContactParams) error
+	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) error
 	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	CreateSupplier(ctx context.Context, arg CreateSupplierParams) error
 	// Queries de autenticação. Estas tabelas não têm RLS: são usadas antes de
@@ -28,6 +32,8 @@ type Querier interface {
 	DeactivateSupplier(ctx context.Context, arg DeactivateSupplierParams) (int64, error)
 	DeletePartyContacts(ctx context.Context, arg DeletePartyContactsParams) error
 	DeleteSession(ctx context.Context, tokenHash []byte) error
+	// Encerra todas as sessões do usuário (ex.: depois de trocar a senha).
+	DeleteUserSessions(ctx context.Context, userID int64) error
 	GetMembership(ctx context.Context, arg GetMembershipParams) (GetMembershipRow, error)
 	// Carrega tudo o que uma requisição autenticada precisa numa consulta só.
 	// LEFT JOIN: a sessão pode ainda não ter organização selecionada.
@@ -35,6 +41,8 @@ type Querier interface {
 	// sqlc.embed devolve as colunas de cada tabela agrupadas (row.Party, row.Supplier).
 	GetSupplier(ctx context.Context, arg GetSupplierParams) (GetSupplierRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
+	// Depois de redefinir, os outros links pendentes deixam de valer.
+	InvalidatePasswordResetTokens(ctx context.Context, userID int64) error
 	ListPartyContacts(ctx context.Context, arg ListPartyContactsParams) ([]PartyContact, error)
 	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]ListSuppliersRow, error)
 	ListUserOrganizations(ctx context.Context, userID int64) ([]ListUserOrganizationsRow, error)
@@ -45,6 +53,7 @@ type Querier interface {
 	SetSessionOrganization(ctx context.Context, arg SetSessionOrganizationParams) error
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (int64, error)
 	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (int64, error)
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 }
 
 var _ Querier = (*Queries)(nil)

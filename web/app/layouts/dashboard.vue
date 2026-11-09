@@ -21,6 +21,8 @@ const adminLinks = computed<NavigationMenuItem[]>(() =>
     ? [
         { label: 'Plataforma', type: 'label' },
         { label: 'Organizações', icon: 'i-lucide-building-2', to: '/app/admin/organizations' },
+        // Painel do River (fora do Nuxt): abre em outra aba.
+        { label: 'Filas', icon: 'i-lucide-list-checks', to: '/admin/queues', external: true, target: '_blank' },
       ]
     : [],
 )

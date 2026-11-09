@@ -24,7 +24,10 @@ na ordem abaixo; os comentários no código explicam cada conceito.
 | 15 | `internal/supplier/supplier.go` | Huma: struct tags, validação, interfaces, embedding, closures, transação com várias tabelas |
 | 16 | `internal/city/city.go` | uma rota pequena de consulta (municípios do IBGE) |
 | 17 | `internal/admin/admin.go` | um recurso simples, para fixar o padrão |
-| 18 | `*_test.go` | testes table-driven, fakes, `httptest`, `humatest`, teste de integração |
+| 18 | `internal/mail/` | e-mail por SMTP, modelos com `html/template` e `text/template`, `//go:embed` |
+| 19 | `internal/queue/queue.go` | fila de jobs com River: job, worker, enfileirar dentro da transação |
+| 20 | `cmd/worker/main.go` | um segundo executável, só com os workers |
+| 21 | `*_test.go` | testes table-driven, fakes, `httptest`, `humatest`, teste de integração |
 
 ## Conceitos-chave em 1 linha cada
 
@@ -83,6 +86,39 @@ Não há rota para virar admin, de propósito. Cadastre-se pela API e rode:
 make promote-admin email=voce@exemplo.com
 ```
 
+## Fila de jobs (River) e e-mail
+
+Equivalente às Jobs/Queues do Laravel, com o [River](https://riverqueue.com),
+que guarda a fila no próprio PostgreSQL (sem Redis).
+
+| Laravel | Aqui |
+|---|---|
+| classe Job + `handle()` | `EmailArgs` (dados) + `EmailWorker.Work()` em `internal/queue` |
+| `dispatch()` | `queue.EnqueueEmail(ctx, tx, msg)` — **dentro da transação** |
+| `queue:work` | os workers sobem junto com a API (`WORKERS_ENABLED=true`) ou `make worker` |
+| `$tries` / backoff | `MaxAttempts: 10`, espera crescente entre tentativas |
+| Horizon | River UI em `/admin/queues` (só admin da plataforma) |
+
+Regras do projeto:
+
+- **Todo e-mail sai por SMTP** (`internal/mail`, biblioteca go-mail) e **sempre
+  pela fila**: nenhuma rota espera o servidor de e-mail.
+- **Enfileire dentro da transação** do que gerou o e-mail. Se der rollback, o
+  job some junto; se gravar, o e-mail com certeza sai (mesmo que o SMTP esteja
+  fora do ar: ele é tentado de novo).
+- Modelos de e-mail em `internal/mail/templates/`: `<nome>.html.tmpl` (usa o
+  layout) e `<nome>.txt.tmpl` (assunto + texto puro).
+
+### Novo tipo de job
+
+1. Em `internal/queue`, crie `XxxArgs` com `Kind()` (nome fixo, não mude depois)
+   e `InsertOpts()` (fila, tentativas).
+2. Crie `XxxWorker` com `Work(ctx, job)`; devolver erro = tentar de novo.
+3. Registre em `queue.New` com `river.AddWorker(workers, &XxxWorker{...})`.
+4. Enfileire com `q.Client.InsertTx(ctx, tx, XxxArgs{...}, nil)`.
+5. Se o job mexe em dados de uma organização, guarde o `organization_id` nos
+   argumentos e use `postgres.InTenant` dentro do `Work`.
+
 ## Fluxo de uma requisição
 
 ```
@@ -106,6 +142,8 @@ make help
 | `make sqlc` | regenera `internal/db` depois de mexer em `queries/*.sql` ou migrations |
 | `make migration name=create_customers` | cria um novo arquivo de migration |
 | `make promote-admin email=...` | torna um usuário admin da plataforma |
+| `make mailpit` | SMTP de desenvolvimento (e-mails em http://localhost:8025) |
+| `make worker` | só os workers da fila (opcional; a API já executa os jobs) |
 
 ## Adicionando um novo recurso de negócio (ex.: clientes)
 
@@ -135,4 +173,7 @@ make help
 - **Documento único por organização**: duas distribuidoras podem cadastrar o mesmo produtor.
 - **Documento salvo sem máscara**: a API aceita `11.222.333/0001-81` e grava `11222333000181`.
 - **Busca ignora acentos** (`unaccent` do PostgreSQL): "sitio" encontra "Sítio".
+- **Recuperação de senha**: link por e-mail com token de uso único (1h), só o
+  hash fica no banco; ao trocar a senha, todas as sessões do usuário caem. A rota
+  "esqueci a senha" responde igual exista o e-mail ou não.
 - **Organização suspensa** bloqueia todos os usuários dela nas rotas de negócio (403).

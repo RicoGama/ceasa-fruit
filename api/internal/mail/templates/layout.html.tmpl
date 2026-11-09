@@ -1,0 +1,27 @@
+{{/* Layout comum dos e-mails. Estilos inline e tabelas: é o que funciona em
+     todos os clientes de e-mail (Gmail, Outlook, celular). */}}
+{{define "layout.header"}}<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Subject}}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#18181b;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 12px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:8px;border:1px solid #e4e4e7;">
+<tr><td style="padding:20px 28px;border-bottom:1px solid #e4e4e7;font-size:18px;font-weight:bold;color:#16a34a;">CEASA Fruit</td></tr>
+<tr><td style="padding:28px;font-size:15px;line-height:1.6;">
+{{end}}
+
+{{define "layout.footer"}}
+</td></tr>
+</table>
+<p style="font-size:12px;color:#71717a;margin-top:16px;">Este é um e-mail automático, não responda.</p>
+</td></tr>
+</table>
+</body>
+</html>{{end}}
+
+{{define "layout.button"}}<p style="margin:28px 0;"><a href="{{.URL}}" style="background:#16a34a;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:bold;display:inline-block;">{{.Label}}</a></p>{{end}}

@@ -21,6 +21,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/city"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
+	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
 )
 
@@ -45,6 +46,12 @@ type Deps struct {
 	Pool         *pgxpool.Pool
 	CORSOrigins  []string
 	CookieSecure bool // true em produção (HTTPS)
+	AppURL       string
+	// Queue é a fila de jobs (e-mails etc.).
+	Queue *queue.Queue
+	// QueueUI é o painel do River (como o Horizon do Laravel), servido em
+	// /admin/queues só para o administrador da plataforma. Opcional.
+	QueueUI http.Handler
 }
 
 // New devolve o http.Handler raiz da aplicação.
@@ -85,6 +92,14 @@ func build(d Deps) (http.Handler, huma.API) {
 	// Rota com chi + net/http puro, escrita à mão de propósito (ver healthHandler).
 	r.Get("/health", healthHandler(d.Pool))
 
+	// Painel das filas. É um http.Handler pronto (do River UI); só colocamos
+	// a proteção na frente: apenas o administrador da plataforma entra.
+	if d.QueueUI != nil {
+		ui := auth.RequirePlatformAdminHTTP(d.QueueUI)
+		r.Handle("/admin/queues", ui)
+		r.Handle("/admin/queues/*", ui)
+	}
+
 	// O Huma fica por cima do mesmo roteador chi. Ele também serve:
 	//   /docs          -> documentação interativa da API
 	//   /openapi.json  -> a especificação OpenAPI (usada para gerar o cliente do Nuxt)
@@ -111,7 +126,15 @@ func build(d Deps) (http.Handler, huma.API) {
 	platformAdmin.UseMiddleware(auth.RequirePlatformAdmin(api))
 	platformAdmin.UseSimpleModifier(auth.RequireSecurity)
 
-	auth.Register(public, authed, d.Pool, auth.Cookies{Secure: d.CookieSecure})
+	// Cuidado com uma pegadinha do Go: um *queue.Queue nil guardado numa
+	// interface NÃO é uma interface nil. Por isso só atribuímos se existir.
+	var emails auth.EmailQueue
+	if d.Queue != nil {
+		emails = d.Queue
+	}
+	auth.Register(public, authed, auth.Options{
+		Pool: d.Pool, Cookies: auth.Cookies{Secure: d.CookieSecure}, Emails: emails, AppURL: d.AppURL,
+	})
 	admin.Register(platformAdmin, queries)
 	city.Register(authed, queries)
 
