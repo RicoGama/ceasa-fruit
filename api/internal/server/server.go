@@ -23,6 +23,14 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
 )
 
+func init() {
+	// Por padrão o Huma declara listas como "podem ser null" no OpenAPI, porque
+	// um slice nil do Go vira null no JSON. Nossos handlers sempre criam a
+	// lista com make(), então devolvem [] e nunca null: avisamos o OpenAPI
+	// para o TypeScript do front não precisar tratar um null que nunca vem.
+	huma.DefaultArrayNullable = false
+}
+
 // Pinger é qualquer coisa capaz de testar a conexão com o banco.
 // *pgxpool.Pool implementa; os testes podem usar um falso.
 type Pinger interface {
@@ -40,6 +48,19 @@ type Deps struct {
 
 // New devolve o http.Handler raiz da aplicação.
 func New(d Deps) http.Handler {
+	h, _ := build(d)
+	return h
+}
+
+// OpenAPISpec devolve a especificação OpenAPI em JSON, sem subir servidor nem
+// conectar no banco. Usada pelo cmd/openapi para gerar o arquivo que o front lê.
+func OpenAPISpec() ([]byte, error) {
+	_, api := build(Deps{Logger: slog.New(slog.DiscardHandler)})
+	return json.MarshalIndent(api.OpenAPI(), "", "  ")
+}
+
+// build monta o roteador e devolve também a API do Huma (para o OpenAPISpec).
+func build(d Deps) (http.Handler, huma.API) {
 	r := chi.NewRouter()
 	queries := db.New(d.Pool)
 
@@ -98,7 +119,7 @@ func New(d Deps) http.Handler {
 	}
 	supplier.Register(tenant, tenantTx)
 
-	return r
+	return r, api
 }
 
 // healthHandler mostra como é um handler SEM o Huma:

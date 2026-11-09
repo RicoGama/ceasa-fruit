@@ -5,9 +5,9 @@ distribuidoras e atacadistas.
 
 ## Escopo
 
-0. Multi-tenant: organizações, usuários em várias organizações, login, admin da plataforma ✅ (API)
+0. Multi-tenant: organizações, usuários em várias organizações, login, admin da plataforma ✅ (API + telas)
 1. Controle de vendas de LFV
-2. Cadastro de fornecedores ✅ (API)
+2. Cadastro de fornecedores ✅ (API + tela)
 3. Cadastro de clientes
 4. Controle de estoque com aviso de perda
 5. Venda
@@ -20,7 +20,7 @@ distribuidoras e atacadistas.
 |---|---|
 | API | Go + [chi](https://github.com/go-chi/chi) (roteador) + [Huma](https://huma.rocks) (OpenAPI, validação) |
 | Banco | PostgreSQL + [sqlc](https://sqlc.dev) (SQL → Go tipado) + [goose](https://github.com/pressly/goose) (migrations) |
-| Front | Nuxt 4 (SPA + PWA) + Nuxt UI / Tailwind — *a fazer* |
+| Front | [Nuxt 4](https://nuxt.com) + [Nuxt UI 4](https://ui.nuxt.com) (Tailwind CSS 4) + cliente tipado gerado do OpenAPI |
 
 Convenção: **código em inglês** (identificadores, banco, rotas, JSON); **comentários e documentação em português**.
 
@@ -29,7 +29,7 @@ Convenção: **código em inglês** (identificadores, banco, rotas, JSON); **com
 ```
 ceasa-fruit/
 ├── api/                # API em Go (ver api/README.md)
-├── web/                # (a fazer) Nuxt
+├── web/                # front em Nuxt (ver web/README.md)
 ├── docker/             # inicialização do Postgres no Docker
 ├── scripts/            # db-setup-local.sql (Postgres sem Docker)
 └── docker-compose.yml  # PostgreSQL de desenvolvimento (+ banco ceasa_test)
@@ -72,7 +72,17 @@ make run     # aplica migrations e sobe a API em :8080
 
 Se o seu Postgres não estiver em `localhost:5432`, copie `.env.example` para `.env` e ajuste `DATABASE_URL`.
 
-Depois abra:
+### Subindo o front (em outro terminal)
+
+Pré-requisito: Node.js 22+.
+
+```bash
+cd web && npm install && npm run dev
+```
+
+Abra http://localhost:3000, crie uma conta e use o sistema.
+
+### Endereços da API
 
 - http://localhost:8080/docs — documentação interativa (dá para testar os endpoints)
 - http://localhost:8080/health — health check

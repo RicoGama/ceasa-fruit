@@ -2,7 +2,7 @@
 -include .env
 export
 
-.PHONY: help tools db-setup-local db-up db-down run build test test-integration sqlc migration promote-admin fmt lint
+.PHONY: help tools db-setup-local db-up db-down run build test test-integration sqlc migration promote-admin openapi fmt lint
 
 help: ## Mostra os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-17s\033[0m %s\n", $$1, $$2}'
@@ -41,6 +41,9 @@ migration: ## Cria uma migration nova: make migration name=create_customers
 
 promote-admin: ## Torna um usuário admin da plataforma: make promote-admin email=voce@exemplo.com
 	go run ./cmd/promote-admin -email $(email)
+
+openapi: ## Gera openapi.json (o front gera os tipos TypeScript a partir dele)
+	go run ./cmd/openapi > openapi.json
 
 fmt: ## Formata o código
 	gofmt -w .
