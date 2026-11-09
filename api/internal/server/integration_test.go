@@ -135,8 +135,45 @@ func TestIntegrationMultiTenancy(t *testing.T) {
 	orgA := *aliceMe.CurrentOrganizationID
 
 	var supplierA idResp
-	alice.expect(http.StatusCreated, "POST", "/suppliers",
-		map[string]any{"name": "Sítio A", "document": "52998224725"}, &supplierA)
+	alice.expect(http.StatusCreated, "POST", "/suppliers", map[string]any{
+		"personType": "individual", "legalName": "Sítio A", "document": "52998224725",
+		"address":  map[string]any{"cityId": 3305802}, // Teresópolis - RJ
+		"contacts": []map[string]any{{"name": "Dono do Sítio A", "isWhatsapp": true}},
+	}, &supplierA)
+
+	// Fornecedor completo lido de volta, com cidade e contato.
+	var fullA struct {
+		Address struct {
+			City *struct {
+				Name  string `json:"name"`
+				State string `json:"state"`
+			} `json:"city"`
+		} `json:"address"`
+		Contacts []struct {
+			Name string `json:"name"`
+		} `json:"contacts"`
+	}
+	alice.expect(http.StatusOK, "GET", fmt.Sprintf("/suppliers/%d", supplierA.ID), nil, &fullA)
+	if fullA.Address.City == nil || fullA.Address.City.Name != "Teresópolis" || len(fullA.Contacts) != 1 {
+		t.Fatalf("supplier not stored completely: %+v", fullA)
+	}
+
+	// Município inexistente vira erro no campo (chave estrangeira do banco).
+	alice.expect(http.StatusUnprocessableEntity, "POST", "/suppliers", map[string]any{
+		"personType": "company", "legalName": "Box X", "address": map[string]any{"cityId": 9999999},
+	}, nil)
+
+	// Busca de municípios: sem acento, e quem começa com o texto vem primeiro.
+	var cities []struct {
+		ID    int    `json:"id"`
+		Name  string `json:"name"`
+		State string `json:"state"`
+	}
+	alice.expect(http.StatusOK, "GET", "/cities?search=teresop", nil, &cities)
+	if len(cities) == 0 || cities[0].Name != "Teresópolis" || cities[0].ID != 3305802 {
+		t.Fatalf("city search: %+v", cities)
+	}
+	anon.expect(http.StatusUnauthorized, "GET", "/cities?search=rio", nil, nil)
 
 	// E-mail repetido no cadastro -> 409.
 	newClient(t, srv.URL).expect(http.StatusConflict, "POST", "/auth/signup", map[string]any{
@@ -160,18 +197,20 @@ func TestIntegrationMultiTenancy(t *testing.T) {
 	}
 	bob.expect(http.StatusNotFound, "GET", fmt.Sprintf("/suppliers/%d", supplierA.ID), nil, nil)
 	// Mesmo documento em outra organização é permitido.
-	bob.expect(http.StatusCreated, "POST", "/suppliers",
-		map[string]any{"name": "Sítio A (cadastro da B)", "document": "52998224725"}, nil)
+	bob.expect(http.StatusCreated, "POST", "/suppliers", map[string]any{
+		"personType": "individual", "legalName": "Sítio A (cadastro da B)", "document": "52998224725",
+	}, nil)
 
 	// --- RLS: mesmo SQL cru, SEM filtro, só enxerga a própria organização ---
 	t.Run("rls hides other organizations", func(t *testing.T) {
 		var visible, foreign int64
 		err := postgres.InTenantTx(ctx, pool, orgB, func(tx pgx.Tx) error {
-			if err := tx.QueryRow(ctx, "SELECT count(*) FROM suppliers").Scan(&visible); err != nil {
+			// parties: a tabela com os dados pessoais, a mais sensível.
+			if err := tx.QueryRow(ctx, "SELECT count(*) FROM parties").Scan(&visible); err != nil {
 				return err
 			}
 			return tx.QueryRow(ctx,
-				"SELECT count(*) FROM suppliers WHERE organization_id = $1", orgA).Scan(&foreign)
+				"SELECT count(*) FROM party_contacts WHERE organization_id = $1", orgA).Scan(&foreign)
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -183,7 +222,7 @@ func TestIntegrationMultiTenancy(t *testing.T) {
 	t.Run("rls blocks writing into another organization", func(t *testing.T) {
 		err := postgres.InTenantTx(ctx, pool, orgB, func(tx pgx.Tx) error {
 			_, err := tx.Exec(ctx,
-				"INSERT INTO suppliers (organization_id, name, document) VALUES ($1, 'x', '11222333000181')", orgA)
+				"INSERT INTO parties (organization_id, person_type, legal_name) VALUES ($1, 'company', 'x')", orgA)
 			return err
 		})
 		if err == nil {

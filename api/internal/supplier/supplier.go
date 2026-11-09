@@ -7,6 +7,9 @@
 // O Huma lê path/query/header/body para dentro de AlgumInput (usando as struct
 // tags), valida, chama a função e serializa AlgumOutput de volta para JSON.
 // As mesmas tags geram o documento OpenAPI em /openapi.json.
+//
+// Um fornecedor é uma pessoa (pacote party: identificação, endereço,
+// contatos, pagamento) + os dados de fornecedor (tipo, consignação, prazo...).
 package supplier
 
 import (
@@ -14,7 +17,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
@@ -22,7 +24,7 @@ import (
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
-	"github.com/RicoGama/ceasa-fruit/api/internal/document"
+	"github.com/RicoGama/ceasa-fruit/api/internal/party"
 )
 
 // Store é o que os handlers precisam do banco de dados.
@@ -30,12 +32,16 @@ import (
 // ("aceite interfaces, retorne structs"): *db.Queries satisfaz essa interface
 // em produção, e os testes podem passar uma implementação falsa.
 type Store interface {
-	CreateSupplier(ctx context.Context, arg db.CreateSupplierParams) (db.Supplier, error)
-	GetSupplier(ctx context.Context, arg db.GetSupplierParams) (db.Supplier, error)
-	ListSuppliers(ctx context.Context, arg db.ListSuppliersParams) ([]db.Supplier, error)
+	party.ContactStore
+	CreateParty(ctx context.Context, arg db.CreatePartyParams) (int64, error)
+	UpdateParty(ctx context.Context, arg db.UpdatePartyParams) (int64, error)
+	CreateSupplier(ctx context.Context, arg db.CreateSupplierParams) error
+	UpdateSupplier(ctx context.Context, arg db.UpdateSupplierParams) (int64, error)
+	GetSupplier(ctx context.Context, arg db.GetSupplierParams) (db.GetSupplierRow, error)
+	ListSuppliers(ctx context.Context, arg db.ListSuppliersParams) ([]db.ListSuppliersRow, error)
 	CountSuppliers(ctx context.Context, arg db.CountSuppliersParams) (int64, error)
-	UpdateSupplier(ctx context.Context, arg db.UpdateSupplierParams) (db.Supplier, error)
 	DeactivateSupplier(ctx context.Context, arg db.DeactivateSupplierParams) (int64, error)
+	ListPartyContacts(ctx context.Context, arg db.ListPartyContactsParams) ([]db.PartyContact, error)
 }
 
 // TxFunc abre uma transação presa à organização (com RLS) e entrega um Store
@@ -43,94 +49,101 @@ type Store interface {
 type TxFunc func(ctx context.Context, organizationID int64, fn func(Store) error) error
 
 // ---------------------------------------------------------------------------
-// Tipos da API (o que trafega no HTTP). Ficam separados de db.Supplier para
-// que o schema do banco e o contrato JSON público possam evoluir independentes.
+// Tipos da API
 // ---------------------------------------------------------------------------
 
-// Supplier é a representação JSON devolvida pela API.
-type Supplier struct {
-	ID        int64     `json:"id" example:"1"`
-	Name      string    `json:"name" example:"Sítio Boa Colheita"`
-	Document  string    `json:"document" example:"11222333000181" doc:"CPF or CNPJ, digits/letters only"`
-	Phone     *string   `json:"phone" example:"11999990000"`
-	Email     *string   `json:"email" example:"contato@boacolheita.com.br"`
-	City      *string   `json:"city" example:"Mogi das Cruzes"`
-	State     *string   `json:"state" example:"SP"`
-	Notes     *string   `json:"notes"`
-	Active    bool      `json:"active"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-// SupplierFields são os campos editáveis, compartilhados entre criar e atualizar.
-//
-// Colinha das tags:
-//   - json:"x,omitempty"  -> campo opcional na requisição
-//   - minLength/maxLength/pattern/format -> o Huma valida automaticamente
-//   - doc/example         -> aparecem na documentação gerada
+// SupplierFields são os campos editáveis: os da pessoa (embutidos, aparecem "achatados"
+// no JSON) + os de fornecedor.
 type SupplierFields struct {
-	Name     string  `json:"name" minLength:"2" maxLength:"120"`
-	Document string  `json:"document" maxLength:"18" doc:"CPF or CNPJ (numeric or alphanumeric), with or without mask" example:"11.222.333/0001-81"`
-	Phone    *string `json:"phone,omitempty" maxLength:"20"`
-	Email    *string `json:"email,omitempty" format:"email" maxLength:"120"`
-	City     *string `json:"city,omitempty" maxLength:"80"`
-	State    *string `json:"state,omitempty" pattern:"^[A-Za-z]{2}$" doc:"Two-letter state code (UF)" example:"SP"`
-	Notes    *string `json:"notes,omitempty" maxLength:"1000"`
+	party.Fields
+
+	SupplierType          string   `json:"supplierType,omitempty" enum:"producer,wholesaler,cooperative,importer,other" default:"producer"`
+	DefaultPurchaseMode   string   `json:"defaultPurchaseMode,omitempty" enum:"direct,consignment" default:"direct" doc:"direct = buys the goods; consignment = sells first and pays later minus commission"`
+	ConsignmentCommission *float64 `json:"consignmentCommission,omitempty" minimum:"0" maximum:"100" doc:"Commission in % kept on consignment sales"`
+	PaymentTermDays       int32    `json:"paymentTermDays,omitempty" minimum:"0" maximum:"365" default:"0" doc:"Default payment term in days (0 = cash)"`
+	CeasaPavilion         *string  `json:"ceasaPavilion,omitempty" maxLength:"30"`
+	CeasaBox              *string  `json:"ceasaBox,omitempty" maxLength:"30"`
+	Status                string   `json:"status,omitempty" enum:"active,inactive,blocked" default:"active"`
+	BlockedReason         *string  `json:"blockedReason,omitempty" maxLength:"500"`
 }
 
-// normalize limpa a entrada antes de ir para o banco e devolve os erros de
-// validação que as struct tags não conseguem expressar (dígitos do CPF/CNPJ).
+// normalize valida a pessoa e as regras de fornecedor.
 func (f *SupplierFields) normalize() []error {
-	f.Name = strings.TrimSpace(f.Name)
-	f.Document = document.Normalize(f.Document)
-	f.Phone = cleanOptional(f.Phone)
-	f.Email = cleanOptional(f.Email)
-	f.City = cleanOptional(f.City)
-	f.Notes = cleanOptional(f.Notes)
-	if s := cleanOptional(f.State); s != nil {
-		upper := strings.ToUpper(*s)
-		f.State = &upper
-	} else {
-		f.State = nil
+	errs := f.Fields.Normalize()
+	fail := func(location, message string) {
+		errs = append(errs, &huma.ErrorDetail{Location: "body." + location, Message: message})
 	}
 
-	if !document.IsValid(f.Document) {
-		return []error{&huma.ErrorDetail{
-			Location: "body.document",
-			Message:  "invalid CPF or CNPJ",
-			Value:    f.Document,
-		}}
+	if f.SupplierType == "" {
+		f.SupplierType = "producer"
 	}
-	return nil
+	if f.DefaultPurchaseMode == "" {
+		f.DefaultPurchaseMode = "direct"
+	}
+	if f.Status == "" {
+		f.Status = "active"
+	}
+	f.CeasaPavilion = trimmed(f.CeasaPavilion)
+	f.CeasaBox = trimmed(f.CeasaBox)
+	f.BlockedReason = trimmed(f.BlockedReason)
+
+	if f.DefaultPurchaseMode == "consignment" && f.ConsignmentCommission == nil {
+		fail("consignmentCommission", "commission is required for consignment")
+	}
+	if f.Status == "blocked" && f.BlockedReason == nil {
+		fail("blockedReason", "reason is required when blocked")
+	}
+	if f.Status != "blocked" {
+		f.BlockedReason = nil
+	}
+	return errs
 }
 
-// cleanOptional tira espaços das pontas e transforma "" em nil (gravado como NULL).
-func cleanOptional(s *string) *string {
-	if s == nil {
-		return nil
-	}
-	v := strings.TrimSpace(*s)
-	if v == "" {
-		return nil
-	}
-	return &v
+// Supplier é o fornecedor completo, como a API devolve.
+type Supplier struct {
+	ID int64 `json:"id"`
+	party.Party
+	SupplierType          string   `json:"supplierType" enum:"producer,wholesaler,cooperative,importer,other"`
+	DefaultPurchaseMode   string   `json:"defaultPurchaseMode" enum:"direct,consignment"`
+	ConsignmentCommission *float64 `json:"consignmentCommission"`
+	PaymentTermDays       int32    `json:"paymentTermDays"`
+	CeasaPavilion         *string  `json:"ceasaPavilion"`
+	CeasaBox              *string  `json:"ceasaBox"`
+	Status                string   `json:"status" enum:"active,inactive,blocked"`
+	BlockedReason         *string  `json:"blockedReason"`
+	party.Timestamps
+}
+
+// SupplierSummary é a versão resumida, usada na listagem.
+type SupplierSummary struct {
+	ID                  int64       `json:"id"`
+	PersonType          string      `json:"personType" enum:"individual,company"`
+	Document            *string     `json:"document"`
+	LegalName           string      `json:"legalName"`
+	TradeName           *string     `json:"tradeName"`
+	Phone               *string     `json:"phone"`
+	Whatsapp            *string     `json:"whatsapp"`
+	City                *party.City `json:"city"`
+	SupplierType        string      `json:"supplierType" enum:"producer,wholesaler,cooperative,importer,other"`
+	DefaultPurchaseMode string      `json:"defaultPurchaseMode" enum:"direct,consignment"`
+	Status              string      `json:"status" enum:"active,inactive,blocked"`
 }
 
 // --- Entradas e saídas de cada operação --------------------------------------
 
 type listSuppliersInput struct {
-	Search string `query:"search" maxLength:"100" doc:"Filter by name (contains, accent-insensitive) or document (prefix)"`
-	Status string `query:"status" enum:"active,inactive,all" default:"active"`
+	Search string `query:"search" maxLength:"100" doc:"Name or nickname (contains, accent-insensitive) or document (prefix)"`
+	Status string `query:"status" enum:"active,inactive,blocked,all" default:"active"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"100" default:"20"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
 type listSuppliersOutput struct {
 	Body struct {
-		Items  []Supplier `json:"items"`
-		Total  int64      `json:"total"`
-		Limit  int32      `json:"limit"`
-		Offset int32      `json:"offset"`
+		Items  []SupplierSummary `json:"items"`
+		Total  int64             `json:"total"`
+		Limit  int32             `json:"limit"`
+		Offset int32             `json:"offset"`
 	}
 }
 
@@ -154,10 +167,7 @@ func (in *createInput) Resolve(huma.Context) []error {
 
 type updateInput struct {
 	ID   int64 `path:"id" minimum:"1"`
-	Body struct {
-		SupplierFields      // struct embutida: os campos dela são "promovidos" (achatados no JSON)
-		Active         bool `json:"active"`
-	}
+	Body SupplierFields
 }
 
 func (in *updateInput) Resolve(huma.Context) []error {
@@ -179,80 +189,60 @@ func Register(api huma.API, tx TxFunc) {
 	tags := []string{"Suppliers"}
 
 	huma.Register(api, huma.Operation{
-		OperationID: "list-suppliers",
-		Method:      http.MethodGet,
-		Path:        "/suppliers",
-		Summary:     "List suppliers",
-		Tags:        tags,
+		OperationID: "list-suppliers", Method: http.MethodGet, Path: "/suppliers",
+		Summary: "List suppliers", Tags: tags,
 	}, h.list)
 
 	huma.Register(api, huma.Operation{
-		OperationID: "get-supplier",
-		Method:      http.MethodGet,
-		Path:        "/suppliers/{id}",
-		Summary:     "Get a supplier",
-		Tags:        tags,
+		OperationID: "get-supplier", Method: http.MethodGet, Path: "/suppliers/{id}",
+		Summary: "Get a supplier", Tags: tags,
 	}, h.get)
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "create-supplier",
-		Method:        http.MethodPost,
-		Path:          "/suppliers",
-		Summary:       "Create a supplier",
-		Tags:          tags,
-		DefaultStatus: http.StatusCreated,
+		OperationID: "create-supplier", Method: http.MethodPost, Path: "/suppliers",
+		Summary: "Create a supplier", Tags: tags, DefaultStatus: http.StatusCreated,
 	}, h.create)
 
 	huma.Register(api, huma.Operation{
-		OperationID: "update-supplier",
-		Method:      http.MethodPut,
-		Path:        "/suppliers/{id}",
-		Summary:     "Update a supplier",
-		Tags:        tags,
+		OperationID: "update-supplier", Method: http.MethodPut, Path: "/suppliers/{id}",
+		Summary: "Update a supplier", Tags: tags,
 	}, h.update)
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "deactivate-supplier",
-		Method:        http.MethodDelete,
-		Path:          "/suppliers/{id}",
-		Summary:       "Deactivate a supplier",
-		Description:   "Soft delete: the supplier is marked inactive, never removed, to preserve history.",
-		Tags:          tags,
-		DefaultStatus: http.StatusNoContent,
+		OperationID: "deactivate-supplier", Method: http.MethodDelete, Path: "/suppliers/{id}",
+		Summary:     "Deactivate a supplier",
+		Description: "Soft delete: the supplier is marked inactive, never removed, to preserve history.",
+		Tags:        tags, DefaultStatus: http.StatusNoContent,
 	}, h.deactivate)
 }
 
 // list é um *método* de handler: (h *handler) é o receiver, parecido com o "this".
 func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppliersOutput, error) {
+	orgID := auth.OrganizationID(ctx)
+
 	var search *string
 	if s := strings.TrimSpace(in.Search); s != "" {
 		search = &s
 	}
-
-	var active *bool // nil = sem filtro ("all")
-	switch in.Status {
-	case "active":
-		active = new(true) // Go 1.26+: new(expr) devolve um ponteiro para o valor
-	case "inactive":
-		active = new(false)
+	var status *string // nil = sem filtro ("all")
+	if in.Status != "all" {
+		status = &in.Status
 	}
 
-	orgID := auth.OrganizationID(ctx)
-
-	var rows []db.Supplier
+	var rows []db.ListSuppliersRow
 	var total int64
 	// A função anônima "enxerga" rows e total de fora (closure) e os preenche.
 	err := h.tx(ctx, orgID, func(s Store) error {
 		var err error
 		rows, err = s.ListSuppliers(ctx, db.ListSuppliersParams{
-			OrganizationID: orgID, Search: search, Active: active,
+			OrganizationID: orgID, Search: search, Status: status,
 			LimitRows: in.Limit, OffsetRows: in.Offset,
 		})
 		if err != nil {
 			return err
 		}
 		total, err = s.CountSuppliers(ctx, db.CountSuppliersParams{
-			OrganizationID: orgID, Search: search, Active: active,
+			OrganizationID: orgID, Search: search, Status: status,
 		})
 		return err
 	})
@@ -262,9 +252,17 @@ func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppli
 
 	out := &listSuppliersOutput{}
 	// make com tamanho 0 para que um resultado vazio vire [] no JSON, e não null.
-	out.Body.Items = make([]Supplier, 0, len(rows))
+	out.Body.Items = make([]SupplierSummary, 0, len(rows))
 	for _, r := range rows {
-		out.Body.Items = append(out.Body.Items, toAPI(r))
+		item := SupplierSummary{
+			ID: r.PartyID, PersonType: r.PersonType, Document: r.Document, LegalName: r.LegalName,
+			TradeName: r.TradeName, Phone: r.Phone, Whatsapp: r.Whatsapp,
+			SupplierType: r.SupplierType, DefaultPurchaseMode: r.DefaultPurchaseMode, Status: r.Status,
+		}
+		if r.CityName != nil && r.CityState != nil {
+			item.City = &party.City{Name: *r.CityName, State: *r.CityState}
+		}
+		out.Body.Items = append(out.Body.Items, item)
 	}
 	out.Body.Total = total
 	out.Body.Limit = in.Limit
@@ -274,53 +272,81 @@ func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppli
 
 func (h *handler) get(ctx context.Context, in *idInput) (*supplierOutput, error) {
 	orgID := auth.OrganizationID(ctx)
-	var row db.Supplier
+	var out Supplier
 	err := h.tx(ctx, orgID, func(s Store) error {
 		var err error
-		row, err = s.GetSupplier(ctx, db.GetSupplierParams{OrganizationID: orgID, ID: in.ID})
+		out, err = load(ctx, s, orgID, in.ID)
 		return err
 	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return &supplierOutput{Body: toAPI(row)}, nil
+	return &supplierOutput{Body: out}, nil
 }
 
+// create grava pessoa + fornecedor + contatos na mesma transação: ou tudo, ou nada.
 func (h *handler) create(ctx context.Context, in *createInput) (*supplierOutput, error) {
 	orgID := auth.OrganizationID(ctx)
-	f := in.Body
-	var row db.Supplier
+	f := &in.Body
+	var out Supplier
 	err := h.tx(ctx, orgID, func(s Store) error {
-		var err error
-		row, err = s.CreateSupplier(ctx, db.CreateSupplierParams{
-			OrganizationID: orgID, Name: f.Name, Document: f.Document, Phone: f.Phone,
-			Email: f.Email, City: f.City, State: f.State, Notes: f.Notes,
+		partyID, err := s.CreateParty(ctx, f.CreateParams(orgID))
+		if err != nil {
+			return err
+		}
+		err = s.CreateSupplier(ctx, db.CreateSupplierParams{
+			PartyID: partyID, OrganizationID: orgID, SupplierType: f.SupplierType,
+			DefaultPurchaseMode: f.DefaultPurchaseMode, ConsignmentCommission: f.ConsignmentCommission,
+			PaymentTermDays: f.PaymentTermDays, CeasaPavilion: f.CeasaPavilion, CeasaBox: f.CeasaBox,
+			Status: f.Status, BlockedReason: f.BlockedReason,
 		})
+		if err != nil {
+			return err
+		}
+		if err := party.SaveContacts(ctx, s, orgID, partyID, f.Contacts); err != nil {
+			return err
+		}
+		out, err = load(ctx, s, orgID, partyID)
 		return err
 	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return &supplierOutput{Body: toAPI(row)}, nil
+	return &supplierOutput{Body: out}, nil
 }
 
 func (h *handler) update(ctx context.Context, in *updateInput) (*supplierOutput, error) {
 	orgID := auth.OrganizationID(ctx)
-	f := in.Body
-	var row db.Supplier
+	f := &in.Body
+	var out Supplier
 	err := h.tx(ctx, orgID, func(s Store) error {
-		var err error
-		row, err = s.UpdateSupplier(ctx, db.UpdateSupplierParams{
-			OrganizationID: orgID, ID: in.ID, Name: f.Name, Document: f.Document,
-			Phone: f.Phone, Email: f.Email, City: f.City, State: f.State,
-			Notes: f.Notes, Active: f.Active,
+		// Primeiro o fornecedor: se ele não existir (ou for de outra organização),
+		// nenhuma linha é alterada e respondemos 404 sem mexer na pessoa.
+		n, err := s.UpdateSupplier(ctx, db.UpdateSupplierParams{
+			PartyID: in.ID, OrganizationID: orgID, SupplierType: f.SupplierType,
+			DefaultPurchaseMode: f.DefaultPurchaseMode, ConsignmentCommission: f.ConsignmentCommission,
+			PaymentTermDays: f.PaymentTermDays, CeasaPavilion: f.CeasaPavilion, CeasaBox: f.CeasaBox,
+			Status: f.Status, BlockedReason: f.BlockedReason,
 		})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return pgx.ErrNoRows
+		}
+		if _, err := s.UpdateParty(ctx, f.UpdateParams(orgID, in.ID)); err != nil {
+			return err
+		}
+		if err := party.SaveContacts(ctx, s, orgID, in.ID, f.Contacts); err != nil {
+			return err
+		}
+		out, err = load(ctx, s, orgID, in.ID)
 		return err
 	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return &supplierOutput{Body: toAPI(row)}, nil
+	return &supplierOutput{Body: out}, nil
 }
 
 // deactivate devolve *struct{}: uma saída vazia, ou seja, resposta sem corpo.
@@ -329,7 +355,7 @@ func (h *handler) deactivate(ctx context.Context, in *idInput) (*struct{}, error
 	var n int64
 	err := h.tx(ctx, orgID, func(s Store) error {
 		var err error
-		n, err = s.DeactivateSupplier(ctx, db.DeactivateSupplierParams{OrganizationID: orgID, ID: in.ID})
+		n, err = s.DeactivateSupplier(ctx, db.DeactivateSupplierParams{OrganizationID: orgID, PartyID: in.ID})
 		return err
 	})
 	if err != nil {
@@ -345,8 +371,37 @@ func (h *handler) deactivate(ctx context.Context, in *idInput) (*struct{}, error
 // Funções auxiliares
 // ---------------------------------------------------------------------------
 
-// uniqueViolation é o código de erro do PostgreSQL quando uma constraint UNIQUE falha.
-const uniqueViolation = "23505"
+// load busca o fornecedor completo (com cidade e contatos).
+func load(ctx context.Context, s Store, orgID, id int64) (Supplier, error) {
+	row, err := s.GetSupplier(ctx, db.GetSupplierParams{OrganizationID: orgID, ID: id})
+	if err != nil {
+		return Supplier{}, err
+	}
+	contacts, err := s.ListPartyContacts(ctx, db.ListPartyContactsParams{OrganizationID: orgID, PartyID: id})
+	if err != nil {
+		return Supplier{}, err
+	}
+	sup := row.Supplier
+	return Supplier{
+		ID:                    sup.PartyID,
+		Party:                 party.FromDB(row.Party, row.CityName, row.CityState, contacts),
+		SupplierType:          sup.SupplierType,
+		DefaultPurchaseMode:   sup.DefaultPurchaseMode,
+		ConsignmentCommission: sup.ConsignmentCommission,
+		PaymentTermDays:       sup.PaymentTermDays,
+		CeasaPavilion:         sup.CeasaPavilion,
+		CeasaBox:              sup.CeasaBox,
+		Status:                sup.Status,
+		BlockedReason:         sup.BlockedReason,
+		Timestamps:            party.Timestamps{CreatedAt: sup.CreatedAt, UpdatedAt: sup.UpdatedAt},
+	}, nil
+}
+
+// Códigos de erro do PostgreSQL que viram respostas específicas.
+const (
+	uniqueViolation     = "23505"
+	foreignKeyViolation = "23503"
+)
 
 // mapError traduz erros do banco em erros HTTP.
 // Qualquer coisa inesperada volta como está e o Huma responde 500.
@@ -355,16 +410,26 @@ func mapError(err error) error {
 		return huma.Error404NotFound("supplier not found")
 	}
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
-		return huma.Error409Conflict("a supplier with this document already exists")
+	if errors.As(err, &pgErr) {
+		switch {
+		case pgErr.Code == uniqueViolation:
+			return huma.Error409Conflict("a registration with this document already exists")
+		case pgErr.Code == foreignKeyViolation && pgErr.ConstraintName == "parties_city_id_fkey":
+			return huma.Error422UnprocessableEntity("validation failed", &huma.ErrorDetail{
+				Location: "body.address.cityId", Message: "city not found",
+			})
+		}
 	}
 	return err
 }
 
-func toAPI(s db.Supplier) Supplier {
-	return Supplier{
-		ID: s.ID, Name: s.Name, Document: s.Document, Phone: s.Phone, Email: s.Email,
-		City: s.City, State: s.State, Notes: s.Notes, Active: s.Active,
-		CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt,
+func trimmed(s *string) *string {
+	if s == nil {
+		return nil
 	}
+	v := strings.TrimSpace(*s)
+	if v == "" {
+		return nil
+	}
+	return &v
 }

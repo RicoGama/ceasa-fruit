@@ -17,3 +17,12 @@ sql:
         overrides:
           - db_type: timestamptz
             go_type: time.Time
+          # Percentuais (comissão) como float64. Valores em dinheiro, quando
+          # vierem, vão usar um tipo decimal de verdade (float tem arredondamento).
+          - db_type: pg_catalog.numeric
+            go_type: float64
+          - db_type: pg_catalog.numeric
+            nullable: true
+            go_type:
+              type: float64
+              pointer: true

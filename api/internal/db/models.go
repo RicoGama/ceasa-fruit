@@ -8,6 +8,27 @@ import (
 	"time"
 )
 
+type City struct {
+	ID        int32
+	Name      string
+	StateCode string
+}
+
+type LegacySupplier struct {
+	ID             int64
+	Name           string
+	Document       string
+	Phone          *string
+	Email          *string
+	City           *string
+	State          *string
+	Notes          *string
+	Active         bool
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	OrganizationID int64
+}
+
 type Membership struct {
 	OrganizationID int64
 	UserID         int64
@@ -23,6 +44,49 @@ type Organization struct {
 	UpdatedAt time.Time
 }
 
+type Party struct {
+	ID                        int64
+	OrganizationID            int64
+	PersonType                string
+	Document                  *string
+	LegalName                 string
+	TradeName                 *string
+	StateRegistration         *string
+	TaxpayerType              string
+	Email                     *string
+	Phone                     *string
+	Whatsapp                  *string
+	PostalCode                *string
+	Street                    *string
+	Number                    *string
+	Complement                *string
+	District                  *string
+	CityID                    *int32
+	PixKeyType                *string
+	PixKey                    *string
+	Bank                      *string
+	BankBranch                *string
+	BankAccount               *string
+	BankAccountType           *string
+	BankAccountHolder         *string
+	BankAccountHolderDocument *string
+	Notes                     *string
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
+}
+
+type PartyContact struct {
+	ID             int64
+	OrganizationID int64
+	PartyID        int64
+	Name           string
+	Role           *string
+	Phone          *string
+	IsWhatsapp     bool
+	Email          *string
+	Position       int32
+}
+
 type Session struct {
 	TokenHash      []byte
 	UserID         int64
@@ -31,19 +95,25 @@ type Session struct {
 	ExpiresAt      time.Time
 }
 
+type State struct {
+	Code   string
+	IbgeID int16
+	Name   string
+}
+
 type Supplier struct {
-	ID             int64
-	Name           string
-	Document       string
-	Phone          *string
-	Email          *string
-	City           *string
-	State          *string
-	Notes          *string
-	Active         bool
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	OrganizationID int64
+	PartyID               int64
+	OrganizationID        int64
+	SupplierType          string
+	DefaultPurchaseMode   string
+	ConsignmentCommission *float64
+	PaymentTermDays       int32
+	CeasaPavilion         *string
+	CeasaBox              *string
+	Status                string
+	BlockedReason         *string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 type User struct {

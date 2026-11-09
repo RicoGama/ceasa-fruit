@@ -20,9 +20,11 @@ na ordem abaixo; os comentários no código explicam cada conceito.
 | 11 | `internal/auth/middleware.go` | middlewares do Huma (controle de acesso) |
 | 12 | `internal/auth/handlers.go` | transações (`pgx.BeginFunc`), cadastro/login, cookies na resposta |
 | 13 | `internal/postgres/tenant.go` | transação "presa" à organização (RLS) |
-| 14 | `internal/supplier/supplier.go` | Huma: struct tags, validação, interfaces, métodos, ponteiros, embedding, closures |
-| 15 | `internal/admin/admin.go` | um recurso simples, para fixar o padrão |
-| 16 | `*_test.go` | testes table-driven, fakes, `httptest`, `humatest`, teste de integração |
+| 14 | `internal/party/party.go` | dados comuns de pessoa (endereço, contatos, PIX), normalização, structs aninhadas |
+| 15 | `internal/supplier/supplier.go` | Huma: struct tags, validação, interfaces, embedding, closures, transação com várias tabelas |
+| 16 | `internal/city/city.go` | uma rota pequena de consulta (municípios do IBGE) |
+| 17 | `internal/admin/admin.go` | um recurso simples, para fixar o padrão |
+| 18 | `*_test.go` | testes table-driven, fakes, `httptest`, `humatest`, teste de integração |
 
 ## Conceitos-chave em 1 linha cada
 
@@ -40,7 +42,11 @@ na ordem abaixo; os comentários no código explicam cada conceito.
 | Usuário | `users` | quem faz login; pode participar de **várias** organizações |
 | Vínculo | `memberships` | usuário + organização + papel (`owner`, `admin`, `member`) |
 | Sessão | `sessions` | login ativo + organização selecionada no momento |
-| Cliente do cliente | `customers` | *(próximo passo)* |
+| Pessoa (física/jurídica) | `parties` | dados comuns: documento, nomes, endereço, PIX/banco |
+| Contatos da pessoa | `party_contacts` | dono, gerente, motorista... |
+| Fornecedor | `suppliers` | papel "fornecedor" de uma pessoa (consignação, prazo, box) |
+| Cliente do cliente | `customers` | *(próximo passo: outro papel da mesma pessoa)* |
+| Municípios/UFs | `cities`, `states` | lista oficial do IBGE (sem organização, sem RLS) |
 
 Toda tabela de negócio tem `organization_id` e é protegida em **duas camadas**:
 
@@ -114,6 +120,15 @@ make help
 6. Testes em `internal/customer/customer_test.go` e um caso no teste de integração.
 
 ## Decisões
+
+- **Cadastro único de pessoas** (`parties`): na CEASA o mesmo CNPJ costuma ser
+  fornecedor e cliente. Os dados comuns ficam uma vez só; cada papel tem sua tabela.
+- **Município pelo código IBGE** (`cities.id`): é o código que a nota fiscal exige.
+  A lista vem da migration `00003`, gerada por `scripts/gen-cities-migration.py`.
+- **Consignação ou compra direta** por fornecedor (padrão), com comissão em %
+  obrigatória na consignação. Cada compra poderá mudar a modalidade.
+- **Documento opcional**: produtor pequeno pode ser cadastrado antes de informar
+  o CPF; quando informado, é único na organização e precisa combinar com o tipo de pessoa.
 
 - **Fornecedor nunca é apagado**: `DELETE /suppliers/{id}` só inativa (`active = false`), porque estoque e compras vão referenciá-lo.
 - **CPF ou CNPJ**: produtor rural costuma ter só CPF. O CNPJ alfanumérico (julho/2026) já é aceito.

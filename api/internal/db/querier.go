@@ -16,27 +16,35 @@ type Querier interface {
 	CountSuppliers(ctx context.Context, arg CountSuppliersParams) (int64, error)
 	CreateMembership(ctx context.Context, arg CreateMembershipParams) error
 	CreateOrganization(ctx context.Context, name string) (Organization, error)
-	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	// Toda query filtra por organization_id explicitamente, MESMO com o RLS ativo.
-	// São duas camadas: se uma falhar, a outra segura.
-	// @nome é atalho do sqlc para sqlc.arg('nome').
-	CreateSupplier(ctx context.Context, arg CreateSupplierParams) (Supplier, error)
+	// @nome é atalho do sqlc para sqlc.arg('nome'); sqlc.narg = pode ser NULL.
+	CreateParty(ctx context.Context, arg CreatePartyParams) (int64, error)
+	CreatePartyContact(ctx context.Context, arg CreatePartyContactParams) error
+	CreateSession(ctx context.Context, arg CreateSessionParams) error
+	CreateSupplier(ctx context.Context, arg CreateSupplierParams) error
 	// Queries de autenticação. Estas tabelas não têm RLS: são usadas antes de
 	// sabermos qual organização está ativa.
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeactivateSupplier(ctx context.Context, arg DeactivateSupplierParams) (int64, error)
+	DeletePartyContacts(ctx context.Context, arg DeletePartyContactsParams) error
 	DeleteSession(ctx context.Context, tokenHash []byte) error
 	GetMembership(ctx context.Context, arg GetMembershipParams) (GetMembershipRow, error)
 	// Carrega tudo o que uma requisição autenticada precisa numa consulta só.
 	// LEFT JOIN: a sessão pode ainda não ter organização selecionada.
 	GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error)
-	GetSupplier(ctx context.Context, arg GetSupplierParams) (Supplier, error)
+	// sqlc.embed devolve as colunas de cada tabela agrupadas (row.Party, row.Supplier).
+	GetSupplier(ctx context.Context, arg GetSupplierParams) (GetSupplierRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
-	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]Supplier, error)
+	ListPartyContacts(ctx context.Context, arg ListPartyContactsParams) ([]PartyContact, error)
+	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]ListSuppliersRow, error)
 	ListUserOrganizations(ctx context.Context, userID int64) ([]ListUserOrganizationsRow, error)
 	PromotePlatformAdmin(ctx context.Context, email string) (int64, error)
+	// Municípios do IBGE (tabela de referência, sem organização).
+	// Busca sem acento; quem começa com o texto aparece primeiro.
+	SearchCities(ctx context.Context, arg SearchCitiesParams) ([]City, error)
 	SetSessionOrganization(ctx context.Context, arg SetSessionOrganizationParams) error
-	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (Supplier, error)
+	UpdateParty(ctx context.Context, arg UpdatePartyParams) (int64, error)
+	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

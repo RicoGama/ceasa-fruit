@@ -6,6 +6,17 @@ import type { ApiErrorModel } from '~/types'
 const translations: Record<string, string> = {
   'invalid CPF or CNPJ': 'CPF ou CNPJ inválido',
   'a supplier with this document already exists': 'Já existe um fornecedor com este documento',
+  'a registration with this document already exists': 'Já existe um cadastro com este documento',
+  'an individual must have a CPF': 'Pessoa física precisa de CPF',
+  'a company must have a CNPJ': 'Pessoa jurídica precisa de CNPJ',
+  'invalid postal code': 'CEP inválido',
+  'invalid phone': 'Telefone inválido',
+  'pix key type is required': 'Informe o tipo da chave PIX',
+  'pix key is required': 'Informe a chave PIX',
+  'invalid pix key': 'Chave PIX inválida',
+  'commission is required for consignment': 'Informe a comissão da consignação',
+  'reason is required when blocked': 'Informe o motivo do bloqueio',
+  'city not found': 'Município não encontrado',
   'supplier not found': 'Fornecedor não encontrado',
   'email already registered': 'Este e-mail já está cadastrado',
   'invalid email or password': 'E-mail ou senha inválidos',
@@ -35,7 +46,8 @@ export function apiFieldErrors(error: unknown): FormError[] {
   return (e?.errors ?? [])
     .filter(err => err.location?.startsWith('body.'))
     .map(err => ({
-      name: err.location!.slice('body.'.length),
+      // "body.contacts[1].name" -> "contacts.1.name" (o formato de caminho do UForm)
+      name: err.location!.slice('body.'.length).replace(/\[(\d+)\]/g, '.$1'),
       message: translateApiMessage(err.message),
     }))
 }

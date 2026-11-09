@@ -10,99 +10,224 @@ import (
 )
 
 const countSuppliers = `-- name: CountSuppliers :one
-SELECT count(*) FROM suppliers
-WHERE organization_id = $1
+SELECT count(*)
+FROM suppliers s
+JOIN parties p ON p.id = s.party_id
+WHERE s.organization_id = $1
   AND ($2::text IS NULL
-       OR unaccent(name) ILIKE '%' || unaccent($2) || '%'
-       OR document LIKE $2 || '%')
-  AND ($3::boolean IS NULL OR active = $3)
+       OR unaccent(p.legal_name) ILIKE '%' || unaccent($2) || '%'
+       OR unaccent(p.trade_name) ILIKE '%' || unaccent($2) || '%'
+       OR p.document LIKE upper($2) || '%')
+  AND ($3::text IS NULL OR s.status = $3)
 `
 
 type CountSuppliersParams struct {
 	OrganizationID int64
 	Search         *string
-	Active         *bool
+	Status         *string
 }
 
 func (q *Queries) CountSuppliers(ctx context.Context, arg CountSuppliersParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countSuppliers, arg.OrganizationID, arg.Search, arg.Active)
+	row := q.db.QueryRow(ctx, countSuppliers, arg.OrganizationID, arg.Search, arg.Status)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
-const createSupplier = `-- name: CreateSupplier :one
+const createParty = `-- name: CreateParty :one
 
-INSERT INTO suppliers (organization_id, name, document, phone, email, city, state, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, name, document, phone, email, city, state, notes, active, created_at, updated_at, organization_id
+INSERT INTO parties (
+    organization_id, person_type, document, legal_name, trade_name,
+    state_registration, taxpayer_type, email, phone, whatsapp,
+    postal_code, street, number, complement, district, city_id,
+    pix_key_type, pix_key, bank, bank_branch, bank_account, bank_account_type,
+    bank_account_holder, bank_account_holder_document, notes
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9, $10,
+    $11, $12, $13, $14, $15, $16,
+    $17, $18, $19, $20, $21, $22,
+    $23, $24, $25
+)
+RETURNING id
 `
 
-type CreateSupplierParams struct {
-	OrganizationID int64
-	Name           string
-	Document       string
-	Phone          *string
-	Email          *string
-	City           *string
-	State          *string
-	Notes          *string
+type CreatePartyParams struct {
+	OrganizationID            int64
+	PersonType                string
+	Document                  *string
+	LegalName                 string
+	TradeName                 *string
+	StateRegistration         *string
+	TaxpayerType              string
+	Email                     *string
+	Phone                     *string
+	Whatsapp                  *string
+	PostalCode                *string
+	Street                    *string
+	Number                    *string
+	Complement                *string
+	District                  *string
+	CityID                    *int32
+	PixKeyType                *string
+	PixKey                    *string
+	Bank                      *string
+	BankBranch                *string
+	BankAccount               *string
+	BankAccountType           *string
+	BankAccountHolder         *string
+	BankAccountHolderDocument *string
+	Notes                     *string
 }
 
 // Toda query filtra por organization_id explicitamente, MESMO com o RLS ativo.
-// São duas camadas: se uma falhar, a outra segura.
-// @nome é atalho do sqlc para sqlc.arg('nome').
-func (q *Queries) CreateSupplier(ctx context.Context, arg CreateSupplierParams) (Supplier, error) {
-	row := q.db.QueryRow(ctx, createSupplier,
+// @nome é atalho do sqlc para sqlc.arg('nome'); sqlc.narg = pode ser NULL.
+func (q *Queries) CreateParty(ctx context.Context, arg CreatePartyParams) (int64, error) {
+	row := q.db.QueryRow(ctx, createParty,
 		arg.OrganizationID,
-		arg.Name,
+		arg.PersonType,
 		arg.Document,
-		arg.Phone,
+		arg.LegalName,
+		arg.TradeName,
+		arg.StateRegistration,
+		arg.TaxpayerType,
 		arg.Email,
-		arg.City,
-		arg.State,
+		arg.Phone,
+		arg.Whatsapp,
+		arg.PostalCode,
+		arg.Street,
+		arg.Number,
+		arg.Complement,
+		arg.District,
+		arg.CityID,
+		arg.PixKeyType,
+		arg.PixKey,
+		arg.Bank,
+		arg.BankBranch,
+		arg.BankAccount,
+		arg.BankAccountType,
+		arg.BankAccountHolder,
+		arg.BankAccountHolderDocument,
 		arg.Notes,
 	)
-	var i Supplier
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Document,
-		&i.Phone,
-		&i.Email,
-		&i.City,
-		&i.State,
-		&i.Notes,
-		&i.Active,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.OrganizationID,
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createPartyContact = `-- name: CreatePartyContact :exec
+INSERT INTO party_contacts (organization_id, party_id, name, role, phone, is_whatsapp, email, position)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+`
+
+type CreatePartyContactParams struct {
+	OrganizationID int64
+	PartyID        int64
+	Name           string
+	Role           *string
+	Phone          *string
+	IsWhatsapp     bool
+	Email          *string
+	Position       int32
+}
+
+func (q *Queries) CreatePartyContact(ctx context.Context, arg CreatePartyContactParams) error {
+	_, err := q.db.Exec(ctx, createPartyContact,
+		arg.OrganizationID,
+		arg.PartyID,
+		arg.Name,
+		arg.Role,
+		arg.Phone,
+		arg.IsWhatsapp,
+		arg.Email,
+		arg.Position,
 	)
-	return i, err
+	return err
+}
+
+const createSupplier = `-- name: CreateSupplier :exec
+INSERT INTO suppliers (
+    party_id, organization_id, supplier_type, default_purchase_mode,
+    consignment_commission, payment_term_days, ceasa_pavilion, ceasa_box,
+    status, blocked_reason
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, $7, $8,
+    $9, $10
+)
+`
+
+type CreateSupplierParams struct {
+	PartyID               int64
+	OrganizationID        int64
+	SupplierType          string
+	DefaultPurchaseMode   string
+	ConsignmentCommission *float64
+	PaymentTermDays       int32
+	CeasaPavilion         *string
+	CeasaBox              *string
+	Status                string
+	BlockedReason         *string
+}
+
+func (q *Queries) CreateSupplier(ctx context.Context, arg CreateSupplierParams) error {
+	_, err := q.db.Exec(ctx, createSupplier,
+		arg.PartyID,
+		arg.OrganizationID,
+		arg.SupplierType,
+		arg.DefaultPurchaseMode,
+		arg.ConsignmentCommission,
+		arg.PaymentTermDays,
+		arg.CeasaPavilion,
+		arg.CeasaBox,
+		arg.Status,
+		arg.BlockedReason,
+	)
+	return err
 }
 
 const deactivateSupplier = `-- name: DeactivateSupplier :execrows
 UPDATE suppliers
-SET active = FALSE, updated_at = now()
-WHERE organization_id = $1 AND id = $2
+SET status = 'inactive', blocked_reason = NULL, updated_at = now()
+WHERE organization_id = $1 AND party_id = $2
 `
 
 type DeactivateSupplierParams struct {
 	OrganizationID int64
-	ID             int64
+	PartyID        int64
 }
 
 func (q *Queries) DeactivateSupplier(ctx context.Context, arg DeactivateSupplierParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deactivateSupplier, arg.OrganizationID, arg.ID)
+	result, err := q.db.Exec(ctx, deactivateSupplier, arg.OrganizationID, arg.PartyID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
+const deletePartyContacts = `-- name: DeletePartyContacts :exec
+DELETE FROM party_contacts
+WHERE organization_id = $1 AND party_id = $2
+`
+
+type DeletePartyContactsParams struct {
+	OrganizationID int64
+	PartyID        int64
+}
+
+func (q *Queries) DeletePartyContacts(ctx context.Context, arg DeletePartyContactsParams) error {
+	_, err := q.db.Exec(ctx, deletePartyContacts, arg.OrganizationID, arg.PartyID)
+	return err
+}
+
 const getSupplier = `-- name: GetSupplier :one
-SELECT id, name, document, phone, email, city, state, notes, active, created_at, updated_at, organization_id FROM suppliers
-WHERE organization_id = $1 AND id = $2
+SELECT p.id, p.organization_id, p.person_type, p.document, p.legal_name, p.trade_name, p.state_registration, p.taxpayer_type, p.email, p.phone, p.whatsapp, p.postal_code, p.street, p.number, p.complement, p.district, p.city_id, p.pix_key_type, p.pix_key, p.bank, p.bank_branch, p.bank_account, p.bank_account_type, p.bank_account_holder, p.bank_account_holder_document, p.notes, p.created_at, p.updated_at, s.party_id, s.organization_id, s.supplier_type, s.default_purchase_mode, s.consignment_commission, s.payment_term_days, s.ceasa_pavilion, s.ceasa_box, s.status, s.blocked_reason, s.created_at, s.updated_at,
+       c.name       AS city_name,
+       c.state_code AS city_state
+FROM suppliers s
+JOIN parties p ON p.id = s.party_id
+LEFT JOIN cities c ON c.id = p.city_id
+WHERE s.organization_id = $1 AND s.party_id = $2
 `
 
 type GetSupplierParams struct {
@@ -110,73 +235,94 @@ type GetSupplierParams struct {
 	ID             int64
 }
 
-func (q *Queries) GetSupplier(ctx context.Context, arg GetSupplierParams) (Supplier, error) {
+type GetSupplierRow struct {
+	Party     Party
+	Supplier  Supplier
+	CityName  *string
+	CityState *string
+}
+
+// sqlc.embed devolve as colunas de cada tabela agrupadas (row.Party, row.Supplier).
+func (q *Queries) GetSupplier(ctx context.Context, arg GetSupplierParams) (GetSupplierRow, error) {
 	row := q.db.QueryRow(ctx, getSupplier, arg.OrganizationID, arg.ID)
-	var i Supplier
+	var i GetSupplierRow
 	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Document,
-		&i.Phone,
-		&i.Email,
-		&i.City,
-		&i.State,
-		&i.Notes,
-		&i.Active,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.OrganizationID,
+		&i.Party.ID,
+		&i.Party.OrganizationID,
+		&i.Party.PersonType,
+		&i.Party.Document,
+		&i.Party.LegalName,
+		&i.Party.TradeName,
+		&i.Party.StateRegistration,
+		&i.Party.TaxpayerType,
+		&i.Party.Email,
+		&i.Party.Phone,
+		&i.Party.Whatsapp,
+		&i.Party.PostalCode,
+		&i.Party.Street,
+		&i.Party.Number,
+		&i.Party.Complement,
+		&i.Party.District,
+		&i.Party.CityID,
+		&i.Party.PixKeyType,
+		&i.Party.PixKey,
+		&i.Party.Bank,
+		&i.Party.BankBranch,
+		&i.Party.BankAccount,
+		&i.Party.BankAccountType,
+		&i.Party.BankAccountHolder,
+		&i.Party.BankAccountHolderDocument,
+		&i.Party.Notes,
+		&i.Party.CreatedAt,
+		&i.Party.UpdatedAt,
+		&i.Supplier.PartyID,
+		&i.Supplier.OrganizationID,
+		&i.Supplier.SupplierType,
+		&i.Supplier.DefaultPurchaseMode,
+		&i.Supplier.ConsignmentCommission,
+		&i.Supplier.PaymentTermDays,
+		&i.Supplier.CeasaPavilion,
+		&i.Supplier.CeasaBox,
+		&i.Supplier.Status,
+		&i.Supplier.BlockedReason,
+		&i.Supplier.CreatedAt,
+		&i.Supplier.UpdatedAt,
+		&i.CityName,
+		&i.CityState,
 	)
 	return i, err
 }
 
-const listSuppliers = `-- name: ListSuppliers :many
-SELECT id, name, document, phone, email, city, state, notes, active, created_at, updated_at, organization_id FROM suppliers
-WHERE organization_id = $1
-  AND ($2::text IS NULL
-       OR unaccent(name) ILIKE '%' || unaccent($2) || '%'
-       OR document LIKE $2 || '%')
-  AND ($3::boolean IS NULL OR active = $3)
-ORDER BY lower(name), id
-LIMIT $5 OFFSET $4
+const listPartyContacts = `-- name: ListPartyContacts :many
+SELECT id, organization_id, party_id, name, role, phone, is_whatsapp, email, position FROM party_contacts
+WHERE organization_id = $1 AND party_id = $2
+ORDER BY position, id
 `
 
-type ListSuppliersParams struct {
+type ListPartyContactsParams struct {
 	OrganizationID int64
-	Search         *string
-	Active         *bool
-	OffsetRows     int32
-	LimitRows      int32
+	PartyID        int64
 }
 
-func (q *Queries) ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]Supplier, error) {
-	rows, err := q.db.Query(ctx, listSuppliers,
-		arg.OrganizationID,
-		arg.Search,
-		arg.Active,
-		arg.OffsetRows,
-		arg.LimitRows,
-	)
+func (q *Queries) ListPartyContacts(ctx context.Context, arg ListPartyContactsParams) ([]PartyContact, error) {
+	rows, err := q.db.Query(ctx, listPartyContacts, arg.OrganizationID, arg.PartyID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Supplier
+	var items []PartyContact
 	for rows.Next() {
-		var i Supplier
+		var i PartyContact
 		if err := rows.Scan(
 			&i.ID,
-			&i.Name,
-			&i.Document,
-			&i.Phone,
-			&i.Email,
-			&i.City,
-			&i.State,
-			&i.Notes,
-			&i.Active,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 			&i.OrganizationID,
+			&i.PartyID,
+			&i.Name,
+			&i.Role,
+			&i.Phone,
+			&i.IsWhatsapp,
+			&i.Email,
+			&i.Position,
 		); err != nil {
 			return nil, err
 		}
@@ -188,61 +334,201 @@ func (q *Queries) ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([
 	return items, nil
 }
 
-const updateSupplier = `-- name: UpdateSupplier :one
-UPDATE suppliers
-SET name       = $1,
-    document   = $2,
-    phone      = $3,
-    email      = $4,
-    city       = $5,
-    state      = $6,
-    notes      = $7,
-    active     = $8,
-    updated_at = now()
-WHERE organization_id = $9 AND id = $10
-RETURNING id, name, document, phone, email, city, state, notes, active, created_at, updated_at, organization_id
+const listSuppliers = `-- name: ListSuppliers :many
+SELECT s.party_id, p.person_type, p.document, p.legal_name, p.trade_name,
+       p.phone, p.whatsapp, c.name AS city_name, c.state_code AS city_state,
+       s.supplier_type, s.default_purchase_mode, s.status
+FROM suppliers s
+JOIN parties p ON p.id = s.party_id
+LEFT JOIN cities c ON c.id = p.city_id
+WHERE s.organization_id = $1
+  AND ($2::text IS NULL
+       OR unaccent(p.legal_name) ILIKE '%' || unaccent($2) || '%'
+       OR unaccent(p.trade_name) ILIKE '%' || unaccent($2) || '%'
+       OR p.document LIKE upper($2) || '%')
+  AND ($3::text IS NULL OR s.status = $3)
+ORDER BY lower(coalesce(p.trade_name, p.legal_name)), s.party_id
+LIMIT $5 OFFSET $4
 `
 
-type UpdateSupplierParams struct {
-	Name           string
-	Document       string
-	Phone          *string
-	Email          *string
-	City           *string
-	State          *string
-	Notes          *string
-	Active         bool
+type ListSuppliersParams struct {
 	OrganizationID int64
-	ID             int64
+	Search         *string
+	Status         *string
+	OffsetRows     int32
+	LimitRows      int32
 }
 
-func (q *Queries) UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (Supplier, error) {
-	row := q.db.QueryRow(ctx, updateSupplier,
-		arg.Name,
+type ListSuppliersRow struct {
+	PartyID             int64
+	PersonType          string
+	Document            *string
+	LegalName           string
+	TradeName           *string
+	Phone               *string
+	Whatsapp            *string
+	CityName            *string
+	CityState           *string
+	SupplierType        string
+	DefaultPurchaseMode string
+	Status              string
+}
+
+func (q *Queries) ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]ListSuppliersRow, error) {
+	rows, err := q.db.Query(ctx, listSuppliers,
+		arg.OrganizationID,
+		arg.Search,
+		arg.Status,
+		arg.OffsetRows,
+		arg.LimitRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSuppliersRow
+	for rows.Next() {
+		var i ListSuppliersRow
+		if err := rows.Scan(
+			&i.PartyID,
+			&i.PersonType,
+			&i.Document,
+			&i.LegalName,
+			&i.TradeName,
+			&i.Phone,
+			&i.Whatsapp,
+			&i.CityName,
+			&i.CityState,
+			&i.SupplierType,
+			&i.DefaultPurchaseMode,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateParty = `-- name: UpdateParty :execrows
+UPDATE parties
+SET person_type = $1, document = $2, legal_name = $3,
+    trade_name = $4, state_registration = $5,
+    taxpayer_type = $6, email = $7, phone = $8, whatsapp = $9,
+    postal_code = $10, street = $11, number = $12,
+    complement = $13, district = $14, city_id = $15,
+    pix_key_type = $16, pix_key = $17, bank = $18,
+    bank_branch = $19, bank_account = $20,
+    bank_account_type = $21, bank_account_holder = $22,
+    bank_account_holder_document = $23, notes = $24,
+    updated_at = now()
+WHERE organization_id = $25 AND id = $26
+`
+
+type UpdatePartyParams struct {
+	PersonType                string
+	Document                  *string
+	LegalName                 string
+	TradeName                 *string
+	StateRegistration         *string
+	TaxpayerType              string
+	Email                     *string
+	Phone                     *string
+	Whatsapp                  *string
+	PostalCode                *string
+	Street                    *string
+	Number                    *string
+	Complement                *string
+	District                  *string
+	CityID                    *int32
+	PixKeyType                *string
+	PixKey                    *string
+	Bank                      *string
+	BankBranch                *string
+	BankAccount               *string
+	BankAccountType           *string
+	BankAccountHolder         *string
+	BankAccountHolderDocument *string
+	Notes                     *string
+	OrganizationID            int64
+	ID                        int64
+}
+
+func (q *Queries) UpdateParty(ctx context.Context, arg UpdatePartyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateParty,
+		arg.PersonType,
 		arg.Document,
-		arg.Phone,
+		arg.LegalName,
+		arg.TradeName,
+		arg.StateRegistration,
+		arg.TaxpayerType,
 		arg.Email,
-		arg.City,
-		arg.State,
+		arg.Phone,
+		arg.Whatsapp,
+		arg.PostalCode,
+		arg.Street,
+		arg.Number,
+		arg.Complement,
+		arg.District,
+		arg.CityID,
+		arg.PixKeyType,
+		arg.PixKey,
+		arg.Bank,
+		arg.BankBranch,
+		arg.BankAccount,
+		arg.BankAccountType,
+		arg.BankAccountHolder,
+		arg.BankAccountHolderDocument,
 		arg.Notes,
-		arg.Active,
 		arg.OrganizationID,
 		arg.ID,
 	)
-	var i Supplier
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Document,
-		&i.Phone,
-		&i.Email,
-		&i.City,
-		&i.State,
-		&i.Notes,
-		&i.Active,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.OrganizationID,
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateSupplier = `-- name: UpdateSupplier :execrows
+UPDATE suppliers
+SET supplier_type = $1, default_purchase_mode = $2,
+    consignment_commission = $3, payment_term_days = $4,
+    ceasa_pavilion = $5, ceasa_box = $6,
+    status = $7, blocked_reason = $8, updated_at = now()
+WHERE organization_id = $9 AND party_id = $10
+`
+
+type UpdateSupplierParams struct {
+	SupplierType          string
+	DefaultPurchaseMode   string
+	ConsignmentCommission *float64
+	PaymentTermDays       int32
+	CeasaPavilion         *string
+	CeasaBox              *string
+	Status                string
+	BlockedReason         *string
+	OrganizationID        int64
+	PartyID               int64
+}
+
+func (q *Queries) UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateSupplier,
+		arg.SupplierType,
+		arg.DefaultPurchaseMode,
+		arg.ConsignmentCommission,
+		arg.PaymentTermDays,
+		arg.CeasaPavilion,
+		arg.CeasaBox,
+		arg.Status,
+		arg.BlockedReason,
+		arg.OrganizationID,
+		arg.PartyID,
 	)
-	return i, err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

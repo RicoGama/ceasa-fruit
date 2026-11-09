@@ -18,6 +18,7 @@ import (
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/admin"
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
+	"github.com/RicoGama/ceasa-fruit/api/internal/city"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
@@ -112,6 +113,7 @@ func build(d Deps) (http.Handler, huma.API) {
 
 	auth.Register(public, authed, d.Pool, auth.Cookies{Secure: d.CookieSecure})
 	admin.Register(platformAdmin, queries)
+	city.Register(authed, queries)
 
 	// Rotas de negócio: cada requisição roda numa transação com RLS da organização.
 	tenantTx := func(ctx context.Context, orgID int64, fn func(supplier.Store) error) error {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuItem, TableColumn } from '@nuxt/ui'
-import type { Supplier } from '~/types'
+import type { SupplierSummary } from '~/types'
 
 definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Fornecedores · CEASA Fruit' })
@@ -11,10 +11,11 @@ const toast = useToast()
 // --- Filtros e paginação ------------------------------------------------------
 const limit = 20
 const page = ref(1)
-const status = ref<'active' | 'inactive' | 'all'>('active')
+const status = ref<'active' | 'inactive' | 'blocked' | 'all'>('active')
 const statusOptions = [
   { label: 'Ativos', value: 'active' },
   { label: 'Inativos', value: 'inactive' },
+  { label: 'Bloqueados', value: 'blocked' },
   { label: 'Todos', value: 'all' },
 ]
 
@@ -49,39 +50,30 @@ const { data, status: loadStatus, error, refresh } = await useAsyncData('supplie
 }, { watch: [debouncedSearch, status, page] })
 
 // --- Tabela -----------------------------------------------------------------
-// No celular, documento, cidade e telefone saem da tabela (classes
+// No celular, documento, cidade e modalidade saem da tabela (classes
 // "hidden md:table-cell"); o documento passa a aparecer embaixo do nome.
 const desktopOnly = { class: { th: 'hidden md:table-cell', td: 'hidden md:table-cell' } }
 
-const columns: TableColumn<Supplier>[] = [
-  { accessorKey: 'name', header: 'Nome' },
+const columns: TableColumn<SupplierSummary>[] = [
+  { accessorKey: 'legalName', header: 'Fornecedor' },
   { accessorKey: 'document', header: 'CPF/CNPJ', meta: desktopOnly },
-  { id: 'location', header: 'Cidade/UF', meta: desktopOnly },
-  { accessorKey: 'phone', header: 'Telefone', meta: desktopOnly },
-  { accessorKey: 'active', header: 'Status' },
+  { id: 'city', header: 'Cidade/UF', meta: desktopOnly },
+  { accessorKey: 'defaultPurchaseMode', header: 'Modalidade', meta: desktopOnly },
+  { accessorKey: 'status', header: 'Situação' },
   { id: 'actions' },
 ]
 
-function rowActions(s: Supplier): DropdownMenuItem[] {
+function rowActions(s: SupplierSummary): DropdownMenuItem[] {
   return [
-    { label: 'Editar', icon: 'i-lucide-pencil', onSelect: () => openForm(s) },
-    s.active
-      ? { label: 'Inativar', icon: 'i-lucide-archive', color: 'error', onSelect: () => { toDeactivate.value = s } }
-      : { label: 'Reativar', icon: 'i-lucide-archive-restore', onSelect: () => reactivate(s) },
+    { label: 'Abrir cadastro', icon: 'i-lucide-pencil', to: `/app/suppliers/${s.id}` },
+    ...(s.status === 'active'
+      ? [{ label: 'Inativar', icon: 'i-lucide-archive', color: 'error' as const, onSelect: () => { toDeactivate.value = s } }]
+      : []),
   ]
 }
 
-// --- Criar / editar --------------------------------------------------------------
-const formOpen = ref(false)
-const editing = ref<Supplier | null>(null)
-
-function openForm(s: Supplier | null) {
-  editing.value = s
-  formOpen.value = true
-}
-
-// --- Inativar / reativar ---------------------------------------------------------
-const toDeactivate = ref<Supplier | null>(null)
+// --- Inativar -----------------------------------------------------------------
+const toDeactivate = ref<SupplierSummary | null>(null)
 const deactivating = ref(false)
 const confirmOpen = computed({
   get: () => toDeactivate.value !== null,
@@ -101,29 +93,6 @@ async function deactivate() {
   toDeactivate.value = null
   await refresh()
 }
-
-async function reactivate(s: Supplier) {
-  // PUT exige todos os campos: reenviamos o fornecedor com active = true.
-  const { error } = await api.PUT('/suppliers/{id}', {
-    params: { path: { id: s.id } },
-    body: {
-      name: s.name,
-      document: s.document,
-      phone: s.phone ?? undefined,
-      email: s.email ?? undefined,
-      city: s.city ?? undefined,
-      state: s.state ?? undefined,
-      notes: s.notes ?? undefined,
-      active: true,
-    },
-  })
-  if (error) {
-    toast.add({ title: apiErrorMessage(error), color: 'error' })
-    return
-  }
-  toast.add({ title: 'Fornecedor reativado', color: 'success' })
-  await refresh()
-}
 </script>
 
 <template>
@@ -134,7 +103,7 @@ async function reactivate(s: Supplier) {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
-          <UButton label="Novo fornecedor" icon="i-lucide-plus" @click="openForm(null)" />
+          <UButton label="Novo fornecedor" icon="i-lucide-plus" to="/app/suppliers/new" />
         </template>
       </UDashboardNavbar>
     </template>
@@ -144,7 +113,7 @@ async function reactivate(s: Supplier) {
         <UInput
           v-model="search"
           icon="i-lucide-search"
-          placeholder="Buscar por nome ou documento"
+          placeholder="Buscar por nome, apelido ou documento"
           class="w-full sm:max-w-sm"
         />
         <USelect v-model="status" :items="statusOptions" class="w-36" />
@@ -167,27 +136,33 @@ async function reactivate(s: Supplier) {
         :loading="loadStatus === 'pending'"
         class="shrink-0"
       >
-        <template #name-cell="{ row }">
-          <p class="font-medium text-highlighted">
-            {{ row.original.name }}
-          </p>
-          <p class="md:hidden font-mono text-xs text-muted">
-            {{ formatDocument(row.original.document) }}
-          </p>
+        <template #legalName-cell="{ row }">
+          <NuxtLink :to="`/app/suppliers/${row.original.id}`" class="block group">
+            <p class="font-medium text-highlighted group-hover:text-primary">
+              {{ displayName(row.original) }}
+            </p>
+            <p v-if="row.original.tradeName" class="text-xs text-muted">
+              {{ row.original.legalName }}
+            </p>
+            <p v-if="row.original.document" class="md:hidden font-mono text-xs text-muted">
+              {{ formatDocument(row.original.document) }}
+            </p>
+          </NuxtLink>
         </template>
         <template #document-cell="{ row }">
-          <span class="font-mono text-sm">{{ formatDocument(row.original.document) }}</span>
+          <span v-if="row.original.document" class="font-mono text-sm">{{ formatDocument(row.original.document) }}</span>
+          <span v-else class="text-dimmed">—</span>
         </template>
-        <template #location-cell="{ row }">
-          {{ [row.original.city, row.original.state].filter(Boolean).join(' / ') || '—' }}
+        <template #city-cell="{ row }">
+          {{ row.original.city ? `${row.original.city.name} / ${row.original.city.state}` : '—' }}
         </template>
-        <template #phone-cell="{ row }">
-          {{ row.original.phone || '—' }}
+        <template #defaultPurchaseMode-cell="{ row }">
+          {{ purchaseModeLabels[row.original.defaultPurchaseMode] }}
         </template>
-        <template #active-cell="{ row }">
+        <template #status-cell="{ row }">
           <UBadge
-            :label="row.original.active ? 'Ativo' : 'Inativo'"
-            :color="row.original.active ? 'success' : 'neutral'"
+            :label="supplierStatusLabels[row.original.status]"
+            :color="supplierStatusColors[row.original.status]"
             variant="subtle"
           />
         </template>
@@ -204,7 +179,7 @@ async function reactivate(s: Supplier) {
             icon="i-lucide-truck"
             :title="debouncedSearch ? 'Nenhum fornecedor encontrado' : 'Nenhum fornecedor ainda'"
             :description="debouncedSearch ? 'Tente outra busca.' : 'Cadastre os produtores e atacadistas de quem você compra.'"
-            :actions="debouncedSearch ? [] : [{ label: 'Cadastrar fornecedor', icon: 'i-lucide-plus', onClick: () => openForm(null) }]"
+            :actions="debouncedSearch ? [] : [{ label: 'Cadastrar fornecedor', icon: 'i-lucide-plus', to: '/app/suppliers/new' }]"
           />
         </template>
       </UTable>
@@ -218,12 +193,10 @@ async function reactivate(s: Supplier) {
     </template>
   </UDashboardPanel>
 
-  <SuppliersSupplierFormModal v-model:open="formOpen" :supplier="editing" @saved="refresh()" />
-
   <UModal
     v-model:open="confirmOpen"
     title="Inativar fornecedor?"
-    :description="`${toDeactivate?.name} deixa de aparecer nas listas, mas o histórico é mantido. Dá para reativar depois.`"
+    :description="`${toDeactivate ? displayName(toDeactivate) : ''} deixa de aparecer nas listas, mas o histórico é mantido. Dá para reativar no cadastro.`"
     :ui="{ footer: 'justify-end' }"
   >
     <template #footer>

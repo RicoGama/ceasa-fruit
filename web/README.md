@@ -51,8 +51,10 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
 | 6 | `app/layouts/dashboard.vue` | layout com barra lateral (`UDashboard*`) |
 | 7 | `app/pages/login.vue`, `signup.vue` | formulários com validação (Zod + `UAuthForm`) |
 | 8 | `app/pages/app/suppliers/index.vue` | listagem com busca, filtro, paginação e `useAsyncData` |
-| 9 | `app/components/suppliers/SupplierFormModal.vue` | formulário em modal, `defineModel`, erros da API nos campos |
-| 10 | `app/utils/*.ts` | funções puras (CPF/CNPJ, tradução de erros, datas) |
+| 9 | `app/pages/app/suppliers/[id].vue` | rota com parâmetro, carregar um registro |
+| 10 | `app/components/suppliers/SupplierForm.vue` | formulário grande em seções, Zod com regras cruzadas, CEP automático, lista de contatos, aviso de alterações não salvas |
+| 11 | `app/components/CityInput.vue` | `defineModel`, busca com espera (debounce) na API |
+| 12 | `app/utils/*.ts` | funções puras (CPF/CNPJ, tradução de erros, datas) |
 
 ## Convenções
 
@@ -63,6 +65,8 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
   vira `<SuppliersSupplierFormModal>`.
 - Textos da tela em português; código em inglês; comentários em português.
 - Erros da API chegam em inglês e são traduzidos em `app/utils/api-error.ts`.
+- Valores de enum da API (`consignment`, `producer`...) ganham nome em português em `app/utils/labels.ts`.
+- O CEP é consultado no ViaCEP direto do navegador (`app/composables/useCep.ts`); sem internet, o usuário preenche à mão.
 
 ## Estrutura de rotas
 
@@ -71,5 +75,5 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
 | `/` | pré-renderizada no build (SEO) | público |
 | `/login`, `/signup` | SPA | só deslogado |
 | `/app/select-organization` | SPA | logado |
-| `/app`, `/app/suppliers` | SPA | logado + organização ativa |
+| `/app`, `/app/suppliers`, `/app/suppliers/new`, `/app/suppliers/:id` | SPA | logado + organização ativa |
 | `/app/admin/organizations` | SPA | admin da plataforma |

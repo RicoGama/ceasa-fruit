@@ -1,6 +1,87 @@
 {
   "components": {
     "schemas": {
+      "Address": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "$ref": "#/components/schemas/City"
+          },
+          "complement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "district": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "postalCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "postalCode",
+          "street",
+          "number",
+          "complement",
+          "district",
+          "city"
+        ],
+        "type": "object"
+      },
+      "AddressInput": {
+        "additionalProperties": false,
+        "properties": {
+          "cityId": {
+            "description": "IBGE city code",
+            "format": "int32",
+            "maximum": 9999999,
+            "minimum": 1000000,
+            "type": "integer"
+          },
+          "complement": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "district": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "number": {
+            "maxLength": 20,
+            "type": "string"
+          },
+          "postalCode": {
+            "description": "CEP, with or without dash",
+            "maxLength": 9,
+            "type": "string"
+          },
+          "street": {
+            "maxLength": 150,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "AdminOrganization": {
         "additionalProperties": false,
         "properties": {
@@ -47,6 +128,109 @@
           "memberCount",
           "createdAt",
           "updatedAt"
+        ],
+        "type": "object"
+      },
+      "City": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "examples": [
+              3304557
+            ],
+            "format": "int32",
+            "type": "integer"
+          },
+          "name": {
+            "examples": [
+              "Rio de Janeiro"
+            ],
+            "type": "string"
+          },
+          "state": {
+            "examples": [
+              "RJ"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "state"
+        ],
+        "type": "object"
+      },
+      "Contact": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "isWhatsapp": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role",
+          "phone",
+          "isWhatsapp",
+          "email"
+        ],
+        "type": "object"
+      },
+      "ContactInput": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "format": "email",
+            "maxLength": 150,
+            "type": "string"
+          },
+          "isWhatsapp": {
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 20,
+            "type": "string"
+          },
+          "role": {
+            "description": "e.g. owner, manager, driver",
+            "maxLength": 60,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
         ],
         "type": "object"
       },
@@ -181,7 +365,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/Supplier"
+              "$ref": "#/components/schemas/SupplierSummary"
             },
             "type": "array"
           },
@@ -304,6 +488,130 @@
         ],
         "type": "object"
       },
+      "Payment": {
+        "additionalProperties": false,
+        "properties": {
+          "bank": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bankAccount": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bankAccountHolder": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bankAccountHolderDocument": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bankAccountType": {
+            "enum": [
+              "checking",
+              "savings",
+              "payment"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bankBranch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pixKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pixKeyType": {
+            "enum": [
+              "cpf",
+              "cnpj",
+              "email",
+              "phone",
+              "random"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "pixKeyType",
+          "pixKey",
+          "bank",
+          "bankBranch",
+          "bankAccount",
+          "bankAccountType",
+          "bankAccountHolder",
+          "bankAccountHolderDocument"
+        ],
+        "type": "object"
+      },
+      "PaymentInput": {
+        "additionalProperties": false,
+        "properties": {
+          "bank": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "bankAccount": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "bankAccountHolder": {
+            "maxLength": 150,
+            "type": "string"
+          },
+          "bankAccountHolderDocument": {
+            "maxLength": 18,
+            "type": "string"
+          },
+          "bankAccountType": {
+            "enum": [
+              "checking",
+              "savings",
+              "payment"
+            ],
+            "type": "string"
+          },
+          "bankBranch": {
+            "maxLength": 20,
+            "type": "string"
+          },
+          "pixKey": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "pixKeyType": {
+            "enum": [
+              "cpf",
+              "cnpj",
+              "email",
+              "phone",
+              "random"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "SetStatusInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -383,49 +691,68 @@
             "readOnly": true,
             "type": "string"
           },
-          "active": {
-            "type": "boolean"
+          "address": {
+            "$ref": "#/components/schemas/Address"
           },
-          "city": {
-            "examples": [
-              "Mogi das Cruzes"
-            ],
+          "blockedReason": {
             "type": [
               "string",
               "null"
             ]
           },
+          "ceasaBox": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ceasaPavilion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "consignmentCommission": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/Contact"
+            },
+            "type": "array"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
           },
-          "document": {
-            "description": "CPF or CNPJ, digits/letters only",
-            "examples": [
-              "11222333000181"
+          "defaultPurchaseMode": {
+            "enum": [
+              "direct",
+              "consignment"
             ],
             "type": "string"
           },
+          "document": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "email": {
-            "examples": [
-              "contato@boacolheita.com.br"
-            ],
             "type": [
               "string",
               "null"
             ]
           },
           "id": {
-            "examples": [
-              1
-            ],
             "format": "int64",
             "type": "integer"
           },
-          "name": {
-            "examples": [
-              "Sítio Boa Colheita"
-            ],
+          "legalName": {
             "type": "string"
           },
           "notes": {
@@ -434,19 +761,59 @@
               "null"
             ]
           },
-          "phone": {
-            "examples": [
-              "11999990000"
+          "payment": {
+            "$ref": "#/components/schemas/Payment"
+          },
+          "paymentTermDays": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "personType": {
+            "enum": [
+              "individual",
+              "company"
             ],
+            "type": "string"
+          },
+          "phone": {
             "type": [
               "string",
               "null"
             ]
           },
-          "state": {
-            "examples": [
-              "SP"
+          "stateRegistration": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "active",
+              "inactive",
+              "blocked"
             ],
+            "type": "string"
+          },
+          "supplierType": {
+            "enum": [
+              "producer",
+              "wholesaler",
+              "cooperative",
+              "importer",
+              "other"
+            ],
+            "type": "string"
+          },
+          "taxpayerType": {
+            "enum": [
+              "taxpayer",
+              "exempt",
+              "non_taxpayer"
+            ],
+            "type": "string"
+          },
+          "tradeName": {
             "type": [
               "string",
               "null"
@@ -455,18 +822,37 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "whatsapp": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
           "id",
-          "name",
+          "supplierType",
+          "defaultPurchaseMode",
+          "consignmentCommission",
+          "paymentTermDays",
+          "ceasaPavilion",
+          "ceasaBox",
+          "status",
+          "blockedReason",
+          "personType",
           "document",
-          "phone",
+          "legalName",
+          "tradeName",
+          "stateRegistration",
+          "taxpayerType",
           "email",
-          "city",
-          "state",
+          "phone",
+          "whatsapp",
+          "address",
+          "payment",
+          "contacts",
           "notes",
-          "active",
           "createdAt",
           "updatedAt"
         ],
@@ -484,48 +870,218 @@
             "readOnly": true,
             "type": "string"
           },
-          "city": {
-            "maxLength": 80,
+          "address": {
+            "$ref": "#/components/schemas/AddressInput"
+          },
+          "blockedReason": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "ceasaBox": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "ceasaPavilion": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "consignmentCommission": {
+            "description": "Commission in % kept on consignment sales",
+            "format": "double",
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/ContactInput"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "defaultPurchaseMode": {
+            "default": "direct",
+            "description": "direct = buys the goods; consignment = sells first and pays later minus commission",
+            "enum": [
+              "direct",
+              "consignment"
+            ],
             "type": "string"
           },
           "document": {
-            "description": "CPF or CNPJ (numeric or alphanumeric), with or without mask",
-            "examples": [
-              "11.222.333/0001-81"
-            ],
+            "description": "CPF or CNPJ, with or without mask",
             "maxLength": 18,
             "type": "string"
           },
           "email": {
             "format": "email",
-            "maxLength": 120,
+            "maxLength": 150,
             "type": "string"
           },
-          "name": {
-            "maxLength": 120,
+          "legalName": {
+            "description": "Company name (razão social) or full name",
+            "maxLength": 150,
             "minLength": 2,
             "type": "string"
           },
           "notes": {
-            "maxLength": 1000,
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentInput"
+          },
+          "paymentTermDays": {
+            "default": 0,
+            "description": "Default payment term in days (0 = cash)",
+            "format": "int32",
+            "maximum": 365,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "personType": {
+            "description": "individual = CPF, company = CNPJ",
+            "enum": [
+              "individual",
+              "company"
+            ],
             "type": "string"
           },
           "phone": {
             "maxLength": 20,
             "type": "string"
           },
-          "state": {
-            "description": "Two-letter state code (UF)",
-            "examples": [
-              "SP"
+          "stateRegistration": {
+            "maxLength": 20,
+            "type": "string"
+          },
+          "status": {
+            "default": "active",
+            "enum": [
+              "active",
+              "inactive",
+              "blocked"
             ],
-            "pattern": "^[A-Za-z]{2}$",
+            "type": "string"
+          },
+          "supplierType": {
+            "default": "producer",
+            "enum": [
+              "producer",
+              "wholesaler",
+              "cooperative",
+              "importer",
+              "other"
+            ],
+            "type": "string"
+          },
+          "taxpayerType": {
+            "default": "non_taxpayer",
+            "enum": [
+              "taxpayer",
+              "exempt",
+              "non_taxpayer"
+            ],
+            "type": "string"
+          },
+          "tradeName": {
+            "description": "Trade name or nickname",
+            "maxLength": 150,
+            "type": "string"
+          },
+          "whatsapp": {
+            "maxLength": 20,
             "type": "string"
           }
         },
         "required": [
-          "name",
-          "document"
+          "personType",
+          "legalName"
+        ],
+        "type": "object"
+      },
+      "SupplierSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "$ref": "#/components/schemas/City"
+          },
+          "defaultPurchaseMode": {
+            "enum": [
+              "direct",
+              "consignment"
+            ],
+            "type": "string"
+          },
+          "document": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "personType": {
+            "enum": [
+              "individual",
+              "company"
+            ],
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "active",
+              "inactive",
+              "blocked"
+            ],
+            "type": "string"
+          },
+          "supplierType": {
+            "enum": [
+              "producer",
+              "wholesaler",
+              "cooperative",
+              "importer",
+              "other"
+            ],
+            "type": "string"
+          },
+          "tradeName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "whatsapp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "personType",
+          "document",
+          "legalName",
+          "tradeName",
+          "phone",
+          "whatsapp",
+          "city",
+          "supplierType",
+          "defaultPurchaseMode",
+          "status"
         ],
         "type": "object"
       },
@@ -549,67 +1105,6 @@
         },
         "required": [
           "organizationId"
-        ],
-        "type": "object"
-      },
-      "UpdateInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": [
-              "https://example.com/schemas/UpdateInputBody.json"
-            ],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "active": {
-            "type": "boolean"
-          },
-          "city": {
-            "maxLength": 80,
-            "type": "string"
-          },
-          "document": {
-            "description": "CPF or CNPJ (numeric or alphanumeric), with or without mask",
-            "examples": [
-              "11.222.333/0001-81"
-            ],
-            "maxLength": 18,
-            "type": "string"
-          },
-          "email": {
-            "format": "email",
-            "maxLength": 120,
-            "type": "string"
-          },
-          "name": {
-            "maxLength": 120,
-            "minLength": 2,
-            "type": "string"
-          },
-          "notes": {
-            "maxLength": 1000,
-            "type": "string"
-          },
-          "phone": {
-            "maxLength": 20,
-            "type": "string"
-          },
-          "state": {
-            "description": "Two-letter state code (UF)",
-            "examples": [
-              "SP"
-            ],
-            "pattern": "^[A-Za-z]{2}$",
-            "type": "string"
-          }
-        },
-        "required": [
-          "active",
-          "name",
-          "document"
         ],
         "type": "object"
       },
@@ -981,17 +1476,94 @@
         ]
       }
     },
+    "/cities": {
+      "get": {
+        "operationId": "search-cities",
+        "parameters": [
+          {
+            "description": "Part of the city name (accent-insensitive)",
+            "explode": false,
+            "in": "query",
+            "name": "search",
+            "required": true,
+            "schema": {
+              "description": "Part of the city name (accent-insensitive)",
+              "maxLength": 60,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional state filter, e.g. RJ",
+            "explode": false,
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "description": "Optional state filter, e.g. RJ",
+              "pattern": "^[A-Za-z]{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/City"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Search cities (IBGE)",
+        "tags": [
+          "Reference data"
+        ]
+      }
+    },
     "/suppliers": {
       "get": {
         "operationId": "list-suppliers",
         "parameters": [
           {
-            "description": "Filter by name (contains, accent-insensitive) or document (prefix)",
+            "description": "Name or nickname (contains, accent-insensitive) or document (prefix)",
             "explode": false,
             "in": "query",
             "name": "search",
             "schema": {
-              "description": "Filter by name (contains, accent-insensitive) or document (prefix)",
+              "description": "Name or nickname (contains, accent-insensitive) or document (prefix)",
               "maxLength": 100,
               "type": "string"
             }
@@ -1005,6 +1577,7 @@
               "enum": [
                 "active",
                 "inactive",
+                "blocked",
                 "all"
               ],
               "type": "string"
@@ -1216,7 +1789,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateInputBody"
+                "$ref": "#/components/schemas/SupplierFields"
               }
             }
           },

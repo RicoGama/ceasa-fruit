@@ -123,6 +123,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search cities (IBGE) */
+        get: operations["search-cities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/suppliers": {
         parameters: {
             query?: never;
@@ -167,6 +184,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Address: {
+            city: components["schemas"]["City"];
+            complement: string | null;
+            district: string | null;
+            number: string | null;
+            postalCode: string | null;
+            street: string | null;
+        };
+        AddressInput: {
+            /**
+             * Format: int32
+             * @description IBGE city code
+             */
+            cityId?: number;
+            complement?: string;
+            district?: string;
+            number?: string;
+            /** @description CEP, with or without dash */
+            postalCode?: string;
+            street?: string;
+        };
         AdminOrganization: {
             /**
              * Format: uri
@@ -185,6 +223,35 @@ export interface components {
             status: "active" | "suspended";
             /** Format: date-time */
             updatedAt: string;
+        };
+        City: {
+            /**
+             * Format: int32
+             * @example 3304557
+             */
+            id: number;
+            /** @example Rio de Janeiro */
+            name: string;
+            /** @example RJ */
+            state: string;
+        };
+        Contact: {
+            email: string | null;
+            /** Format: int64 */
+            id: number;
+            isWhatsapp: boolean;
+            name: string;
+            phone: string | null;
+            role: string | null;
+        };
+        ContactInput: {
+            /** Format: email */
+            email?: string;
+            isWhatsapp?: boolean;
+            name: string;
+            phone?: string;
+            /** @description e.g. owner, manager, driver */
+            role?: string;
         };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
@@ -255,7 +322,7 @@ export interface components {
              * @example https://example.com/schemas/ListSuppliersOutputBody.json
              */
             readonly $schema?: string;
-            items: components["schemas"]["Supplier"][];
+            items: components["schemas"]["SupplierSummary"][];
             /** Format: int32 */
             limit: number;
             /** Format: int32 */
@@ -297,6 +364,30 @@ export interface components {
             /** @enum {string} */
             status: "active" | "suspended";
         };
+        Payment: {
+            bank: string | null;
+            bankAccount: string | null;
+            bankAccountHolder: string | null;
+            bankAccountHolderDocument: string | null;
+            /** @enum {string|null} */
+            bankAccountType: "checking" | "savings" | "payment" | null;
+            bankBranch: string | null;
+            pixKey: string | null;
+            /** @enum {string|null} */
+            pixKeyType: "cpf" | "cnpj" | "email" | "phone" | "random" | null;
+        };
+        PaymentInput: {
+            bank?: string;
+            bankAccount?: string;
+            bankAccountHolder?: string;
+            bankAccountHolderDocument?: string;
+            /** @enum {string} */
+            bankAccountType?: "checking" | "savings" | "payment";
+            bankBranch?: string;
+            pixKey?: string;
+            /** @enum {string} */
+            pixKeyType?: "cpf" | "cnpj" | "email" | "phone" | "random";
+        };
         SetStatusInputBody: {
             /**
              * Format: uri
@@ -328,32 +419,40 @@ export interface components {
              * @example https://example.com/schemas/Supplier.json
              */
             readonly $schema?: string;
-            active: boolean;
-            /** @example Mogi das Cruzes */
-            city: string | null;
+            address: components["schemas"]["Address"];
+            blockedReason: string | null;
+            ceasaBox: string | null;
+            ceasaPavilion: string | null;
+            /** Format: double */
+            consignmentCommission: number | null;
+            contacts: components["schemas"]["Contact"][];
             /** Format: date-time */
             createdAt: string;
-            /**
-             * @description CPF or CNPJ, digits/letters only
-             * @example 11222333000181
-             */
-            document: string;
-            /** @example contato@boacolheita.com.br */
+            /** @enum {string} */
+            defaultPurchaseMode: "direct" | "consignment";
+            document: string | null;
             email: string | null;
-            /**
-             * Format: int64
-             * @example 1
-             */
+            /** Format: int64 */
             id: number;
-            /** @example Sítio Boa Colheita */
-            name: string;
+            legalName: string;
             notes: string | null;
-            /** @example 11999990000 */
+            payment: components["schemas"]["Payment"];
+            /** Format: int32 */
+            paymentTermDays: number;
+            /** @enum {string} */
+            personType: "individual" | "company";
             phone: string | null;
-            /** @example SP */
-            state: string | null;
+            stateRegistration: string | null;
+            /** @enum {string} */
+            status: "active" | "inactive" | "blocked";
+            /** @enum {string} */
+            supplierType: "producer" | "wholesaler" | "cooperative" | "importer" | "other";
+            /** @enum {string} */
+            taxpayerType: "taxpayer" | "exempt" | "non_taxpayer";
+            tradeName: string | null;
             /** Format: date-time */
             updatedAt: string;
+            whatsapp: string | null;
         };
         SupplierFields: {
             /**
@@ -362,22 +461,79 @@ export interface components {
              * @example https://example.com/schemas/SupplierFields.json
              */
             readonly $schema?: string;
-            city?: string;
+            address?: components["schemas"]["AddressInput"];
+            blockedReason?: string;
+            ceasaBox?: string;
+            ceasaPavilion?: string;
             /**
-             * @description CPF or CNPJ (numeric or alphanumeric), with or without mask
-             * @example 11.222.333/0001-81
+             * Format: double
+             * @description Commission in % kept on consignment sales
              */
-            document: string;
+            consignmentCommission?: number;
+            contacts?: components["schemas"]["ContactInput"][];
+            /**
+             * @description direct = buys the goods; consignment = sells first and pays later minus commission
+             * @default direct
+             * @enum {string}
+             */
+            defaultPurchaseMode: "direct" | "consignment";
+            /** @description CPF or CNPJ, with or without mask */
+            document?: string;
             /** Format: email */
             email?: string;
-            name: string;
+            /** @description Company name (razão social) or full name */
+            legalName: string;
             notes?: string;
-            phone?: string;
+            payment?: components["schemas"]["PaymentInput"];
             /**
-             * @description Two-letter state code (UF)
-             * @example SP
+             * Format: int32
+             * @description Default payment term in days (0 = cash)
+             * @default 0
              */
-            state?: string;
+            paymentTermDays: number;
+            /**
+             * @description individual = CPF, company = CNPJ
+             * @enum {string}
+             */
+            personType: "individual" | "company";
+            phone?: string;
+            stateRegistration?: string;
+            /**
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "inactive" | "blocked";
+            /**
+             * @default producer
+             * @enum {string}
+             */
+            supplierType: "producer" | "wholesaler" | "cooperative" | "importer" | "other";
+            /**
+             * @default non_taxpayer
+             * @enum {string}
+             */
+            taxpayerType: "taxpayer" | "exempt" | "non_taxpayer";
+            /** @description Trade name or nickname */
+            tradeName?: string;
+            whatsapp?: string;
+        };
+        SupplierSummary: {
+            city: components["schemas"]["City"];
+            /** @enum {string} */
+            defaultPurchaseMode: "direct" | "consignment";
+            document: string | null;
+            /** Format: int64 */
+            id: number;
+            legalName: string;
+            /** @enum {string} */
+            personType: "individual" | "company";
+            phone: string | null;
+            /** @enum {string} */
+            status: "active" | "inactive" | "blocked";
+            /** @enum {string} */
+            supplierType: "producer" | "wholesaler" | "cooperative" | "importer" | "other";
+            tradeName: string | null;
+            whatsapp: string | null;
         };
         SwitchOrganizationInputBody: {
             /**
@@ -388,31 +544,6 @@ export interface components {
             readonly $schema?: string;
             /** Format: int64 */
             organizationId: number;
-        };
-        UpdateInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/UpdateInputBody.json
-             */
-            readonly $schema?: string;
-            active: boolean;
-            city?: string;
-            /**
-             * @description CPF or CNPJ (numeric or alphanumeric), with or without mask
-             * @example 11.222.333/0001-81
-             */
-            document: string;
-            /** Format: email */
-            email?: string;
-            name: string;
-            notes?: string;
-            phone?: string;
-            /**
-             * @description Two-letter state code (UF)
-             * @example SP
-             */
-            state?: string;
         };
         User: {
             email: string;
@@ -655,12 +786,47 @@ export interface operations {
             };
         };
     };
+    "search-cities": {
+        parameters: {
+            query: {
+                /** @description Part of the city name (accent-insensitive) */
+                search: string;
+                /** @description Optional state filter, e.g. RJ */
+                state?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["City"][];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-suppliers": {
         parameters: {
             query?: {
-                /** @description Filter by name (contains, accent-insensitive) or document (prefix) */
+                /** @description Name or nickname (contains, accent-insensitive) or document (prefix) */
                 search?: string;
-                status?: "active" | "inactive" | "all";
+                status?: "active" | "inactive" | "blocked" | "all";
                 limit?: number;
                 offset?: number;
             };
@@ -765,7 +931,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateInputBody"];
+                "application/json": components["schemas"]["SupplierFields"];
             };
         };
         responses: {
