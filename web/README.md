@@ -46,7 +46,7 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
 | 1 | `nuxt.config.ts` | módulos, renderização por rota (SSR, SPA, pré-render), proxy |
 | 2 | `app/app.vue`, `app/app.config.ts` | raiz do app, tema e idioma do Nuxt UI |
 | 3 | `app/plugins/api.ts` | cliente HTTP tipado (openapi-fetch) e interceptação de 401/403 |
-| 4 | `app/composables/useAuth.ts` | estado global com `useState`, login/logout/troca de organização |
+| 4 | `app/stores/auth.ts` | store do Pinia (estado, getters, actions): sessão, login/logout/troca de organização |
 | 5 | `app/middleware/auth.global.ts` | proteção de rotas antes de cada navegação |
 | 6 | `app/layouts/dashboard.vue` | layout com barra lateral (`UDashboard*`) |
 | 7 | `app/pages/login.vue`, `signup.vue` | formulários com validação (Zod + `UAuthForm`) |
@@ -56,10 +56,23 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
 | 11 | `app/components/CityInput.vue` | `defineModel`, busca com espera (debounce) na API |
 | 12 | `app/utils/*.ts` | funções puras (CPF/CNPJ, tradução de erros, datas) |
 
+## Estado: Pinia × dados da API
+
+- **Pinia (`app/stores/`)**: estado do app que várias telas compartilham e que
+  muda com ações do usuário ou eventos em tempo real: a sessão hoje; depois o
+  pedido de venda em andamento, a fila offline, eventos do servidor.
+  Uso: `const auth = useAuthStore()` e, no template, `auth.user?.name`.
+  (Não desestruture direto — `const { user } = useAuthStore()` perde a
+  reatividade; se precisar, use `storeToRefs(auth)`.)
+- **Dados da API (listas, um cadastro)**: ficam no `useAsyncData` de cada
+  página, para não virar cópia desatualizada num store. Quando as telas
+  começarem a se cruzar (vendas), a ideia é adotar o Pinia Colada (cache com
+  invalidação automática).
+
 ## Convenções
 
 - Páginas e componentes usam `<script setup lang="ts">`.
-- Arquivos em `components/`, `composables/` e `utils/` são **importados automaticamente**
+- Arquivos em `components/`, `composables/`, `utils/` e `stores/` são **importados automaticamente**
   pelo Nuxt (por isso não há `import` de `useAuth`, `formatDocument`...).
   Componente em subpasta ganha o prefixo da pasta: `components/suppliers/SupplierFormModal.vue`
   vira `<SuppliersSupplierFormModal>`.

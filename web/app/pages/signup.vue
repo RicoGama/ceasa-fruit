@@ -5,7 +5,7 @@ import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
 definePageMeta({ layout: 'auth' })
 useHead({ title: 'Criar conta · CEASA Fruit' })
 
-const { signup } = useAuth()
+const auth = useAuthStore()
 const errorMessage = ref('')
 
 const fields: AuthFormField[] = [
@@ -26,7 +26,7 @@ type Schema = z.output<typeof schema>
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   errorMessage.value = ''
   try {
-    await signup(event.data)
+    await auth.signup(event.data)
     await navigateTo('/app')
   }
   catch (error) {

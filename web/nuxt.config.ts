@@ -1,6 +1,6 @@
 // Configuração do Nuxt. Documentação: https://nuxt.com/docs/api/nuxt-config
 export default defineNuxtConfig({
-  modules: ['@nuxt/ui'],
+  modules: ['@nuxt/ui', '@pinia/nuxt'],
 
   css: ['~/assets/css/main.css'],
 

@@ -19,7 +19,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
       if (response.status === 401) {
         nuxtApp.runWithContext(() => {
-          useState('me').value = null
+          useAuthStore().reset()
           navigateTo('/login')
         })
       }
@@ -30,7 +30,7 @@ export default defineNuxtPlugin((nuxtApp) => {
         const body = await response.clone().json().catch(() => null)
         if (body?.detail === 'organization is suspended' || body?.detail === 'no organization selected') {
           nuxtApp.runWithContext(() => {
-            useState('me-loaded').value = false
+            useAuthStore().invalidate()
             navigateTo('/app/select-organization')
           })
         }

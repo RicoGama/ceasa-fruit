@@ -3,7 +3,7 @@ definePageMeta({ layout: 'dashboard' })
 useHead({ title: 'Início · CEASA Fruit' })
 
 const api = useApi()
-const { me, currentOrganization } = useAuth()
+const auth = useAuthStore()
 
 // Só o total de fornecedores ativos (limit=1 para não trazer a lista toda).
 const { data: suppliers } = await useAsyncData('home-suppliers', async () => {
@@ -11,7 +11,7 @@ const { data: suppliers } = await useAsyncData('home-suppliers', async () => {
   return data
 })
 
-const firstName = computed(() => me.value?.user.name.split(' ')[0])
+const firstName = computed(() => auth.user?.name.split(' ')[0])
 
 const comingSoon = [
   { title: 'Clientes', description: 'Restaurantes, sacolões e mercados que compram de você.', icon: 'i-lucide-users' },
@@ -37,7 +37,7 @@ const comingSoon = [
           Olá, {{ firstName }}!
         </h2>
         <p class="text-muted">
-          Você está em <span class="font-medium text-default">{{ currentOrganization?.name }}</span>.
+          Você está em <span class="font-medium text-default">{{ auth.currentOrganization?.name }}</span>.
         </p>
       </div>
 

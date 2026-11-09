@@ -13,8 +13,10 @@
   "dependencies": {
     "@iconify-json/lucide": "1.2.152",
     "@nuxt/ui": "4.12.0",
+    "@pinia/nuxt": "1.0.3",
     "nuxt": "4.6.4",
     "openapi-fetch": "0.17.0",
+    "pinia": "4.1.0",
     "tailwindcss": "4.3.5",
     "zod": "4.3.6"
   },

@@ -3,11 +3,11 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 
 defineProps<{ collapsed?: boolean }>()
 
-const { me, logout } = useAuth()
+const auth = useAuthStore()
 const colorMode = useColorMode()
 
 const items = computed<DropdownMenuItem[][]>(() => [
-  [{ type: 'label', label: me.value?.user.name, description: me.value?.user.email }],
+  [{ type: 'label', label: auth.user?.name, description: auth.user?.email }],
   [
     {
       label: 'Tema',
@@ -37,7 +37,7 @@ const items = computed<DropdownMenuItem[][]>(() => [
       ],
     },
   ],
-  [{ label: 'Sair', icon: 'i-lucide-log-out', onSelect: () => logout() }],
+  [{ label: 'Sair', icon: 'i-lucide-log-out', onSelect: () => auth.logout() }],
 ])
 </script>
 
@@ -48,8 +48,8 @@ const items = computed<DropdownMenuItem[][]>(() => [
     :ui="{ content: collapsed ? 'w-48' : 'w-(--reka-dropdown-menu-trigger-width)' }"
   >
     <UButton
-      :label="collapsed ? undefined : me?.user.name"
-      :avatar="{ alt: me?.user.name }"
+      :label="collapsed ? undefined : auth.user?.name"
+      :avatar="{ alt: auth.user?.name }"
       :trailing-icon="collapsed ? undefined : 'i-lucide-chevrons-up-down'"
       color="neutral"
       variant="ghost"

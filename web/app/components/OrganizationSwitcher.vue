@@ -3,12 +3,12 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 
 defineProps<{ collapsed?: boolean }>()
 
-const { me, currentOrganization, switchOrganization } = useAuth()
+const auth = useAuthStore()
 const toast = useToast()
 
 async function select(id: number) {
   try {
-    await switchOrganization(id)
+    await auth.switchOrganization(id)
   }
   catch (error) {
     toast.add({ title: apiErrorMessage(error), color: 'error' })
@@ -17,11 +17,11 @@ async function select(id: number) {
 
 // Uma opção por organização do usuário; a atual aparece marcada.
 const items = computed<DropdownMenuItem[][]>(() => [
-  (me.value?.organizations ?? []).map(org => ({
+  auth.organizations.map(org => ({
     label: org.name,
     avatar: { alt: org.name },
     type: 'checkbox' as const,
-    checked: org.id === me.value?.currentOrganizationId,
+    checked: org.id === auth.currentOrganization?.id,
     disabled: org.status !== 'active',
     onSelect: () => select(org.id),
   })),
@@ -35,8 +35,8 @@ const items = computed<DropdownMenuItem[][]>(() => [
     :ui="{ content: collapsed ? 'w-48' : 'w-(--reka-dropdown-menu-trigger-width)' }"
   >
     <UButton
-      :label="collapsed ? undefined : (currentOrganization?.name ?? 'Selecionar organização')"
-      :avatar="{ alt: currentOrganization?.name ?? '?' }"
+      :label="collapsed ? undefined : (auth.currentOrganization?.name ?? 'Selecionar organização')"
+      :avatar="{ alt: auth.currentOrganization?.name ?? '?' }"
       :trailing-icon="collapsed ? undefined : 'i-lucide-chevrons-up-down'"
       color="neutral"
       variant="ghost"

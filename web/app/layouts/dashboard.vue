@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
 
-const { me } = useAuth()
+const auth = useAuthStore()
 
 // open controla a barra lateral no celular (vira um menu deslizante).
 const open = ref(false)
@@ -15,9 +15,9 @@ const mainLinks: NavigationMenuItem[] = [
   { label: 'Rotas', icon: 'i-lucide-map', disabled: true, badge: 'em breve' },
 ]
 
-// computed: recalcula sozinho quando `me` muda (ex.: depois do login).
+// computed: recalcula sozinho quando o store muda (ex.: depois do login).
 const adminLinks = computed<NavigationMenuItem[]>(() =>
-  me.value?.user.isPlatformAdmin
+  auth.isPlatformAdmin
     ? [
         { label: 'Plataforma', type: 'label' },
         { label: 'Organizações', icon: 'i-lucide-building-2', to: '/app/admin/organizations' },

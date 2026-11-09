@@ -5,7 +5,7 @@ import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
 definePageMeta({ layout: 'auth' })
 useHead({ title: 'Entrar · CEASA Fruit' })
 
-const { login } = useAuth()
+const auth = useAuthStore()
 const route = useRoute()
 const errorMessage = ref('')
 
@@ -23,7 +23,7 @@ type Schema = z.output<typeof schema>
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   errorMessage.value = ''
   try {
-    const me = await login(event.data)
+    const me = await auth.login(event.data)
     // Com várias organizações e nenhuma escolhida, o middleware manda para a seleção.
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/app'
     await navigateTo(me.currentOrganizationId == null ? '/app/select-organization' : redirect)

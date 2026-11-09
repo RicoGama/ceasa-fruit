@@ -2,18 +2,17 @@
 definePageMeta({ layout: 'auth' })
 useHead({ title: 'Escolher organização · CEASA Fruit' })
 
-const { me, currentOrganization, switchOrganization, logout } = useAuth()
+const auth = useAuthStore()
 
 // A organização atual pode ter sido suspensa pelo administrador da plataforma.
-const suspended = computed(() => currentOrganization.value?.status === 'suspended')
-const activeOrganizations = computed(() => me.value?.organizations.filter(o => o.status === 'active') ?? [])
+const suspended = computed(() => auth.currentOrganization?.status === 'suspended')
 const toast = useToast()
 const selecting = ref<number | null>(null)
 
 async function select(id: number) {
   selecting.value = id
   try {
-    await switchOrganization(id)
+    await auth.switchOrganization(id)
   }
   catch (error) {
     toast.add({ title: apiErrorMessage(error), color: 'error' })
@@ -40,15 +39,15 @@ async function select(id: number) {
       color="warning"
       variant="subtle"
       icon="i-lucide-octagon-pause"
-      :title="`${currentOrganization?.name} está suspensa`"
-      :description="activeOrganizations.length
+      :title="`${auth.currentOrganization?.name} está suspensa`"
+      :description="auth.activeOrganizations.length
         ? 'Fale com o suporte para reativar, ou escolha outra organização abaixo.'
         : 'Fale com o suporte para reativar o acesso.'"
     />
 
-    <div v-if="me?.organizations.length" class="space-y-2">
+    <div v-if="auth.organizations.length" class="space-y-2">
       <UButton
-        v-for="org in me.organizations"
+        v-for="org in auth.organizations"
         :key="org.id"
         :label="org.name"
         :avatar="{ alt: org.name }"
@@ -76,7 +75,7 @@ async function select(id: number) {
     />
 
     <div class="text-center">
-      <UButton label="Sair" color="neutral" variant="link" @click="logout" />
+      <UButton label="Sair" color="neutral" variant="link" @click="auth.logout()" />
     </div>
   </div>
 </template>
