@@ -1,0 +1,19 @@
+# Go
+/api/bin/
+*.test
+*.out
+coverage.*
+
+# Environment
+.env
+.env.local
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Frontend (Nuxt) - future
+node_modules/
+.nuxt/
+.output/
