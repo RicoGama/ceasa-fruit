@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/document"
 )
@@ -30,12 +31,16 @@ import (
 // em produção, e os testes podem passar uma implementação falsa.
 type Store interface {
 	CreateSupplier(ctx context.Context, arg db.CreateSupplierParams) (db.Supplier, error)
-	GetSupplier(ctx context.Context, id int64) (db.Supplier, error)
+	GetSupplier(ctx context.Context, arg db.GetSupplierParams) (db.Supplier, error)
 	ListSuppliers(ctx context.Context, arg db.ListSuppliersParams) ([]db.Supplier, error)
 	CountSuppliers(ctx context.Context, arg db.CountSuppliersParams) (int64, error)
 	UpdateSupplier(ctx context.Context, arg db.UpdateSupplierParams) (db.Supplier, error)
-	DeactivateSupplier(ctx context.Context, id int64) (int64, error)
+	DeactivateSupplier(ctx context.Context, arg db.DeactivateSupplierParams) (int64, error)
 }
+
+// TxFunc abre uma transação presa à organização (com RLS) e entrega um Store
+// para usar dentro dela. Em produção é postgres.InTenant; nos testes, um falso.
+type TxFunc func(ctx context.Context, organizationID int64, fn func(Store) error) error
 
 // ---------------------------------------------------------------------------
 // Tipos da API (o que trafega no HTTP). Ficam separados de db.Supplier para
@@ -164,12 +169,13 @@ func (in *updateInput) Resolve(huma.Context) []error {
 // ---------------------------------------------------------------------------
 
 type handler struct {
-	store Store
+	tx TxFunc
 }
 
 // Register adiciona todas as rotas de fornecedor na API do Huma.
-func Register(api huma.API, store Store) {
-	h := &handler{store: store}
+// A api recebida deve ser um grupo protegido por auth.RequireOrganization.
+func Register(api huma.API, tx TxFunc) {
+	h := &handler{tx: tx}
 	tags := []string{"Suppliers"}
 
 	huma.Register(api, huma.Operation{
@@ -231,13 +237,25 @@ func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppli
 		active = new(false)
 	}
 
-	rows, err := h.store.ListSuppliers(ctx, db.ListSuppliersParams{
-		Search: search, Active: active, Limit: in.Limit, Offset: in.Offset,
+	orgID := auth.OrganizationID(ctx)
+
+	var rows []db.Supplier
+	var total int64
+	// A função anônima "enxerga" rows e total de fora (closure) e os preenche.
+	err := h.tx(ctx, orgID, func(s Store) error {
+		var err error
+		rows, err = s.ListSuppliers(ctx, db.ListSuppliersParams{
+			OrganizationID: orgID, Search: search, Active: active,
+			LimitRows: in.Limit, OffsetRows: in.Offset,
+		})
+		if err != nil {
+			return err
+		}
+		total, err = s.CountSuppliers(ctx, db.CountSuppliersParams{
+			OrganizationID: orgID, Search: search, Active: active,
+		})
+		return err
 	})
-	if err != nil {
-		return nil, err
-	}
-	total, err := h.store.CountSuppliers(ctx, db.CountSuppliersParams{Search: search, Active: active})
 	if err != nil {
 		return nil, err
 	}
@@ -255,40 +273,65 @@ func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppli
 }
 
 func (h *handler) get(ctx context.Context, in *idInput) (*supplierOutput, error) {
-	s, err := h.store.GetSupplier(ctx, in.ID)
+	orgID := auth.OrganizationID(ctx)
+	var row db.Supplier
+	err := h.tx(ctx, orgID, func(s Store) error {
+		var err error
+		row, err = s.GetSupplier(ctx, db.GetSupplierParams{OrganizationID: orgID, ID: in.ID})
+		return err
+	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return &supplierOutput{Body: toAPI(s)}, nil
+	return &supplierOutput{Body: toAPI(row)}, nil
 }
 
 func (h *handler) create(ctx context.Context, in *createInput) (*supplierOutput, error) {
+	orgID := auth.OrganizationID(ctx)
 	f := in.Body
-	s, err := h.store.CreateSupplier(ctx, db.CreateSupplierParams{
-		Name: f.Name, Document: f.Document, Phone: f.Phone, Email: f.Email,
-		City: f.City, State: f.State, Notes: f.Notes,
+	var row db.Supplier
+	err := h.tx(ctx, orgID, func(s Store) error {
+		var err error
+		row, err = s.CreateSupplier(ctx, db.CreateSupplierParams{
+			OrganizationID: orgID, Name: f.Name, Document: f.Document, Phone: f.Phone,
+			Email: f.Email, City: f.City, State: f.State, Notes: f.Notes,
+		})
+		return err
 	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return &supplierOutput{Body: toAPI(s)}, nil
+	return &supplierOutput{Body: toAPI(row)}, nil
 }
 
 func (h *handler) update(ctx context.Context, in *updateInput) (*supplierOutput, error) {
+	orgID := auth.OrganizationID(ctx)
 	f := in.Body
-	s, err := h.store.UpdateSupplier(ctx, db.UpdateSupplierParams{
-		ID: in.ID, Name: f.Name, Document: f.Document, Phone: f.Phone, Email: f.Email,
-		City: f.City, State: f.State, Notes: f.Notes, Active: f.Active,
+	var row db.Supplier
+	err := h.tx(ctx, orgID, func(s Store) error {
+		var err error
+		row, err = s.UpdateSupplier(ctx, db.UpdateSupplierParams{
+			OrganizationID: orgID, ID: in.ID, Name: f.Name, Document: f.Document,
+			Phone: f.Phone, Email: f.Email, City: f.City, State: f.State,
+			Notes: f.Notes, Active: f.Active,
+		})
+		return err
 	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return &supplierOutput{Body: toAPI(s)}, nil
+	return &supplierOutput{Body: toAPI(row)}, nil
 }
 
 // deactivate devolve *struct{}: uma saída vazia, ou seja, resposta sem corpo.
 func (h *handler) deactivate(ctx context.Context, in *idInput) (*struct{}, error) {
-	n, err := h.store.DeactivateSupplier(ctx, in.ID)
+	orgID := auth.OrganizationID(ctx)
+	var n int64
+	err := h.tx(ctx, orgID, func(s Store) error {
+		var err error
+		n, err = s.DeactivateSupplier(ctx, db.DeactivateSupplierParams{OrganizationID: orgID, ID: in.ID})
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}

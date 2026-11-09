@@ -15,14 +15,18 @@ type Config struct {
 	Port        string
 	DatabaseURL string
 	CORSOrigins []string
+	// CookieSecure faz o cookie de sessão só trafegar em HTTPS. Em
+	// desenvolvimento (http://localhost) precisa ser false.
+	CookieSecure bool
 }
 
 // Load monta uma Config a partir do ambiente, com padrões de desenvolvimento.
 func Load() Config {
 	return Config{
-		Port:        getEnv("PORT", "8080"),
-		DatabaseURL: getEnv("DATABASE_URL", "postgres://ceasa:ceasa@localhost:5432/ceasa?sslmode=disable"),
-		CORSOrigins: strings.Split(getEnv("CORS_ORIGINS", "http://localhost:3000"), ","),
+		Port:         getEnv("PORT", "8080"),
+		DatabaseURL:  getEnv("DATABASE_URL", "postgres://ceasa:ceasa@localhost:5432/ceasa?sslmode=disable"),
+		CORSOrigins:  strings.Split(getEnv("CORS_ORIGINS", "http://localhost:3000"), ","),
+		CookieSecure: getEnv("COOKIE_SECURE", "false") == "true",
 	}
 }
 

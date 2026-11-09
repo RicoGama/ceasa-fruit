@@ -1,43 +1,49 @@
+-- Toda query filtra por organization_id explicitamente, MESMO com o RLS ativo.
+-- São duas camadas: se uma falhar, a outra segura.
+-- @nome é atalho do sqlc para sqlc.arg('nome').
+
 -- name: CreateSupplier :one
-INSERT INTO suppliers (name, document, phone, email, city, state, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO suppliers (organization_id, name, document, phone, email, city, state, notes)
+VALUES (@organization_id, @name, @document, @phone, @email, @city, @state, @notes)
 RETURNING *;
 
 -- name: GetSupplier :one
 SELECT * FROM suppliers
-WHERE id = $1;
+WHERE organization_id = @organization_id AND id = @id;
 
 -- name: ListSuppliers :many
 SELECT * FROM suppliers
-WHERE (sqlc.narg('search')::text IS NULL
+WHERE organization_id = @organization_id
+  AND (sqlc.narg('search')::text IS NULL
        OR unaccent(name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
        OR document LIKE sqlc.narg('search') || '%')
   AND (sqlc.narg('active')::boolean IS NULL OR active = sqlc.narg('active'))
 ORDER BY lower(name), id
-LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+LIMIT @limit_rows OFFSET @offset_rows;
 
 -- name: CountSuppliers :one
 SELECT count(*) FROM suppliers
-WHERE (sqlc.narg('search')::text IS NULL
+WHERE organization_id = @organization_id
+  AND (sqlc.narg('search')::text IS NULL
        OR unaccent(name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
        OR document LIKE sqlc.narg('search') || '%')
   AND (sqlc.narg('active')::boolean IS NULL OR active = sqlc.narg('active'));
 
 -- name: UpdateSupplier :one
 UPDATE suppliers
-SET name       = $2,
-    document   = $3,
-    phone      = $4,
-    email      = $5,
-    city       = $6,
-    state      = $7,
-    notes      = $8,
-    active     = $9,
+SET name       = @name,
+    document   = @document,
+    phone      = @phone,
+    email      = @email,
+    city       = @city,
+    state      = @state,
+    notes      = @notes,
+    active     = @active,
     updated_at = now()
-WHERE id = $1
+WHERE organization_id = @organization_id AND id = @id
 RETURNING *;
 
 -- name: DeactivateSupplier :execrows
 UPDATE suppliers
 SET active = FALSE, updated_at = now()
-WHERE id = $1;
+WHERE organization_id = @organization_id AND id = @id;

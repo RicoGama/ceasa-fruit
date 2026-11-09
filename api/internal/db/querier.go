@@ -9,11 +9,33 @@ import (
 )
 
 type Querier interface {
+	AdminCountOrganizations(ctx context.Context) (int64, error)
+	// Queries do painel do administrador da plataforma (o dono do SaaS).
+	AdminListOrganizations(ctx context.Context, arg AdminListOrganizationsParams) ([]AdminListOrganizationsRow, error)
+	AdminSetOrganizationStatus(ctx context.Context, arg AdminSetOrganizationStatusParams) (Organization, error)
 	CountSuppliers(ctx context.Context, arg CountSuppliersParams) (int64, error)
+	CreateMembership(ctx context.Context, arg CreateMembershipParams) error
+	CreateOrganization(ctx context.Context, name string) (Organization, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) error
+	// Toda query filtra por organization_id explicitamente, MESMO com o RLS ativo.
+	// São duas camadas: se uma falhar, a outra segura.
+	// @nome é atalho do sqlc para sqlc.arg('nome').
 	CreateSupplier(ctx context.Context, arg CreateSupplierParams) (Supplier, error)
-	DeactivateSupplier(ctx context.Context, id int64) (int64, error)
-	GetSupplier(ctx context.Context, id int64) (Supplier, error)
+	// Queries de autenticação. Estas tabelas não têm RLS: são usadas antes de
+	// sabermos qual organização está ativa.
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeactivateSupplier(ctx context.Context, arg DeactivateSupplierParams) (int64, error)
+	DeleteSession(ctx context.Context, tokenHash []byte) error
+	GetMembership(ctx context.Context, arg GetMembershipParams) (GetMembershipRow, error)
+	// Carrega tudo o que uma requisição autenticada precisa numa consulta só.
+	// LEFT JOIN: a sessão pode ainda não ter organização selecionada.
+	GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error)
+	GetSupplier(ctx context.Context, arg GetSupplierParams) (Supplier, error)
+	GetUserByEmail(ctx context.Context, email string) (User, error)
 	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]Supplier, error)
+	ListUserOrganizations(ctx context.Context, userID int64) ([]ListUserOrganizationsRow, error)
+	PromotePlatformAdmin(ctx context.Context, email string) (int64, error)
+	SetSessionOrganization(ctx context.Context, arg SetSessionOrganizationParams) error
 	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (Supplier, error)
 }
 

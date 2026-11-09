@@ -1,9 +1,11 @@
 # CEASA Fruit
 
-Sistema de controle de vendas de LFV (Legumes, Frutas e Verduras).
+SaaS de controle de vendas de LFV (Legumes, Frutas e Verduras) para
+distribuidoras e atacadistas.
 
 ## Escopo
 
+0. Multi-tenant: organizações, usuários em várias organizações, login, admin da plataforma ✅ (API)
 1. Controle de vendas de LFV
 2. Cadastro de fornecedores ✅ (API)
 3. Cadastro de clientes
@@ -28,7 +30,8 @@ Convenção: **código em inglês** (identificadores, banco, rotas, JSON); **com
 ceasa-fruit/
 ├── api/                # API em Go (ver api/README.md)
 ├── web/                # (a fazer) Nuxt
-└── docker-compose.yml  # PostgreSQL de desenvolvimento
+├── docker/             # scripts de inicialização do Postgres
+└── docker-compose.yml  # PostgreSQL de desenvolvimento (+ banco ceasa_test)
 ```
 
 ## Rodando

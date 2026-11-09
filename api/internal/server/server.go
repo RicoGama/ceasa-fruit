@@ -14,7 +14,12 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/RicoGama/ceasa-fruit/api/internal/admin"
+	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
 )
 
@@ -27,15 +32,16 @@ type Pinger interface {
 // Deps agrupa o que o servidor precisa. Passar dependências explicitamente
 // (em vez de variáveis globais) deixa o código mais fácil de seguir e testar.
 type Deps struct {
-	Logger      *slog.Logger
-	DB          db.DBTX // o pool de conexões, usado pelas queries do sqlc
-	Pinger      Pinger
-	CORSOrigins []string
+	Logger       *slog.Logger
+	Pool         *pgxpool.Pool
+	CORSOrigins  []string
+	CookieSecure bool // true em produção (HTTPS)
 }
 
 // New devolve o http.Handler raiz da aplicação.
 func New(d Deps) http.Handler {
 	r := chi.NewRouter()
+	queries := db.New(d.Pool)
 
 	// Middlewares envolvem cada requisição, na ordem em que são adicionados.
 	r.Use(middleware.RequestID) // adiciona um X-Request-Id em cada requisição
@@ -45,19 +51,52 @@ func New(d Deps) http.Handler {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: d.CORSOrigins,
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
-		MaxAge:         300,
+		AllowedHeaders: []string{"Accept", "Content-Type"},
+		// Necessário para o navegador enviar o cookie de sessão em requisições
+		// vindas do front (outra porta/subdomínio).
+		AllowCredentials: true,
+		MaxAge:           300,
 	}))
+	// Lê o cookie de sessão (se houver) e coloca o usuário no context.
+	r.Use(auth.LoadSession(queries, d.Logger))
 
 	// Rota com chi + net/http puro, escrita à mão de propósito (ver healthHandler).
-	r.Get("/health", healthHandler(d.Pinger))
+	r.Get("/health", healthHandler(d.Pool))
 
 	// O Huma fica por cima do mesmo roteador chi. Ele também serve:
 	//   /docs          -> documentação interativa da API
 	//   /openapi.json  -> a especificação OpenAPI (usada para gerar o cliente do Nuxt)
-	api := humachi.New(r, huma.DefaultConfig("CEASA Fruit API", "0.1.0"))
+	config := huma.DefaultConfig("CEASA Fruit API", "0.1.0")
+	config.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
+		auth.SecuritySchemeName: auth.SecurityScheme,
+	}
+	api := humachi.New(r, config)
 
-	supplier.Register(api, db.New(d.DB))
+	// Grupos de rotas: cada grupo aplica um middleware de acesso a todas as
+	// rotas registradas nele. Esquecer a proteção numa rota fica bem difícil,
+	// porque a rota é registrada já dentro do grupo certo.
+	public := huma.NewGroup(api)
+
+	authed := huma.NewGroup(api) // exige login
+	authed.UseMiddleware(auth.RequireUser(api))
+	authed.UseSimpleModifier(auth.RequireSecurity)
+
+	tenant := huma.NewGroup(api) // exige login + organização ativa
+	tenant.UseMiddleware(auth.RequireOrganization(api))
+	tenant.UseSimpleModifier(auth.RequireSecurity)
+
+	platformAdmin := huma.NewGroup(api) // exige administrador da plataforma
+	platformAdmin.UseMiddleware(auth.RequirePlatformAdmin(api))
+	platformAdmin.UseSimpleModifier(auth.RequireSecurity)
+
+	auth.Register(public, authed, d.Pool, auth.Cookies{Secure: d.CookieSecure})
+	admin.Register(platformAdmin, queries)
+
+	// Rotas de negócio: cada requisição roda numa transação com RLS da organização.
+	tenantTx := func(ctx context.Context, orgID int64, fn func(supplier.Store) error) error {
+		return postgres.InTenant(ctx, d.Pool, orgID, func(q *db.Queries) error { return fn(q) })
+	}
+	supplier.Register(tenant, tenantTx)
 
 	return r
 }

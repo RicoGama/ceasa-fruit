@@ -8,16 +8,51 @@ import (
 	"time"
 )
 
-type Supplier struct {
+type Membership struct {
+	OrganizationID int64
+	UserID         int64
+	Role           string
+	CreatedAt      time.Time
+}
+
+type Organization struct {
 	ID        int64
 	Name      string
-	Document  string
-	Phone     *string
-	Email     *string
-	City      *string
-	State     *string
-	Notes     *string
-	Active    bool
+	Status    string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type Session struct {
+	TokenHash      []byte
+	UserID         int64
+	OrganizationID *int64
+	CreatedAt      time.Time
+	ExpiresAt      time.Time
+}
+
+type Supplier struct {
+	ID             int64
+	Name           string
+	Document       string
+	Phone          *string
+	Email          *string
+	City           *string
+	State          *string
+	Notes          *string
+	Active         bool
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	OrganizationID int64
+}
+
+type User struct {
+	ID              int64
+	Name            string
+	Email           string
+	PasswordHash    string
+	IsPlatformAdmin bool
+	Active          bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }

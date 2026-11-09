@@ -52,10 +52,10 @@ func run(logger *slog.Logger) error {
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
 		Handler: server.New(server.Deps{
-			Logger:      logger,
-			DB:          pool,
-			Pinger:      pool,
-			CORSOrigins: cfg.CORSOrigins,
+			Logger:       logger,
+			Pool:         pool,
+			CORSOrigins:  cfg.CORSOrigins,
+			CookieSecure: cfg.CookieSecure,
 		}),
 		// Timeouts protegem o servidor de clientes lentos ou travados.
 		ReadHeaderTimeout: 5 * time.Second,

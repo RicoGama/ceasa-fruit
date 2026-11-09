@@ -11,42 +11,50 @@ import (
 
 const countSuppliers = `-- name: CountSuppliers :one
 SELECT count(*) FROM suppliers
-WHERE ($1::text IS NULL
-       OR unaccent(name) ILIKE '%' || unaccent($1) || '%'
-       OR document LIKE $1 || '%')
-  AND ($2::boolean IS NULL OR active = $2)
+WHERE organization_id = $1
+  AND ($2::text IS NULL
+       OR unaccent(name) ILIKE '%' || unaccent($2) || '%'
+       OR document LIKE $2 || '%')
+  AND ($3::boolean IS NULL OR active = $3)
 `
 
 type CountSuppliersParams struct {
-	Search *string
-	Active *bool
+	OrganizationID int64
+	Search         *string
+	Active         *bool
 }
 
 func (q *Queries) CountSuppliers(ctx context.Context, arg CountSuppliersParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countSuppliers, arg.Search, arg.Active)
+	row := q.db.QueryRow(ctx, countSuppliers, arg.OrganizationID, arg.Search, arg.Active)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const createSupplier = `-- name: CreateSupplier :one
-INSERT INTO suppliers (name, document, phone, email, city, state, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, name, document, phone, email, city, state, notes, active, created_at, updated_at
+
+INSERT INTO suppliers (organization_id, name, document, phone, email, city, state, notes)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, name, document, phone, email, city, state, notes, active, created_at, updated_at, organization_id
 `
 
 type CreateSupplierParams struct {
-	Name     string
-	Document string
-	Phone    *string
-	Email    *string
-	City     *string
-	State    *string
-	Notes    *string
+	OrganizationID int64
+	Name           string
+	Document       string
+	Phone          *string
+	Email          *string
+	City           *string
+	State          *string
+	Notes          *string
 }
 
+// Toda query filtra por organization_id explicitamente, MESMO com o RLS ativo.
+// São duas camadas: se uma falhar, a outra segura.
+// @nome é atalho do sqlc para sqlc.arg('nome').
 func (q *Queries) CreateSupplier(ctx context.Context, arg CreateSupplierParams) (Supplier, error) {
 	row := q.db.QueryRow(ctx, createSupplier,
+		arg.OrganizationID,
 		arg.Name,
 		arg.Document,
 		arg.Phone,
@@ -68,6 +76,7 @@ func (q *Queries) CreateSupplier(ctx context.Context, arg CreateSupplierParams) 
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OrganizationID,
 	)
 	return i, err
 }
@@ -75,11 +84,16 @@ func (q *Queries) CreateSupplier(ctx context.Context, arg CreateSupplierParams) 
 const deactivateSupplier = `-- name: DeactivateSupplier :execrows
 UPDATE suppliers
 SET active = FALSE, updated_at = now()
-WHERE id = $1
+WHERE organization_id = $1 AND id = $2
 `
 
-func (q *Queries) DeactivateSupplier(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.Exec(ctx, deactivateSupplier, id)
+type DeactivateSupplierParams struct {
+	OrganizationID int64
+	ID             int64
+}
+
+func (q *Queries) DeactivateSupplier(ctx context.Context, arg DeactivateSupplierParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deactivateSupplier, arg.OrganizationID, arg.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -87,12 +101,17 @@ func (q *Queries) DeactivateSupplier(ctx context.Context, id int64) (int64, erro
 }
 
 const getSupplier = `-- name: GetSupplier :one
-SELECT id, name, document, phone, email, city, state, notes, active, created_at, updated_at FROM suppliers
-WHERE id = $1
+SELECT id, name, document, phone, email, city, state, notes, active, created_at, updated_at, organization_id FROM suppliers
+WHERE organization_id = $1 AND id = $2
 `
 
-func (q *Queries) GetSupplier(ctx context.Context, id int64) (Supplier, error) {
-	row := q.db.QueryRow(ctx, getSupplier, id)
+type GetSupplierParams struct {
+	OrganizationID int64
+	ID             int64
+}
+
+func (q *Queries) GetSupplier(ctx context.Context, arg GetSupplierParams) (Supplier, error) {
+	row := q.db.QueryRow(ctx, getSupplier, arg.OrganizationID, arg.ID)
 	var i Supplier
 	err := row.Scan(
 		&i.ID,
@@ -106,33 +125,37 @@ func (q *Queries) GetSupplier(ctx context.Context, id int64) (Supplier, error) {
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OrganizationID,
 	)
 	return i, err
 }
 
 const listSuppliers = `-- name: ListSuppliers :many
-SELECT id, name, document, phone, email, city, state, notes, active, created_at, updated_at FROM suppliers
-WHERE ($1::text IS NULL
-       OR unaccent(name) ILIKE '%' || unaccent($1) || '%'
-       OR document LIKE $1 || '%')
-  AND ($2::boolean IS NULL OR active = $2)
+SELECT id, name, document, phone, email, city, state, notes, active, created_at, updated_at, organization_id FROM suppliers
+WHERE organization_id = $1
+  AND ($2::text IS NULL
+       OR unaccent(name) ILIKE '%' || unaccent($2) || '%'
+       OR document LIKE $2 || '%')
+  AND ($3::boolean IS NULL OR active = $3)
 ORDER BY lower(name), id
-LIMIT $4 OFFSET $3
+LIMIT $5 OFFSET $4
 `
 
 type ListSuppliersParams struct {
-	Search *string
-	Active *bool
-	Offset int32
-	Limit  int32
+	OrganizationID int64
+	Search         *string
+	Active         *bool
+	OffsetRows     int32
+	LimitRows      int32
 }
 
 func (q *Queries) ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]Supplier, error) {
 	rows, err := q.db.Query(ctx, listSuppliers,
+		arg.OrganizationID,
 		arg.Search,
 		arg.Active,
-		arg.Offset,
-		arg.Limit,
+		arg.OffsetRows,
+		arg.LimitRows,
 	)
 	if err != nil {
 		return nil, err
@@ -153,6 +176,7 @@ func (q *Queries) ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([
 			&i.Active,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.OrganizationID,
 		); err != nil {
 			return nil, err
 		}
@@ -166,34 +190,34 @@ func (q *Queries) ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([
 
 const updateSupplier = `-- name: UpdateSupplier :one
 UPDATE suppliers
-SET name       = $2,
-    document   = $3,
-    phone      = $4,
-    email      = $5,
-    city       = $6,
-    state      = $7,
-    notes      = $8,
-    active     = $9,
+SET name       = $1,
+    document   = $2,
+    phone      = $3,
+    email      = $4,
+    city       = $5,
+    state      = $6,
+    notes      = $7,
+    active     = $8,
     updated_at = now()
-WHERE id = $1
-RETURNING id, name, document, phone, email, city, state, notes, active, created_at, updated_at
+WHERE organization_id = $9 AND id = $10
+RETURNING id, name, document, phone, email, city, state, notes, active, created_at, updated_at, organization_id
 `
 
 type UpdateSupplierParams struct {
-	ID       int64
-	Name     string
-	Document string
-	Phone    *string
-	Email    *string
-	City     *string
-	State    *string
-	Notes    *string
-	Active   bool
+	Name           string
+	Document       string
+	Phone          *string
+	Email          *string
+	City           *string
+	State          *string
+	Notes          *string
+	Active         bool
+	OrganizationID int64
+	ID             int64
 }
 
 func (q *Queries) UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (Supplier, error) {
 	row := q.db.QueryRow(ctx, updateSupplier,
-		arg.ID,
 		arg.Name,
 		arg.Document,
 		arg.Phone,
@@ -202,6 +226,8 @@ func (q *Queries) UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) 
 		arg.State,
 		arg.Notes,
 		arg.Active,
+		arg.OrganizationID,
+		arg.ID,
 	)
 	var i Supplier
 	err := row.Scan(
@@ -216,6 +242,7 @@ func (q *Queries) UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) 
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OrganizationID,
 	)
 	return i, err
 }

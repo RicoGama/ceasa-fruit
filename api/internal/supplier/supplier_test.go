@@ -8,15 +8,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 )
 
 // fakeStore é um Store em memória. Como os handlers dependem da interface
 // Store (e não do Postgres), estes testes rodam sem banco de dados.
+// Ele imita o filtro por organization_id das queries reais.
 type fakeStore struct {
 	rows   map[int64]db.Supplier
 	nextID int64
@@ -28,23 +31,24 @@ func newFakeStore() *fakeStore {
 
 func (f *fakeStore) CreateSupplier(_ context.Context, a db.CreateSupplierParams) (db.Supplier, error) {
 	for _, r := range f.rows {
-		if r.Document == a.Document {
+		if r.OrganizationID == a.OrganizationID && r.Document == a.Document {
 			return db.Supplier{}, &pgconn.PgError{Code: uniqueViolation}
 		}
 	}
 	now := time.Now()
 	s := db.Supplier{
-		ID: f.nextID, Name: a.Name, Document: a.Document, Phone: a.Phone, Email: a.Email,
-		City: a.City, State: a.State, Notes: a.Notes, Active: true, CreatedAt: now, UpdatedAt: now,
+		ID: f.nextID, OrganizationID: a.OrganizationID, Name: a.Name, Document: a.Document,
+		Phone: a.Phone, Email: a.Email, City: a.City, State: a.State, Notes: a.Notes,
+		Active: true, CreatedAt: now, UpdatedAt: now,
 	}
 	f.rows[s.ID] = s
 	f.nextID++
 	return s, nil
 }
 
-func (f *fakeStore) GetSupplier(_ context.Context, id int64) (db.Supplier, error) {
-	s, ok := f.rows[id]
-	if !ok {
+func (f *fakeStore) GetSupplier(_ context.Context, a db.GetSupplierParams) (db.Supplier, error) {
+	s, ok := f.rows[a.ID]
+	if !ok || s.OrganizationID != a.OrganizationID {
 		return db.Supplier{}, pgx.ErrNoRows
 	}
 	return s, nil
@@ -53,7 +57,7 @@ func (f *fakeStore) GetSupplier(_ context.Context, id int64) (db.Supplier, error
 func (f *fakeStore) ListSuppliers(_ context.Context, a db.ListSuppliersParams) ([]db.Supplier, error) {
 	var out []db.Supplier
 	for _, r := range f.rows {
-		if a.Active == nil || r.Active == *a.Active {
+		if r.OrganizationID == a.OrganizationID && (a.Active == nil || r.Active == *a.Active) {
 			out = append(out, r)
 		}
 	}
@@ -61,13 +65,13 @@ func (f *fakeStore) ListSuppliers(_ context.Context, a db.ListSuppliersParams) (
 }
 
 func (f *fakeStore) CountSuppliers(ctx context.Context, a db.CountSuppliersParams) (int64, error) {
-	rows, _ := f.ListSuppliers(ctx, db.ListSuppliersParams{Active: a.Active})
+	rows, _ := f.ListSuppliers(ctx, db.ListSuppliersParams{OrganizationID: a.OrganizationID, Active: a.Active})
 	return int64(len(rows)), nil
 }
 
 func (f *fakeStore) UpdateSupplier(_ context.Context, a db.UpdateSupplierParams) (db.Supplier, error) {
 	s, ok := f.rows[a.ID]
-	if !ok {
+	if !ok || s.OrganizationID != a.OrganizationID {
 		return db.Supplier{}, pgx.ErrNoRows
 	}
 	s.Name, s.Document, s.State, s.Active = a.Name, a.Document, a.State, a.Active
@@ -75,28 +79,46 @@ func (f *fakeStore) UpdateSupplier(_ context.Context, a db.UpdateSupplierParams)
 	return s, nil
 }
 
-func (f *fakeStore) DeactivateSupplier(_ context.Context, id int64) (int64, error) {
-	s, ok := f.rows[id]
-	if !ok {
+func (f *fakeStore) DeactivateSupplier(_ context.Context, a db.DeactivateSupplierParams) (int64, error) {
+	s, ok := f.rows[a.ID]
+	if !ok || s.OrganizationID != a.OrganizationID {
 		return 0, nil
 	}
 	s.Active = false
-	f.rows[id] = s
+	f.rows[a.ID] = s
 	return 1, nil
 }
 
-// newTestAPI sobe uma API Huma em memória só com as rotas de fornecedor.
-func newTestAPI(t *testing.T) (humatest.TestAPI, *fakeStore) {
+// testEnv guarda a API de teste e permite trocar a organização "logada".
+type testEnv struct {
+	api   humatest.TestAPI
+	store *fakeStore
+	orgID int64
+}
+
+// newTestEnv sobe uma API Huma em memória só com as rotas de fornecedor.
+// Um middleware coloca no context uma sessão falsa da organização env.orgID,
+// fazendo o papel do login.
+func newTestEnv(t *testing.T) *testEnv {
 	_, api := humatest.New(t)
-	store := newFakeStore()
-	Register(api, store)
-	return api, store
+	env := &testEnv{api: api, store: newFakeStore(), orgID: 1}
+
+	api.UseMiddleware(func(ctx huma.Context, next func(huma.Context)) {
+		orgID := env.orgID
+		s := &auth.Session{UserID: 1, OrganizationID: &orgID, OrganizationStatus: "active"}
+		next(huma.WithContext(ctx, auth.WithSession(ctx.Context(), s)))
+	})
+
+	// TxFunc falso: sem transação, só entrega o store em memória.
+	tx := func(_ context.Context, _ int64, fn func(Store) error) error { return fn(env.store) }
+	Register(api, tx)
+	return env
 }
 
 func TestCreateSupplier(t *testing.T) {
-	api, store := newTestAPI(t)
+	env := newTestEnv(t)
 
-	resp := api.Post("/suppliers", map[string]any{
+	resp := env.api.Post("/suppliers", map[string]any{
 		"name":     "  Sítio Boa Colheita ",
 		"document": "11.222.333/0001-81",
 		"state":    "sp",
@@ -123,8 +145,8 @@ func TestCreateSupplier(t *testing.T) {
 	if got.Phone != nil {
 		t.Errorf("empty phone should be stored as null, got %q", *got.Phone)
 	}
-	if len(store.rows) != 1 {
-		t.Errorf("expected 1 row in store, got %d", len(store.rows))
+	if env.store.rows[got.ID].OrganizationID != 1 {
+		t.Errorf("supplier not bound to the session organization")
 	}
 }
 
@@ -142,8 +164,8 @@ func TestCreateSupplierValidation(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			api, _ := newTestAPI(t)
-			resp := api.Post("/suppliers", c.body)
+			env := newTestEnv(t)
+			resp := env.api.Post("/suppliers", c.body)
 			if resp.Code != http.StatusUnprocessableEntity {
 				t.Fatalf("status = %d, want 422; body = %s", resp.Code, resp.Body.String())
 			}
@@ -154,40 +176,59 @@ func TestCreateSupplierValidation(t *testing.T) {
 	}
 }
 
-func TestCreateSupplierDuplicateDocument(t *testing.T) {
-	api, _ := newTestAPI(t)
+func TestDuplicateDocumentIsPerOrganization(t *testing.T) {
+	env := newTestEnv(t)
 	body := map[string]any{"name": "Abc", "document": "52998224725"}
 
-	api.Post("/suppliers", body)
-	resp := api.Post("/suppliers", body)
+	env.api.Post("/suppliers", body)
+	if resp := env.api.Post("/suppliers", body); resp.Code != http.StatusConflict {
+		t.Fatalf("same org: status = %d, want 409", resp.Code)
+	}
 
-	if resp.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want 409", resp.Code)
+	env.orgID = 2 // outra organização pode cadastrar o mesmo produtor
+	if resp := env.api.Post("/suppliers", body); resp.Code != http.StatusCreated {
+		t.Fatalf("other org: status = %d, want 201", resp.Code)
+	}
+}
+
+func TestOrganizationsAreIsolated(t *testing.T) {
+	env := newTestEnv(t)
+	env.api.Post("/suppliers", map[string]any{"name": "Abc", "document": "52998224725"})
+
+	env.orgID = 2
+	if resp := env.api.Get("/suppliers/1"); resp.Code != http.StatusNotFound {
+		t.Errorf("get from other org: status = %d, want 404", resp.Code)
+	}
+	if resp := env.api.Delete("/suppliers/1"); resp.Code != http.StatusNotFound {
+		t.Errorf("delete from other org: status = %d, want 404", resp.Code)
+	}
+	if resp := env.api.Get("/suppliers"); !strings.Contains(resp.Body.String(), `"total":0`) {
+		t.Errorf("list from other org should be empty, got %s", resp.Body.String())
 	}
 }
 
 func TestGetSupplierNotFound(t *testing.T) {
-	api, _ := newTestAPI(t)
-	if resp := api.Get("/suppliers/99"); resp.Code != http.StatusNotFound {
+	env := newTestEnv(t)
+	if resp := env.api.Get("/suppliers/99"); resp.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", resp.Code)
 	}
 }
 
 func TestDeactivateAndList(t *testing.T) {
-	api, _ := newTestAPI(t)
-	api.Post("/suppliers", map[string]any{"name": "Abc", "document": "52998224725"})
+	env := newTestEnv(t)
+	env.api.Post("/suppliers", map[string]any{"name": "Abc", "document": "52998224725"})
 
-	if resp := api.Delete("/suppliers/1"); resp.Code != http.StatusNoContent {
+	if resp := env.api.Delete("/suppliers/1"); resp.Code != http.StatusNoContent {
 		t.Fatalf("delete status = %d", resp.Code)
 	}
 
 	// O filtro padrão de status é "active", então a lista agora deve vir vazia ([] e não null).
-	resp := api.Get("/suppliers")
+	resp := env.api.Get("/suppliers")
 	if !strings.Contains(resp.Body.String(), `"items":[]`) {
 		t.Errorf("expected empty items, got %s", resp.Body.String())
 	}
 
-	resp = api.Get("/suppliers?status=all")
+	resp = env.api.Get("/suppliers?status=all")
 	if !strings.Contains(resp.Body.String(), `"total":1`) {
 		t.Errorf("expected total 1, got %s", resp.Body.String())
 	}
