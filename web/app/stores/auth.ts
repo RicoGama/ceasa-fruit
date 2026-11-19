@@ -1,15 +1,14 @@
-import type { Me } from '~/types'
+import type { Me, Role } from '~/types'
 
-// Store da sessão: quem está logado, de quais organizações participa e qual
-// está ativa. Qualquer componente que use useAuthStore() enxerga o mesmo
-// estado e se atualiza sozinho quando ele muda.
+// Store da sessão: quem está logado, com qual papel, e qual é a empresa.
+// Qualquer componente que use useAuthStore() enxerga o mesmo estado e se
+// atualiza sozinho quando ele muda.
 //
 // É um "setup store": parece um <script setup>. ref() vira estado,
 // computed() vira getter e function vira action.
 //
-// Tempo real (futuro): quando o servidor avisar que a organização foi
-// suspensa, ou que o usuário ganhou acesso a outra, basta chamar fetchMe()
-// (ou alterar `me`) e todas as telas refletem a mudança.
+// Tempo real (futuro): quando o servidor avisar que o papel do usuário mudou,
+// basta chamar fetchMe() (ou alterar `me`) e todas as telas refletem a mudança.
 export const useAuthStore = defineStore('auth', () => {
   // --- Estado ------------------------------------------------------------------
   const me = ref<Me | null>(null)
@@ -18,14 +17,15 @@ export const useAuthStore = defineStore('auth', () => {
 
   // --- Getters (valores derivados do estado) ----------------------------------
   const user = computed(() => me.value?.user ?? null)
+  const company = computed(() => me.value?.company ?? null)
   const isLoggedIn = computed(() => me.value !== null)
-  const isPlatformAdmin = computed(() => me.value?.user.isPlatformAdmin ?? false)
-  const organizations = computed(() => me.value?.organizations ?? [])
-  const currentOrganization = computed(() =>
-    organizations.value.find(o => o.id === me.value?.currentOrganizationId) ?? null,
-  )
-  // Organizações em que dá para entrar (as suspensas ficam de fora).
-  const activeOrganizations = computed(() => organizations.value.filter(o => o.status === 'active'))
+  const isAdmin = computed(() => me.value?.user.role === 'admin')
+
+  // hasRole('finance', 'manager'): o admin sempre pode (igual à API).
+  function hasRole(...roles: Role[]) {
+    const role = me.value?.user.role
+    return role === 'admin' || (role !== undefined && roles.includes(role))
+  }
 
   // --- Actions -----------------------------------------------------------------
   // O cliente da API é pego na hora de usar (e não na criação do store), para
@@ -47,27 +47,11 @@ export const useAuthStore = defineStore('auth', () => {
     return data
   }
 
-  async function signup(body: { name: string, email: string, password: string, organizationName: string }) {
-    const { data, error } = await api().POST('/auth/signup', { body })
-    if (error) throw error
-    me.value = data
-    loaded.value = true
-    return data
-  }
-
   async function logout() {
     await api().POST('/auth/logout')
     reset()
     clearNuxtData() // descarta dados em cache da sessão anterior
     await navigateTo('/login')
-  }
-
-  async function switchOrganization(organizationId: number) {
-    const { data, error } = await api().PUT('/auth/organization', { body: { organizationId } })
-    if (error) throw error
-    me.value = data
-    clearNuxtData() // os dados em tela eram da organização anterior
-    await navigateTo('/app')
   }
 
   // A sessão acabou (ex.: a API respondeu 401): volta ao estado "deslogado".
@@ -76,15 +60,9 @@ export const useAuthStore = defineStore('auth', () => {
     loaded.value = true
   }
 
-  // Algo mudou no servidor (ex.: organização suspensa): a próxima navegação
-  // consulta o /auth/me de novo.
-  function invalidate() {
-    loaded.value = false
-  }
-
   return {
     me, loaded,
-    user, isLoggedIn, isPlatformAdmin, organizations, currentOrganization, activeOrganizations,
-    fetchMe, login, signup, logout, switchOrganization, reset, invalidate,
+    user, company, isLoggedIn, isAdmin, hasRole,
+    fetchMe, login, logout, reset,
   }
 })

@@ -13,7 +13,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   // Middleware do cliente: se a sessão expirar no meio do uso, qualquer
   // chamada recebe 401 e mandamos o usuário para o login.
   api.use({
-    async onResponse({ request, response }) {
+    onResponse({ request, response }) {
       const isAuthCall = new URL(request.url).pathname.startsWith('/api/auth/')
       if (isAuthCall) return
 
@@ -24,17 +24,6 @@ export default defineNuxtPlugin((nuxtApp) => {
         })
       }
 
-      // A organização foi suspensa (ou desmarcada) enquanto o usuário usava o
-      // sistema: recarrega o "quem sou eu" e manda para a seleção de organização.
-      if (response.status === 403) {
-        const body = await response.clone().json().catch(() => null)
-        if (body?.detail === 'organization is suspended' || body?.detail === 'no organization selected') {
-          nuxtApp.runWithContext(() => {
-            useAuthStore().invalidate()
-            navigateTo('/app/select-organization')
-          })
-        }
-      }
     },
   })
 

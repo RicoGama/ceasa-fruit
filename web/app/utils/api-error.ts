@@ -21,11 +21,13 @@ const translations: Record<string, string> = {
   'supplier not found': 'Fornecedor não encontrado',
   'email already registered': 'Este e-mail já está cadastrado',
   'invalid email or password': 'E-mail ou senha inválidos',
-  'not a member of this organization': 'Você não participa desta organização',
-  'organization is suspended': 'Esta organização está suspensa',
-  'no organization selected': 'Selecione uma organização',
-  'organization not found': 'Organização não encontrada',
-  'platform admin only': 'Acesso restrito ao administrador da plataforma',
+  'not allowed for your role': 'Seu perfil não tem permissão para isso',
+  'you cannot deactivate your own user': 'Você não pode desativar o seu próprio usuário',
+  'the system must keep at least one active admin': 'O sistema precisa de pelo menos um administrador ativo',
+  'user is inactive': 'Este usuário está desativado',
+  'user not found': 'Usuário não encontrado',
+  'company not configured': 'Os dados da empresa ainda não foram cadastrados',
+  'invalid CNPJ': 'CNPJ inválido',
   'validation failed': 'Verifique os campos destacados',
 }
 

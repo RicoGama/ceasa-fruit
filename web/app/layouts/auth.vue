@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Layout das telas de acesso (login, cadastro, senha, escolha de organização).
+// Layout das telas de acesso (login e senha).
 // Esquerda: painel da marca (some no celular). Direita: logo + formulário.
 const brand = useRuntimeConfig().public.brand
 

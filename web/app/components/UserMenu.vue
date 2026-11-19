@@ -10,7 +10,6 @@ const theme = useBrandTheme()
 const initials = computed(() =>
   (auth.user?.name ?? '?').split(' ').filter(Boolean).slice(0, 2).map(p => p[0]!.toUpperCase()).join(''),
 )
-const roleLabels: Record<string, string> = { owner: 'Proprietário', admin: 'Administrador', member: 'Equipe' }
 
 const items = computed<DropdownMenuItem[][]>(() => [
   [{ type: 'label', label: auth.user?.name, description: auth.user?.email }],
@@ -56,7 +55,7 @@ const items = computed<DropdownMenuItem[][]>(() => [
       </span>
       <span v-if="!collapsed" class="min-w-0 flex-1">
         <span class="block text-sm font-bold text-highlighted truncate">{{ auth.user?.name }}</span>
-        <span class="block text-xs text-muted truncate">{{ roleLabels[auth.currentOrganization?.role ?? ''] ?? 'Usuário' }}</span>
+        <span class="block text-xs text-muted truncate">{{ auth.user ? roleLabels[auth.user.role] : '' }}</span>
       </span>
       <UIcon v-if="!collapsed" name="i-lucide-chevrons-up-down" class="size-4 text-dimmed shrink-0" />
     </button>

@@ -7,7 +7,7 @@
 \set ON_ERROR_STOP on
 
 -- Usuário da aplicação. SUPERUSER só em desenvolvimento: as migrations criam a
--- extensão unaccent e o papel ceasa_app. (Igual ao usuário que o Docker criaria.)
+-- extensão unaccent. (Igual ao usuário que o Docker criaria.)
 SELECT 'CREATE ROLE ceasa LOGIN SUPERUSER PASSWORD ''ceasa'''
 WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ceasa')
 \gexec

@@ -1,11 +1,14 @@
 # CEASA Fruit
 
-SaaS de controle de vendas de LFV (Legumes, Frutas e Verduras) para
-distribuidoras e atacadistas.
+Sistema de controle de vendas de LFV (Legumes, Frutas e Verduras) e ovos
+para atacadistas da CEASA-RJ. Primeiro cliente: **Irmãos Faisão Frutícola**.
+
+Roda num **servidor local dentro do box** (a internet da CEASA não é
+confiável): um servidor e um banco por cliente, sem multi-tenant.
 
 ## Escopo
 
-0. Multi-tenant: organizações, usuários em várias organizações, login, admin da plataforma ✅ (API + telas)
+0. Login, papéis (admin, gerente, vendedor, conferente, financeiro, motorista), usuários com convite por e-mail, dados da empresa ✅ (API + telas)
 1. Controle de vendas de LFV
 2. Cadastro de fornecedores ✅ (API + tela)
 3. Cadastro de clientes
@@ -91,6 +94,12 @@ Os e-mails aparecem em http://localhost:8025. (Com Docker, o `make db-up` já so
 make run     # aplica migrations e sobe a API em :8080
 ```
 
+No primeiro acesso, crie a empresa e o admin (em outro terminal):
+
+```bash
+make seed    # mostra o e-mail e a senha gerada
+```
+
 Se o seu Postgres não estiver em `localhost:5432`, copie `.env.example` para `.env` e ajuste `DATABASE_URL`.
 
 ### Subindo o front (em outro terminal)
@@ -143,7 +152,7 @@ Abra http://ceasa-fruit.test:6240. O hot reload do Nuxt funciona pelo vhost tamb
 
 ### Endereços da API
 
-- http://localhost:3000/admin/queues — painel das filas (River UI), só para o admin da plataforma
+- http://localhost:3000/admin/queues — painel das filas (River UI), só para o papel admin
 
 - http://localhost:8080/docs — documentação interativa (dá para testar os endpoints)
 - http://localhost:8080/health — health check

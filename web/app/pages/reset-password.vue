@@ -12,6 +12,8 @@ const errorMessage = ref('')
 
 // O token vem no link do e-mail: /reset-password?token=...
 const token = computed(() => (typeof route.query.token === 'string' ? route.query.token : ''))
+// Convite de usuário novo (?invite=1): mesma tela, outros textos.
+const isInvite = computed(() => route.query.invite === '1')
 
 const fields: AuthFormField[] = [
   { name: 'password', type: 'password', label: 'Nova senha', description: 'Pelo menos 8 caracteres', required: true },
@@ -32,7 +34,11 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof schema>>) {
     errorMessage.value = apiErrorMessage(error)
     return
   }
-  toast.add({ title: 'Senha alterada', description: 'Entre com a nova senha.', color: 'success' })
+  toast.add({
+    title: isInvite.value ? 'Senha criada' : 'Senha alterada',
+    description: 'Entre com seu e-mail e a nova senha.',
+    color: 'success',
+  })
   await navigateTo('/login')
 }
 </script>
@@ -51,12 +57,14 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof schema>>) {
 
   <UAuthForm
     v-else
-    title="Criar nova senha"
-    description="Depois de salvar, você vai entrar de novo em todos os aparelhos."
+    :title="isInvite ? 'Criar sua senha' : 'Criar nova senha'"
+    :description="isInvite
+      ? 'Bem-vindo ao CEASA Fruit! Escolha a senha que você vai usar para entrar.'
+      : 'Depois de salvar, você vai entrar de novo em todos os aparelhos.'"
     icon="i-lucide-lock-keyhole"
     :fields="fields"
     :schema="schema"
-    :submit="{ label: 'Salvar nova senha', block: true }"
+    :submit="{ label: isInvite ? 'Criar senha' : 'Salvar nova senha', block: true }"
     loading-auto
     @submit="onSubmit"
   >

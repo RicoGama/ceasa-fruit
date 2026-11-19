@@ -94,7 +94,7 @@ const toneClasses = {
           <div class="relative z-10 p-8 lg:p-10">
             <p class="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-white/80">
               <UIcon name="i-lucide-leaf" class="size-4" />
-              {{ auth.currentOrganization?.name }}
+              {{ auth.company?.tradeName || auth.company?.name }}
             </p>
             <h2 class="mt-3 text-4xl font-extrabold tracking-tight lg:text-5xl">
               Da cotação à expedição

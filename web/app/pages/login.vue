@@ -23,10 +23,9 @@ type Schema = z.output<typeof schema>
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   errorMessage.value = ''
   try {
-    const me = await auth.login(event.data)
-    // Com várias organizações e nenhuma escolhida, o middleware manda para a seleção.
+    await auth.login(event.data)
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/app'
-    await navigateTo(me.currentOrganizationId == null ? '/app/select-organization' : redirect)
+    await navigateTo(redirect)
   }
   catch (error) {
     errorMessage.value = apiErrorMessage(error)
@@ -51,8 +50,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       <ULink to="/forgot-password" class="text-primary font-medium" tabindex="-1">Esqueci minha senha</ULink>
     </template>
     <template #footer>
-      Ainda não tem conta?
-      <ULink to="/signup" class="text-primary font-medium">Criar conta</ULink>
+      Não tem acesso? Peça ao administrador do sistema.
     </template>
   </UAuthForm>
 </template>

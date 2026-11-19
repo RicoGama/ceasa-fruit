@@ -43,7 +43,7 @@ type userOutput struct {
 	Body User
 }
 
-type createInput struct {
+type createUserInput struct {
 	Body struct {
 		Name  string `json:"name" minLength:"2" maxLength:"120"`
 		Email string `json:"email" format:"email" maxLength:"254"`
@@ -53,13 +53,13 @@ type createInput struct {
 	}
 }
 
-func (in *createInput) Resolve(huma.Context) []error {
+func (in *createUserInput) Resolve(huma.Context) []error {
 	in.Body.Name = strings.TrimSpace(in.Body.Name)
 	in.Body.Email = auth.NormalizeEmail(in.Body.Email)
 	return nil
 }
 
-type updateInput struct {
+type updateUserInput struct {
 	ID   int64 `path:"id" minimum:"1"`
 	Body struct {
 		Name   string `json:"name" minLength:"2" maxLength:"120"`
@@ -128,7 +128,7 @@ func (h *handler) list(ctx context.Context, _ *struct{}) (*listOutput, error) {
 	return out, nil
 }
 
-func (h *handler) create(ctx context.Context, in *createInput) (*userOutput, error) {
+func (h *handler) create(ctx context.Context, in *createUserInput) (*userOutput, error) {
 	b := in.Body
 
 	// Sem senha informada, gravamos o hash de uma senha aleatória que ninguém
@@ -165,7 +165,7 @@ func (h *handler) create(ctx context.Context, in *createInput) (*userOutput, err
 	return &userOutput{Body: toAPI(created)}, nil
 }
 
-func (h *handler) update(ctx context.Context, in *updateInput) (*userOutput, error) {
+func (h *handler) update(ctx context.Context, in *updateUserInput) (*userOutput, error) {
 	me, _ := auth.FromContext(ctx)
 	b := in.Body
 	b.Name = strings.TrimSpace(b.Name)

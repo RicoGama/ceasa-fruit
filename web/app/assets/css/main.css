@@ -9,7 +9,7 @@
  * O Nuxt UI usa as cores "brand" (primária) e "base" (neutros), configuradas
  * em app.config.ts. Aqui cada uma aponta para variáveis --brand-* e --base-*,
  * que mudam conforme o atributo data-theme no <html>. Assim o tema troca na
- * hora, sem rebuild — e no futuro cada organização pode ter o seu (white-label).
+ * hora, sem rebuild — e cada cliente pode ter o seu.
  *
  * "static" faz o Tailwind gerar TODAS as variáveis abaixo, mesmo as que nenhuma
  * classe usa: o Nuxt UI lê a paleta neutra (base-*) direto pelas variáveis.

@@ -4,40 +4,6 @@
  */
 
 export interface paths {
-    "/admin/organizations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all organizations */
-        get: operations["admin-list-organizations"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/organizations/{id}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Suspend or reactivate an organization */
-        put: operations["admin-set-organization-status"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -79,26 +45,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Current user and organizations */
+        /** Current user and company */
         get: operations["get-me"];
         put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/organization": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Select the active organization */
-        put: operations["switch-organization"];
         post?: never;
         delete?: never;
         options?: never;
@@ -136,27 +85,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Set a new password using the emailed token
+         * Set a new password using the emailed token (reset or invite)
          * @description Ends every session of the user; they must log in again.
          */
         post: operations["reset-password"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/signup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Create an account and a new organization */
-        post: operations["signup"];
         delete?: never;
         options?: never;
         head?: never;
@@ -173,6 +105,24 @@ export interface paths {
         /** Search cities (IBGE) */
         get: operations["search-cities"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Company of this installation */
+        get: operations["get-company"];
+        /** Update the company profile */
+        put: operations["update-company"];
         post?: never;
         delete?: never;
         options?: never;
@@ -220,6 +170,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List users */
+        get: operations["list-users"];
+        put?: never;
+        /**
+         * Create a user
+         * @description Without a password, an invitation email is sent so the person sets their own.
+         */
+        post: operations["create-user"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update a user's name, role or status */
+        put: operations["update-user"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a new invitation (link to set the password) */
+        post: operations["resend-user-invite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -245,25 +250,6 @@ export interface components {
             postalCode?: string;
             street?: string;
         };
-        AdminOrganization: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/AdminOrganization.json
-             */
-            readonly $schema?: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: int64 */
-            id: number;
-            /** Format: int64 */
-            memberCount: number;
-            name: string;
-            /** @enum {string} */
-            status: "active" | "suspended";
-            /** Format: date-time */
-            updatedAt: string;
-        };
         City: {
             /**
              * Format: int32
@@ -274,6 +260,35 @@ export interface components {
             name: string;
             /** @example RJ */
             state: string;
+        };
+        Company: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Company.json
+             */
+            readonly $schema?: string;
+            city: components["schemas"]["City"];
+            complement: string | null;
+            district: string | null;
+            /** @description CNPJ */
+            document: string | null;
+            email: string | null;
+            name: string;
+            number: string | null;
+            phone: string | null;
+            postalCode: string | null;
+            stateRegistration: string | null;
+            street: string | null;
+            /** @enum {string|null} */
+            taxRegime: "simples" | "presumido" | "real" | null;
+            tradeName: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CompanyName: {
+            name: string;
+            tradeName: string | null;
         };
         Contact: {
             email: string | null;
@@ -292,6 +307,28 @@ export interface components {
             phone?: string;
             /** @description e.g. owner, manager, driver */
             role?: string;
+        };
+        CreateUserInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateUserInputBody.json
+             */
+            readonly $schema?: string;
+            /** Format: email */
+            email: string;
+            name: string;
+            password?: string;
+            /** @enum {string} */
+            role: "admin" | "manager" | "seller" | "checker" | "finance" | "driver";
+        };
+        CurrentUser: {
+            email: string;
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** @enum {string} */
+            role: "admin" | "manager" | "seller" | "checker" | "finance" | "driver";
         };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
@@ -349,20 +386,14 @@ export interface components {
             readonly $schema?: string;
             email: string;
         };
-        ListOrganizationsOutputBody: {
+        ListOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListOrganizationsOutputBody.json
+             * @example https://example.com/schemas/ListOutputBody.json
              */
             readonly $schema?: string;
-            items: components["schemas"]["AdminOrganization"][];
-            /** Format: int32 */
-            limit: number;
-            /** Format: int32 */
-            offset: number;
-            /** Format: int64 */
-            total: number;
+            items: components["schemas"]["User"][];
         };
         ListSuppliersOutputBody: {
             /**
@@ -396,22 +427,9 @@ export interface components {
              * @example https://example.com/schemas/Me.json
              */
             readonly $schema?: string;
-            /**
-             * Format: int64
-             * @description null until the user selects an organization
-             */
-            currentOrganizationId: number | null;
-            organizations: components["schemas"]["OrganizationMembership"][];
-            user: components["schemas"]["User"];
-        };
-        OrganizationMembership: {
-            /** Format: int64 */
-            id: number;
-            name: string;
-            /** @enum {string} */
-            role: "owner" | "admin" | "member";
-            /** @enum {string} */
-            status: "active" | "suspended";
+            /** @description null until the company is configured (make seed) */
+            company: components["schemas"]["CompanyName"];
+            user: components["schemas"]["CurrentUser"];
         };
         Payment: {
             bank: string | null;
@@ -446,30 +464,6 @@ export interface components {
             readonly $schema?: string;
             password: string;
             token: string;
-        };
-        SetStatusInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/SetStatusInputBody.json
-             */
-            readonly $schema?: string;
-            /** @enum {string} */
-            status: "active" | "suspended";
-        };
-        SignupInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/SignupInputBody.json
-             */
-            readonly $schema?: string;
-            /** Format: email */
-            email: string;
-            name: string;
-            /** @description Company that is subscribing to the platform */
-            organizationName: string;
-            password: string;
         };
         Supplier: {
             /**
@@ -594,22 +588,62 @@ export interface components {
             tradeName: string | null;
             whatsapp: string | null;
         };
-        SwitchOrganizationInputBody: {
+        UpdateCompanyInputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/SwitchOrganizationInputBody.json
+             * @example https://example.com/schemas/UpdateCompanyInputBody.json
              */
             readonly $schema?: string;
-            /** Format: int64 */
-            organizationId: number;
+            /** Format: int32 */
+            cityId?: number;
+            complement?: string;
+            district?: string;
+            /** @description CNPJ, with or without mask */
+            document?: string;
+            /** Format: email */
+            email?: string;
+            /** @description Legal name (razão social) */
+            name: string;
+            number?: string;
+            phone?: string;
+            postalCode?: string;
+            stateRegistration?: string;
+            street?: string;
+            /** @enum {string} */
+            taxRegime?: "simples" | "presumido" | "real";
+            tradeName?: string;
+        };
+        UpdateUserInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateUserInputBody.json
+             */
+            readonly $schema?: string;
+            active: boolean;
+            name: string;
+            /** @enum {string} */
+            role: "admin" | "manager" | "seller" | "checker" | "finance" | "driver";
         };
         User: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/User.json
+             */
+            readonly $schema?: string;
+            active: boolean;
+            /** Format: date-time */
+            createdAt: string;
             email: string;
             /** Format: int64 */
             id: number;
-            isPlatformAdmin: boolean;
             name: string;
+            /** @enum {string} */
+            role: "admin" | "manager" | "seller" | "checker" | "finance" | "driver";
+            /** Format: date-time */
+            updatedAt: string;
         };
     };
     responses: never;
@@ -620,73 +654,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    "admin-list-organizations": {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListOrganizationsOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "admin-set-organization-status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetStatusInputBody"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminOrganization"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     login: {
         parameters: {
             query?: never;
@@ -778,39 +745,6 @@ export interface operations {
             };
         };
     };
-    "switch-organization": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SwitchOrganizationInputBody"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Me"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "forgot-password": {
         parameters: {
             query?: never;
@@ -873,40 +807,6 @@ export interface operations {
             };
         };
     };
-    signup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SignupInputBody"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    "Set-Cookie"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Me"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "search-cities": {
         parameters: {
             query: {
@@ -929,6 +829,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["City"][];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Company"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "update-company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCompanyInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Company"];
                 };
             };
             /** @description Error */
@@ -1089,6 +1051,132 @@ export interface operations {
         responses: {
             /** @description No Content */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "create-user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserInputBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "update-user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "resend-user-invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };

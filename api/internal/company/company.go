@@ -47,7 +47,7 @@ type companyOutput struct {
 	Body Company
 }
 
-type updateInput struct {
+type updateCompanyInput struct {
 	Body struct {
 		Name              string  `json:"name" minLength:"2" maxLength:"150" doc:"Legal name (razão social)"`
 		TradeName         *string `json:"tradeName,omitempty" maxLength:"150"`
@@ -67,7 +67,7 @@ type updateInput struct {
 
 var nonDigits = regexp.MustCompile(`\D`)
 
-func (in *updateInput) Resolve(huma.Context) []error {
+func (in *updateCompanyInput) Resolve(huma.Context) []error {
 	b := &in.Body
 	var errs []error
 	b.Name = strings.TrimSpace(b.Name)
@@ -134,7 +134,7 @@ func (h *handler) get(ctx context.Context, _ *struct{}) (*companyOutput, error) 
 	return &companyOutput{Body: out}, nil
 }
 
-func (h *handler) update(ctx context.Context, in *updateInput) (*companyOutput, error) {
+func (h *handler) update(ctx context.Context, in *updateCompanyInput) (*companyOutput, error) {
 	b := in.Body
 	err := h.store.UpsertCompany(ctx, db.UpsertCompanyParams{
 		Name: b.Name, TradeName: b.TradeName, Document: b.Document, StateRegistration: b.StateRegistration,

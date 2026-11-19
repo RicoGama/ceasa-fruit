@@ -52,9 +52,9 @@ export default defineNuxtConfig({
   // - site público: HTML gerado no build (rápido e bom para SEO)
   // - login e dashboard: SPA, renderizados só no navegador (não precisam de SEO)
   routeRules: {
-    '/': { prerender: true },
+    // Sem site público: a raiz vai direto para o painel.
+    '/': { redirect: '/app' },
     '/login': { ssr: false },
-    '/signup': { ssr: false },
     '/forgot-password': { ssr: false },
     '/reset-password': { ssr: false },
     '/app/**': { ssr: false },

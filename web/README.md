@@ -45,11 +45,11 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
 |---|---|---|
 | 1 | `nuxt.config.ts` | módulos, renderização por rota (SSR, SPA, pré-render), proxy |
 | 2 | `app/app.vue`, `app/app.config.ts` | raiz do app, tema e idioma do Nuxt UI |
-| 3 | `app/plugins/api.ts` | cliente HTTP tipado (openapi-fetch) e interceptação de 401/403 |
-| 4 | `app/stores/auth.ts` | store do Pinia (estado, getters, actions): sessão, login/logout/troca de organização |
+| 3 | `app/plugins/api.ts` | cliente HTTP tipado (openapi-fetch) e interceptação de 401 |
+| 4 | `app/stores/auth.ts` | store do Pinia (estado, getters, actions): sessão, papel do usuário, empresa, login/logout |
 | 5 | `app/middleware/auth.global.ts` | proteção de rotas antes de cada navegação |
 | 6 | `app/layouts/dashboard.vue` | layout com barra lateral (`UDashboard*`) |
-| 7 | `app/pages/login.vue`, `signup.vue` | formulários com validação (Zod + `UAuthForm`) |
+| 7 | `app/pages/login.vue`, `reset-password.vue` | formulários com validação (Zod + `UAuthForm`); a mesma tela serve para convite (`?invite=1`) |
 | 8 | `app/pages/app/suppliers/index.vue` | listagem com busca, filtro, paginação e `useAsyncData` |
 | 9 | `app/pages/app/suppliers/[id].vue` | rota com parâmetro, carregar um registro |
 | 10 | `app/components/suppliers/SupplierForm.vue` | formulário grande em seções, Zod com regras cruzadas, CEP automático, lista de contatos, aviso de alterações não salvas |
@@ -102,8 +102,7 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
 
 | Rota | Renderização | Acesso |
 |---|---|---|
-| `/` | pré-renderizada no build (SEO) | público |
-| `/login`, `/signup` | SPA | só deslogado |
-| `/app/select-organization` | SPA | logado |
-| `/app`, `/app/suppliers`, `/app/suppliers/new`, `/app/suppliers/:id` | SPA | logado + organização ativa |
-| `/app/admin/organizations` | SPA | admin da plataforma |
+| `/` | redireciona para `/app` | — |
+| `/login`, `/forgot-password`, `/reset-password` | SPA | só deslogado |
+| `/app`, `/app/suppliers`, `/app/suppliers/new`, `/app/suppliers/:id` | SPA | logado |
+| `/app/settings/users`, `/app/settings/company` | SPA | papel admin |

@@ -28,10 +28,11 @@ const registryLinks: NavigationMenuItem[] = [
 
 // computed: recalcula sozinho quando o store muda (ex.: depois do login).
 const adminLinks = computed<NavigationMenuItem[]>(() =>
-  auth.isPlatformAdmin
+  auth.isAdmin
     ? [
-        { label: 'Plataforma', type: 'label' },
-        { label: 'Organizações', icon: 'i-lucide-building-2', to: '/app/admin/organizations' },
+        { label: 'Administração', type: 'label' },
+        { label: 'Usuários', icon: 'i-lucide-user-cog', to: '/app/settings/users' },
+        { label: 'Dados da empresa', icon: 'i-lucide-building-2', to: '/app/settings/company' },
         // Painel do River (fora do Nuxt): abre em outra aba.
         { label: 'Filas', icon: 'i-lucide-list-checks', to: '/admin/queues', external: true, target: '_blank' },
       ]
@@ -63,7 +64,19 @@ const menuUi = {
           <img v-if="!collapsed" :src="brand.logo" :alt="brand.name" class="h-14 w-auto object-contain">
           <img v-else src="/brand/icon-512.png" :alt="brand.name" class="size-9 object-contain">
         </NuxtLink>
-        <OrganizationSwitcher :collapsed="collapsed" />
+        <!-- Cartão da empresa (cliente) dona deste servidor -->
+        <div
+          v-if="!collapsed && auth.company"
+          class="flex items-center gap-3 rounded-xl border border-default bg-canvas/60 p-3"
+        >
+          <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-brand-800 dark:text-brand-200">
+            <UIcon name="i-lucide-store" class="size-5" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block text-sm font-bold text-highlighted truncate">{{ auth.company.tradeName || auth.company.name }}</span>
+            <span class="block text-xs text-muted truncate">Box CEASA-RJ</span>
+          </span>
+        </div>
       </template>
 
       <template #default="{ collapsed }">
