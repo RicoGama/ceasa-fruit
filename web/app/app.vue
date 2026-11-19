@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { pt_br } from '@nuxt/ui/locale'
+
+// Aplica o tema de cor (azul/verde) no <html>; o CSS em main.css faz o resto.
+const theme = useBrandTheme()
+useHead({ htmlAttrs: { 'data-theme': () => theme.value } })
 </script>
 
 <template>

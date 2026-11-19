@@ -15,11 +15,13 @@ async function select(id: number) {
   }
 }
 
+const roleLabels: Record<string, string> = { owner: 'Painel do gestor', admin: 'Administração', member: 'Equipe' }
+
 // Uma opção por organização do usuário; a atual aparece marcada.
 const items = computed<DropdownMenuItem[][]>(() => [
   auth.organizations.map(org => ({
     label: org.name,
-    avatar: { alt: org.name },
+    icon: 'i-lucide-store',
     type: 'checkbox' as const,
     checked: org.id === auth.currentOrganization?.id,
     disabled: org.status !== 'active',
@@ -29,22 +31,28 @@ const items = computed<DropdownMenuItem[][]>(() => [
 </script>
 
 <template>
+  <!-- Cartão da organização atual (como no layout); clicando, troca de organização. -->
   <UDropdownMenu
     :items="items"
-    :content="{ align: 'center', collisionPadding: 12 }"
-    :ui="{ content: collapsed ? 'w-48' : 'w-(--reka-dropdown-menu-trigger-width)' }"
+    :content="{ align: 'start', collisionPadding: 12 }"
+    :ui="{ content: collapsed ? 'w-56' : 'w-(--reka-dropdown-menu-trigger-width)' }"
   >
-    <UButton
-      :label="collapsed ? undefined : (auth.currentOrganization?.name ?? 'Selecionar organização')"
-      :avatar="{ alt: auth.currentOrganization?.name ?? '?' }"
-      :trailing-icon="collapsed ? undefined : 'i-lucide-chevrons-up-down'"
-      color="neutral"
-      variant="ghost"
-      block
-      :square="collapsed"
-      class="data-[state=open]:bg-elevated"
-      :class="[!collapsed && 'py-2']"
-      :ui="{ trailingIcon: 'text-dimmed' }"
-    />
+    <button
+      type="button"
+      class="w-full flex items-center gap-3 rounded-xl border border-default bg-canvas/60 hover:bg-elevated transition-colors text-left"
+      :class="collapsed ? 'justify-center p-1.5' : 'p-3'"
+      :aria-label="`Organização: ${auth.currentOrganization?.name ?? 'nenhuma'}`"
+    >
+      <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-brand-800 dark:text-brand-200">
+        <UIcon name="i-lucide-store" class="size-5" />
+      </span>
+      <span v-if="!collapsed" class="min-w-0 flex-1">
+        <span class="block text-sm font-bold text-highlighted truncate">
+          {{ roleLabels[auth.currentOrganization?.role ?? ''] ?? 'Selecionar organização' }}
+        </span>
+        <span class="block text-xs text-muted truncate">{{ auth.currentOrganization?.name }}</span>
+      </span>
+      <UIcon v-if="!collapsed && auth.organizations.length > 1" name="i-lucide-chevrons-up-down" class="size-4 text-dimmed shrink-0" />
+    </button>
   </UDropdownMenu>
 </template>

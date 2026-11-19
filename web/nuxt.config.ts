@@ -14,7 +14,9 @@ export default defineNuxtConfig({
     // Embute no JavaScript do app todos os ícones usados no código (procura
     // "i-lucide-..." nos arquivos). Assim nenhum ícone é baixado em tempo de
     // execução — nem da internet, nem do servidor.
-    clientBundle: { scan: true },
+    // A varredura padrão não olha arquivos .ts; incluímos para pegar ícones
+    // escritos em composables (ex.: os indicadores do painel).
+    clientBundle: { scan: { globInclude: ['**/*.{vue,ts}'] } },
     // Ícones que não estiverem no pacote vêm do próprio Nuxt (nunca da internet).
     // O caminho padrão seria /api/_nuxt_icon, mas /api/** é da API em Go.
     provider: 'server',
@@ -28,6 +30,21 @@ export default defineNuxtConfig({
     head: {
       htmlAttrs: { lang: 'pt-BR' },
       title: 'CEASA Fruit',
+      link: [
+        { rel: 'icon', type: 'image/png', href: '/favicon.png' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+      ],
+    },
+  },
+
+  // Marca do cliente desta instalação (logo, nome). Pode ser trocada sem
+  // rebuild com as variáveis NUXT_PUBLIC_BRAND_NAME e NUXT_PUBLIC_BRAND_LOGO.
+  runtimeConfig: {
+    public: {
+      brand: {
+        name: 'Irmãos Faisão Frutícola',
+        logo: '/brand/logo.webp',
+      },
     },
   },
 

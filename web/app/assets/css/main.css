@@ -1,2 +1,127 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+/* Fonte servida pelo próprio app (sem depender da internet no servidor do box). */
+@import "@fontsource-variable/plus-jakarta-sans";
+
+/*
+ * TEMAS DE COR
+ *
+ * O Nuxt UI usa as cores "brand" (primária) e "base" (neutros), configuradas
+ * em app.config.ts. Aqui cada uma aponta para variáveis --brand-* e --base-*,
+ * que mudam conforme o atributo data-theme no <html>. Assim o tema troca na
+ * hora, sem rebuild — e no futuro cada organização pode ter o seu (white-label).
+ *
+ * "static" faz o Tailwind gerar TODAS as variáveis abaixo, mesmo as que nenhuma
+ * classe usa: o Nuxt UI lê a paleta neutra (base-*) direto pelas variáveis.
+ */
+@theme static {
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-brand-950: var(--brand-950);
+
+  --color-base-50: var(--base-50);
+  --color-base-100: var(--base-100);
+  --color-base-200: var(--base-200);
+  --color-base-300: var(--base-300);
+  --color-base-400: var(--base-400);
+  --color-base-500: var(--base-500);
+  --color-base-600: var(--base-600);
+  --color-base-700: var(--base-700);
+  --color-base-800: var(--base-800);
+  --color-base-900: var(--base-900);
+  --color-base-950: var(--base-950);
+
+  /* Cores de apoio do layout (fundos suaves, barras secundárias do gráfico). */
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-strong: var(--accent-strong);
+  --color-canvas: var(--canvas);
+}
+
+/* Tema azul (padrão): #0149a2 é o tom 700, usado em botões e destaques. */
+:root,
+:root[data-theme="blue"] {
+  --brand-50: #eef4ff;
+  --brand-100: #dbe7ff;
+  --brand-200: #bfd5fe;
+  --brand-300: #93b9fc;
+  --brand-400: #5f93f7;
+  --brand-500: #346df0;
+  --brand-600: #1b56d8;
+  --brand-700: #0149a2;
+  --brand-800: #053d85;
+  --brand-900: #0a356e;
+  --brand-950: #082249;
+
+  --base-50: #f8fafc;
+  --base-100: #f1f5f9;
+  --base-200: #e2e8f0;
+  --base-300: #cbd5e1;
+  --base-400: #94a3b8;
+  --base-500: #64748b;
+  --base-600: #475569;
+  --base-700: #334155;
+  --base-800: #1e293b;
+  --base-900: #0f172a;
+  --base-950: #020617;
+
+  --accent-soft: #e3edff;
+  --accent-strong: #a9c6f5;
+  --canvas: #f3f6fb;
+}
+
+/* Tema verde: as cores do layout do designer. */
+:root[data-theme="green"] {
+  --brand-50: #f1f7f1;
+  --brand-100: #dcecdf;
+  --brand-200: #bcd9c3;
+  --brand-300: #8fbf9c;
+  --brand-400: #5fa073;
+  --brand-500: #3e8456;
+  --brand-600: #2f7a52;
+  --brand-700: #276848;
+  --brand-800: #1d5239;
+  --brand-900: #11402c;
+  --brand-950: #0a2a1c;
+
+  --base-50: #f6f7f5;
+  --base-100: #eceee9;
+  --base-200: #dcdfd8;
+  --base-300: #c2c7bd;
+  --base-400: #8f978b;
+  --base-500: #6b7367;
+  --base-600: #535a50;
+  --base-700: #40463e;
+  --base-800: #2a312b;
+  --base-900: #1d231f;
+  --base-950: #111512;
+
+  --accent-soft: #eaf3d6;
+  --accent-strong: #c0dbae;
+  --canvas: #f4f6f1;
+}
+
+/*
+ * O Nuxt UI usa o tom 500 como cor principal; o layout pede um tom mais
+ * fechado (700). :root:root aumenta a prioridade sobre o CSS do Nuxt UI.
+ */
+:root:root {
+  --ui-primary: var(--ui-color-primary-700);
+}
+
+/* Modo escuro: tons mais claros para contraste e fundo da página escuro. */
+:root:root.dark {
+  --ui-primary: var(--ui-color-primary-400);
+  --canvas: var(--base-950);
+  --accent-soft: color-mix(in oklab, var(--brand-400) 18%, transparent);
+  --accent-strong: color-mix(in oklab, var(--brand-300) 55%, transparent);
+}

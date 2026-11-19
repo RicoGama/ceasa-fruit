@@ -1,10 +1,10 @@
-// Tema do Nuxt UI. As cores viram variáveis CSS: no futuro dá para trocar a
-// cor principal por organização (white-label) sem rebuild.
+// Tema do Nuxt UI. "brand" e "base" são paletas definidas em assets/css/main.css,
+// que mudam conforme o tema escolhido (azul ou verde) sem rebuild.
 export default defineAppConfig({
   ui: {
     colors: {
-      primary: 'green',
-      neutral: 'zinc',
+      primary: 'brand',
+      neutral: 'base',
     },
   },
 })

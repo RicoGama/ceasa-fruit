@@ -56,6 +56,23 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
 | 11 | `app/components/CityInput.vue` | `defineModel`, busca com espera (debounce) na API |
 | 12 | `app/utils/*.ts` | funções puras (CPF/CNPJ, tradução de erros, datas) |
 
+## Tema de cor e marca do cliente
+
+- **Temas**: azul (padrão, `#0149a2`) e verde (layout do designer). O usuário troca
+  em *menu do usuário → Cor do sistema*; a escolha fica num cookie. As paletas
+  estão em `app/assets/css/main.css` (`--brand-*`, `--base-*`), aplicadas por
+  `<html data-theme="...">`. Para um tema novo, basta outro bloco
+  `:root[data-theme="..."]` e uma entrada em `app/composables/useBrandTheme.ts`.
+- **Marca do cliente**: logo em `public/brand/logo.webp` e ícone em
+  `public/brand/icon-512.png`. Nome e logo vêm de `runtimeConfig.public.brand`
+  (`nuxt.config.ts`) e podem ser trocados sem rebuild com
+  `NUXT_PUBLIC_BRAND_NAME` e `NUXT_PUBLIC_BRAND_LOGO`.
+- **Fonte**: Plus Jakarta Sans, servida pelo próprio app (pacote `@fontsource`),
+  sem depender da internet.
+- **Painel (Visão geral)**: os números ainda são **ilustrativos**
+  (`app/composables/useDashboardDemo.ts`); cada bloco passa a usar dados reais
+  quando o módulo correspondente (cotações, pedidos, compras) existir.
+
 ## Estado: Pinia × dados da API
 
 - **Pinia (`app/stores/`)**: estado do app que várias telas compartilham e que

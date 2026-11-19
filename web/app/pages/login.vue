@@ -36,12 +36,11 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 
 <template>
   <UAuthForm
-    title="Entrar"
-    description="Acesse o painel da sua empresa."
-    icon="i-lucide-log-in"
+    title="Bem-vindo de volta"
+    description="Entre com seu e-mail e senha para acessar o painel."
     :fields="fields"
     :schema="schema"
-    :submit="{ label: 'Entrar', block: true }"
+    :submit="{ label: 'Entrar', block: true, size: 'lg', class: 'rounded-xl' }"
     loading-auto
     @submit="onSubmit"
   >
