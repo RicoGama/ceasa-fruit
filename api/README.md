@@ -142,6 +142,8 @@ make help
 | `make sqlc` | regenera `internal/db` depois de mexer em `queries/*.sql` ou migrations |
 | `make migration name=create_customers` | cria um novo arquivo de migration |
 | `make promote-admin email=...` | torna um usuário admin da plataforma |
+| `make seed [email=...] [password=...]` | cria ou atualiza um admin da plataforma com uma organização (senha aleatória se não informar) |
+| `make set-password email=... [password=...]` | redefine a senha de um usuário pelo servidor, sem e-mail |
 | `make mailpit` | SMTP de desenvolvimento (e-mails em http://localhost:8025) |
 | `make worker` | só os workers da fila (opcional; a API já executa os jobs) |
 

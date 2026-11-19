@@ -2,7 +2,7 @@
 -include .env
 export
 
-.PHONY: help tools db-setup-local db-up db-down run build test test-integration sqlc migration promote-admin openapi worker mailpit fmt lint
+.PHONY: help tools db-setup-local db-up db-down run build test test-integration sqlc migration promote-admin seed set-password openapi worker mailpit fmt lint
 
 help: ## Mostra os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-17s\033[0m %s\n", $$1, $$2}'
@@ -41,6 +41,13 @@ migration: ## Cria uma migration nova: make migration name=create_customers
 
 promote-admin: ## Torna um usuário admin da plataforma: make promote-admin email=voce@exemplo.com
 	go run ./cmd/promote-admin -email $(email)
+
+# $(if $(x),...) só passa a opção quando a variável foi informada.
+seed: ## Cria/atualiza um admin da plataforma (senha aleatória): make seed [email=...] [password=...]
+	go run ./cmd/seed $(if $(email),-email '$(email)') $(if $(password),-password '$(password)')
+
+set-password: ## Redefine a senha de um usuário: make set-password email=... [password=...]
+	go run ./cmd/set-password -email '$(email)' $(if $(password),-password '$(password)')
 
 worker: ## Roda só os workers da fila (opcional: a API já roda os workers)
 	go run ./cmd/worker
