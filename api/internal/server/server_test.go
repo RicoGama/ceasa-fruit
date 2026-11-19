@@ -58,7 +58,7 @@ func TestNewBuildsOpenAPI(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d", rec.Code)
 	}
-	for _, path := range []string{`"/suppliers"`, `"/auth/login"`, `"/admin/organizations"`, `"sessionCookie"`} {
+	for _, path := range []string{`"/suppliers"`, `"/auth/login"`, `"/users"`, `"/company"`, `"sessionCookie"`} {
 		if !strings.Contains(rec.Body.String(), path) {
 			t.Errorf("openapi.json is missing %s", path)
 		}
@@ -70,7 +70,7 @@ func TestProtectedRoutesRequireLogin(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h := New(Deps{Logger: logger})
 
-	for _, path := range []string{"/suppliers", "/auth/me", "/admin/organizations"} {
+	for _, path := range []string{"/suppliers", "/auth/me", "/users", "/company", "/cities?search=rio"} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusUnauthorized {

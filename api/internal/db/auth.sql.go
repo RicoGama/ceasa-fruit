@@ -31,41 +31,6 @@ func (q *Queries) ConsumePasswordResetToken(ctx context.Context, tokenHash []byt
 	return user_id, err
 }
 
-const createMembership = `-- name: CreateMembership :exec
-INSERT INTO memberships (organization_id, user_id, role)
-VALUES ($1, $2, $3)
-`
-
-type CreateMembershipParams struct {
-	OrganizationID int64
-	UserID         int64
-	Role           string
-}
-
-func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipParams) error {
-	_, err := q.db.Exec(ctx, createMembership, arg.OrganizationID, arg.UserID, arg.Role)
-	return err
-}
-
-const createOrganization = `-- name: CreateOrganization :one
-INSERT INTO organizations (name)
-VALUES ($1)
-RETURNING id, name, status, created_at, updated_at
-`
-
-func (q *Queries) CreateOrganization(ctx context.Context, name string) (Organization, error) {
-	row := q.db.QueryRow(ctx, createOrganization, name)
-	var i Organization
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Status,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const createPasswordResetToken = `-- name: CreatePasswordResetToken :exec
 INSERT INTO password_reset_tokens (token_hash, user_id, expires_at)
 VALUES ($1, $2, $3)
@@ -83,51 +48,50 @@ func (q *Queries) CreatePasswordResetToken(ctx context.Context, arg CreatePasswo
 }
 
 const createSession = `-- name: CreateSession :exec
-INSERT INTO sessions (token_hash, user_id, organization_id, expires_at)
-VALUES ($1, $2, $3, $4)
+INSERT INTO sessions (token_hash, user_id, expires_at)
+VALUES ($1, $2, $3)
 `
 
 type CreateSessionParams struct {
-	TokenHash      []byte
-	UserID         int64
-	OrganizationID *int64
-	ExpiresAt      time.Time
+	TokenHash []byte
+	UserID    int64
+	ExpiresAt time.Time
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
-	_, err := q.db.Exec(ctx, createSession,
-		arg.TokenHash,
-		arg.UserID,
-		arg.OrganizationID,
-		arg.ExpiresAt,
-	)
+	_, err := q.db.Exec(ctx, createSession, arg.TokenHash, arg.UserID, arg.ExpiresAt)
 	return err
 }
 
 const createUser = `-- name: CreateUser :one
 
-INSERT INTO users (name, email, password_hash)
-VALUES ($1, $2, $3)
-RETURNING id, name, email, password_hash, is_platform_admin, active, created_at, updated_at
+INSERT INTO users (name, email, password_hash, role)
+VALUES ($1, $2, $3, $4)
+RETURNING id, name, email, password_hash, role, active, created_at, updated_at
 `
 
 type CreateUserParams struct {
 	Name         string
 	Email        string
 	PasswordHash string
+	Role         string
 }
 
-// Queries de autenticação. Estas tabelas não têm RLS: são usadas antes de
-// sabermos qual organização está ativa.
+// Queries de autenticação e senha.
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Name, arg.Email, arg.PasswordHash)
+	row := q.db.QueryRow(ctx, createUser,
+		arg.Name,
+		arg.Email,
+		arg.PasswordHash,
+		arg.Role,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.Email,
 		&i.PasswordHash,
-		&i.IsPlatformAdmin,
+		&i.Role,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -150,82 +114,43 @@ DELETE FROM sessions
 WHERE user_id = $1
 `
 
-// Encerra todas as sessões do usuário (ex.: depois de trocar a senha).
+// Encerra todas as sessões do usuário (ex.: troca de senha, usuário desativado).
 func (q *Queries) DeleteUserSessions(ctx context.Context, userID int64) error {
 	_, err := q.db.Exec(ctx, deleteUserSessions, userID)
 	return err
 }
 
-const getMembership = `-- name: GetMembership :one
-SELECT m.role, o.status AS organization_status
-FROM memberships m
-JOIN organizations o ON o.id = m.organization_id
-WHERE m.user_id = $1 AND m.organization_id = $2
-`
-
-type GetMembershipParams struct {
-	UserID         int64
-	OrganizationID int64
-}
-
-type GetMembershipRow struct {
-	Role               string
-	OrganizationStatus string
-}
-
-func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (GetMembershipRow, error) {
-	row := q.db.QueryRow(ctx, getMembership, arg.UserID, arg.OrganizationID)
-	var i GetMembershipRow
-	err := row.Scan(&i.Role, &i.OrganizationStatus)
-	return i, err
-}
-
 const getSession = `-- name: GetSession :one
-SELECT s.user_id,
-       s.organization_id,
-       u.name              AS user_name,
-       u.email             AS user_email,
-       u.is_platform_admin,
-       m.role,
-       o.status            AS organization_status
+SELECT u.id AS user_id, u.name AS user_name, u.email AS user_email, u.role
 FROM sessions s
 JOIN users u ON u.id = s.user_id
-LEFT JOIN memberships m ON m.user_id = s.user_id AND m.organization_id = s.organization_id
-LEFT JOIN organizations o ON o.id = s.organization_id
 WHERE s.token_hash = $1
   AND s.expires_at > now()
   AND u.active
 `
 
 type GetSessionRow struct {
-	UserID             int64
-	OrganizationID     *int64
-	UserName           string
-	UserEmail          string
-	IsPlatformAdmin    bool
-	Role               *string
-	OrganizationStatus *string
+	UserID    int64
+	UserName  string
+	UserEmail string
+	Role      string
 }
 
-// Carrega tudo o que uma requisição autenticada precisa numa consulta só.
-// LEFT JOIN: a sessão pode ainda não ter organização selecionada.
+// Carrega o que uma requisição autenticada precisa numa consulta só.
 func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error) {
 	row := q.db.QueryRow(ctx, getSession, tokenHash)
 	var i GetSessionRow
 	err := row.Scan(
 		&i.UserID,
-		&i.OrganizationID,
 		&i.UserName,
 		&i.UserEmail,
-		&i.IsPlatformAdmin,
 		&i.Role,
-		&i.OrganizationStatus,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, name, email, password_hash, is_platform_admin, active, created_at, updated_at FROM users
+SELECT id, name, email, password_hash, role, active, created_at, updated_at FROM users
 WHERE email = $1
 `
 
@@ -237,7 +162,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Name,
 		&i.Email,
 		&i.PasswordHash,
-		&i.IsPlatformAdmin,
+		&i.Role,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -254,62 +179,6 @@ WHERE user_id = $1 AND used_at IS NULL
 // Depois de redefinir, os outros links pendentes deixam de valer.
 func (q *Queries) InvalidatePasswordResetTokens(ctx context.Context, userID int64) error {
 	_, err := q.db.Exec(ctx, invalidatePasswordResetTokens, userID)
-	return err
-}
-
-const listUserOrganizations = `-- name: ListUserOrganizations :many
-SELECT o.id, o.name, o.status, m.role
-FROM memberships m
-JOIN organizations o ON o.id = m.organization_id
-WHERE m.user_id = $1
-ORDER BY lower(o.name), o.id
-`
-
-type ListUserOrganizationsRow struct {
-	ID     int64
-	Name   string
-	Status string
-	Role   string
-}
-
-func (q *Queries) ListUserOrganizations(ctx context.Context, userID int64) ([]ListUserOrganizationsRow, error) {
-	rows, err := q.db.Query(ctx, listUserOrganizations, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListUserOrganizationsRow
-	for rows.Next() {
-		var i ListUserOrganizationsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Status,
-			&i.Role,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const setSessionOrganization = `-- name: SetSessionOrganization :exec
-UPDATE sessions
-SET organization_id = $1
-WHERE token_hash = $2
-`
-
-type SetSessionOrganizationParams struct {
-	OrganizationID *int64
-	TokenHash      []byte
-}
-
-func (q *Queries) SetSessionOrganization(ctx context.Context, arg SetSessionOrganizationParams) error {
-	_, err := q.db.Exec(ctx, setSessionOrganization, arg.OrganizationID, arg.TokenHash)
 	return err
 }
 

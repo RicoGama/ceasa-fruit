@@ -43,13 +43,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
 		return fmt.Errorf("migrating river: %w", err)
 	}
-	// Permite enfileirar de dentro de uma transação de organização
-	// (postgres.InTenant troca para o papel ceasa_app, sujeito ao RLS).
-	_, err = pool.Exec(ctx, `
-		GRANT SELECT, INSERT, UPDATE ON river_job TO ceasa_app;
-		GRANT USAGE ON SEQUENCE river_job_id_seq TO ceasa_app;
-		GRANT SELECT, INSERT, UPDATE ON river_queue TO ceasa_app;`)
-	return err
+	return nil
 }
 
 // ---------------------------------------------------------------------------

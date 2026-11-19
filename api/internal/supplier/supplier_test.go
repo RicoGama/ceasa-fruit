@@ -9,19 +9,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 )
 
 // fakeStore é um Store em memória. Como os handlers dependem da interface
 // Store (e não do Postgres), estes testes rodam sem banco de dados.
-// Ele imita o que importa do banco: filtro por organização, documento único
-// por organização e município inexistente (chave estrangeira).
+// Ele imita o que importa do banco: documento único e município inexistente
+// (chave estrangeira).
 type fakeStore struct {
 	parties   map[int64]db.Party
 	suppliers map[int64]db.Supplier
@@ -39,7 +37,7 @@ func newFakeStore() *fakeStore {
 	}
 }
 
-func (f *fakeStore) checkParty(orgID, id int64, document *string, cityID *int32) error {
+func (f *fakeStore) checkParty(id int64, document *string, cityID *int32) error {
 	if cityID != nil {
 		if _, ok := fakeCities[*cityID]; !ok {
 			return &pgconn.PgError{Code: foreignKeyViolation, ConstraintName: "parties_city_id_fkey"}
@@ -47,7 +45,7 @@ func (f *fakeStore) checkParty(orgID, id int64, document *string, cityID *int32)
 	}
 	if document != nil {
 		for _, p := range f.parties {
-			if p.ID != id && p.OrganizationID == orgID && p.Document != nil && *p.Document == *document {
+			if p.ID != id && p.Document != nil && *p.Document == *document {
 				return &pgconn.PgError{Code: uniqueViolation}
 			}
 		}
@@ -56,13 +54,13 @@ func (f *fakeStore) checkParty(orgID, id int64, document *string, cityID *int32)
 }
 
 func (f *fakeStore) CreateParty(_ context.Context, a db.CreatePartyParams) (int64, error) {
-	if err := f.checkParty(a.OrganizationID, 0, a.Document, a.CityID); err != nil {
+	if err := f.checkParty(0, a.Document, a.CityID); err != nil {
 		return 0, err
 	}
 	id := f.nextID
 	f.nextID++
 	f.parties[id] = db.Party{
-		ID: id, OrganizationID: a.OrganizationID, PersonType: a.PersonType, Document: a.Document,
+		ID: id, PersonType: a.PersonType, Document: a.Document,
 		LegalName: a.LegalName, TradeName: a.TradeName, TaxpayerType: a.TaxpayerType,
 		Phone: a.Phone, PostalCode: a.PostalCode, CityID: a.CityID,
 		PixKeyType: a.PixKeyType, PixKey: a.PixKey,
@@ -72,10 +70,10 @@ func (f *fakeStore) CreateParty(_ context.Context, a db.CreatePartyParams) (int6
 
 func (f *fakeStore) UpdateParty(_ context.Context, a db.UpdatePartyParams) (int64, error) {
 	p, ok := f.parties[a.ID]
-	if !ok || p.OrganizationID != a.OrganizationID {
+	if !ok {
 		return 0, nil
 	}
-	if err := f.checkParty(a.OrganizationID, a.ID, a.Document, a.CityID); err != nil {
+	if err := f.checkParty(a.ID, a.Document, a.CityID); err != nil {
 		return 0, err
 	}
 	p.LegalName, p.TradeName, p.Document, p.CityID = a.LegalName, a.TradeName, a.Document, a.CityID
@@ -86,7 +84,7 @@ func (f *fakeStore) UpdateParty(_ context.Context, a db.UpdatePartyParams) (int6
 func (f *fakeStore) CreateSupplier(_ context.Context, a db.CreateSupplierParams) error {
 	now := time.Now()
 	f.suppliers[a.PartyID] = db.Supplier{
-		PartyID: a.PartyID, OrganizationID: a.OrganizationID, SupplierType: a.SupplierType,
+		PartyID: a.PartyID, SupplierType: a.SupplierType,
 		DefaultPurchaseMode: a.DefaultPurchaseMode, ConsignmentCommission: a.ConsignmentCommission,
 		PaymentTermDays: a.PaymentTermDays, CeasaPavilion: a.CeasaPavilion, CeasaBox: a.CeasaBox,
 		Status: a.Status, BlockedReason: a.BlockedReason, CreatedAt: now, UpdatedAt: now,
@@ -96,7 +94,7 @@ func (f *fakeStore) CreateSupplier(_ context.Context, a db.CreateSupplierParams)
 
 func (f *fakeStore) UpdateSupplier(_ context.Context, a db.UpdateSupplierParams) (int64, error) {
 	s, ok := f.suppliers[a.PartyID]
-	if !ok || s.OrganizationID != a.OrganizationID {
+	if !ok {
 		return 0, nil
 	}
 	s.SupplierType, s.DefaultPurchaseMode, s.Status = a.SupplierType, a.DefaultPurchaseMode, a.Status
@@ -105,12 +103,12 @@ func (f *fakeStore) UpdateSupplier(_ context.Context, a db.UpdateSupplierParams)
 	return 1, nil
 }
 
-func (f *fakeStore) GetSupplier(_ context.Context, a db.GetSupplierParams) (db.GetSupplierRow, error) {
-	s, ok := f.suppliers[a.ID]
-	if !ok || s.OrganizationID != a.OrganizationID {
+func (f *fakeStore) GetSupplier(_ context.Context, id int64) (db.GetSupplierRow, error) {
+	s, ok := f.suppliers[id]
+	if !ok {
 		return db.GetSupplierRow{}, pgx.ErrNoRows
 	}
-	p := f.parties[a.ID]
+	p := f.parties[id]
 	row := db.GetSupplierRow{Party: p, Supplier: s}
 	if p.CityID != nil {
 		c := fakeCities[*p.CityID]
@@ -122,7 +120,7 @@ func (f *fakeStore) GetSupplier(_ context.Context, a db.GetSupplierParams) (db.G
 func (f *fakeStore) ListSuppliers(_ context.Context, a db.ListSuppliersParams) ([]db.ListSuppliersRow, error) {
 	var out []db.ListSuppliersRow
 	for id, s := range f.suppliers {
-		if s.OrganizationID != a.OrganizationID || (a.Status != nil && s.Status != *a.Status) {
+		if a.Status != nil && s.Status != *a.Status {
 			continue
 		}
 		p := f.parties[id]
@@ -137,26 +135,26 @@ func (f *fakeStore) ListSuppliers(_ context.Context, a db.ListSuppliersParams) (
 }
 
 func (f *fakeStore) CountSuppliers(ctx context.Context, a db.CountSuppliersParams) (int64, error) {
-	rows, _ := f.ListSuppliers(ctx, db.ListSuppliersParams{OrganizationID: a.OrganizationID, Status: a.Status})
+	rows, _ := f.ListSuppliers(ctx, db.ListSuppliersParams{Status: a.Status})
 	return int64(len(rows)), nil
 }
 
-func (f *fakeStore) DeactivateSupplier(_ context.Context, a db.DeactivateSupplierParams) (int64, error) {
-	s, ok := f.suppliers[a.PartyID]
-	if !ok || s.OrganizationID != a.OrganizationID {
+func (f *fakeStore) DeactivateSupplier(_ context.Context, partyID int64) (int64, error) {
+	s, ok := f.suppliers[partyID]
+	if !ok {
 		return 0, nil
 	}
 	s.Status, s.BlockedReason = "inactive", nil
-	f.suppliers[a.PartyID] = s
+	f.suppliers[partyID] = s
 	return 1, nil
 }
 
-func (f *fakeStore) ListPartyContacts(_ context.Context, a db.ListPartyContactsParams) ([]db.PartyContact, error) {
-	return f.contacts[a.PartyID], nil
+func (f *fakeStore) ListPartyContacts(_ context.Context, partyID int64) ([]db.PartyContact, error) {
+	return f.contacts[partyID], nil
 }
 
-func (f *fakeStore) DeletePartyContacts(_ context.Context, a db.DeletePartyContactsParams) error {
-	delete(f.contacts, a.PartyID)
+func (f *fakeStore) DeletePartyContacts(_ context.Context, partyID int64) error {
+	delete(f.contacts, partyID)
 	return nil
 }
 
@@ -168,28 +166,20 @@ func (f *fakeStore) CreatePartyContact(_ context.Context, a db.CreatePartyContac
 	return nil
 }
 
-// testEnv guarda a API de teste e permite trocar a organização "logada".
+// testEnv guarda a API de teste e o banco falso.
 type testEnv struct {
 	api   humatest.TestAPI
 	store *fakeStore
-	orgID int64
 }
 
 // newTestEnv sobe uma API Huma em memória só com as rotas de fornecedor.
-// Um middleware coloca no context uma sessão falsa da organização env.orgID,
-// fazendo o papel do login.
+// (O login é testado no pacote auth e no teste de integração.)
 func newTestEnv(t *testing.T) *testEnv {
 	_, api := humatest.New(t)
-	env := &testEnv{api: api, store: newFakeStore(), orgID: 1}
-
-	api.UseMiddleware(func(ctx huma.Context, next func(huma.Context)) {
-		orgID := env.orgID
-		s := &auth.Session{UserID: 1, OrganizationID: &orgID, OrganizationStatus: "active"}
-		next(huma.WithContext(ctx, auth.WithSession(ctx.Context(), s)))
-	})
+	env := &testEnv{api: api, store: newFakeStore()}
 
 	// TxFunc falso: sem transação, só entrega o store em memória.
-	tx := func(_ context.Context, _ int64, fn func(Store) error) error { return fn(env.store) }
+	tx := func(_ context.Context, fn func(Store) error) error { return fn(env.store) }
 	Register(api, tx)
 	return env
 }
@@ -301,17 +291,12 @@ func TestUnknownCityIsAFieldError(t *testing.T) {
 	}
 }
 
-func TestDuplicateDocumentIsPerOrganization(t *testing.T) {
+func TestDuplicateDocument(t *testing.T) {
 	env := newTestEnv(t)
 
 	env.api.Post("/suppliers", fullBody())
 	if resp := env.api.Post("/suppliers", fullBody()); resp.Code != http.StatusConflict {
-		t.Fatalf("same org: status = %d, want 409", resp.Code)
-	}
-
-	env.orgID = 2 // outra organização pode cadastrar o mesmo produtor
-	if resp := env.api.Post("/suppliers", fullBody()); resp.Code != http.StatusCreated {
-		t.Fatalf("other org: status = %d, want 201; %s", resp.Code, resp.Body.String())
+		t.Fatalf("status = %d, want 409", resp.Code)
 	}
 }
 
@@ -332,22 +317,16 @@ func TestUpdateReplacesContacts(t *testing.T) {
 	}
 }
 
-func TestOrganizationsAreIsolated(t *testing.T) {
+func TestUnknownSupplierIs404(t *testing.T) {
 	env := newTestEnv(t)
-	env.api.Post("/suppliers", fullBody())
-
-	env.orgID = 2
-	if resp := env.api.Get("/suppliers/1"); resp.Code != http.StatusNotFound {
-		t.Errorf("get from other org: status = %d, want 404", resp.Code)
+	if resp := env.api.Get("/suppliers/99"); resp.Code != http.StatusNotFound {
+		t.Errorf("get: status = %d, want 404", resp.Code)
 	}
-	if resp := env.api.Put("/suppliers/1", fullBody()); resp.Code != http.StatusNotFound {
-		t.Errorf("update from other org: status = %d, want 404", resp.Code)
+	if resp := env.api.Put("/suppliers/99", fullBody()); resp.Code != http.StatusNotFound {
+		t.Errorf("update: status = %d, want 404", resp.Code)
 	}
-	if resp := env.api.Delete("/suppliers/1"); resp.Code != http.StatusNotFound {
-		t.Errorf("delete from other org: status = %d, want 404", resp.Code)
-	}
-	if resp := env.api.Get("/suppliers"); !strings.Contains(resp.Body.String(), `"total":0`) {
-		t.Errorf("list from other org should be empty, got %s", resp.Body.String())
+	if resp := env.api.Delete("/suppliers/99"); resp.Code != http.StatusNotFound {
+		t.Errorf("delete: status = %d, want 404", resp.Code)
 	}
 }
 

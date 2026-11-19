@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -21,7 +22,7 @@ var SecurityScheme = &huma.SecurityScheme{
 // Para deixar passar, chamamos next(ctx); para barrar, escrevemos o erro e
 // simplesmente não chamamos next.
 
-// RequireUser exige um usuário logado (qualquer organização, ou nenhuma).
+// RequireUser exige um usuário logado (qualquer papel).
 func RequireUser(api huma.API) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		if _, ok := FromContext(ctx.Context()); !ok {
@@ -32,57 +33,39 @@ func RequireUser(api huma.API) func(huma.Context, func(huma.Context)) {
 	}
 }
 
-// RequireOrganization exige usuário logado COM uma organização ativa selecionada.
-// É o middleware de todas as rotas de negócio (fornecedores, clientes, vendas...).
-func RequireOrganization(api huma.API) func(huma.Context, func(huma.Context)) {
+// RequireRole exige um usuário logado com um dos papéis informados.
+// O administrador sempre passa.
+func RequireRole(api huma.API, roles ...string) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		s, ok := FromContext(ctx.Context())
 		switch {
 		case !ok:
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "authentication required")
-		case s.OrganizationID == nil:
-			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "no organization selected")
-		case s.OrganizationStatus != "active":
-			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "organization is suspended")
+		case !s.IsAdmin() && !slices.Contains(roles, s.Role):
+			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "not allowed for your role")
 		default:
 			next(ctx)
 		}
 	}
 }
 
-// RequirePlatformAdmin exige o administrador da plataforma (o dono do SaaS).
-func RequirePlatformAdmin(api huma.API) func(huma.Context, func(huma.Context)) {
-	return func(ctx huma.Context, next func(huma.Context)) {
-		s, ok := FromContext(ctx.Context())
-		switch {
-		case !ok:
-			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "authentication required")
-		case !s.IsPlatformAdmin:
-			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "platform admin only")
-		default:
-			next(ctx)
-		}
-	}
-}
-
-// RequireSecurity marca as operações de um grupo como autenticadas no OpenAPI.
-func RequireSecurity(op *huma.Operation) {
-	op.Security = []map[string][]string{{SecuritySchemeName: {}}}
-}
-
-// RequirePlatformAdminHTTP é a mesma regra de RequirePlatformAdmin, mas como
-// middleware net/http comum, para proteger handlers que não são do Huma
-// (ex.: o painel das filas).
-func RequirePlatformAdminHTTP(next http.Handler) http.Handler {
+// RequireAdminHTTP é a regra "só administrador" como middleware net/http comum,
+// para proteger handlers que não são do Huma (ex.: o painel das filas).
+func RequireAdminHTTP(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s, ok := FromContext(r.Context())
 		switch {
 		case !ok:
 			http.Error(w, "authentication required", http.StatusUnauthorized)
-		case !s.IsPlatformAdmin:
-			http.Error(w, "platform admin only", http.StatusForbidden)
+		case !s.IsAdmin():
+			http.Error(w, "not allowed for your role", http.StatusForbidden)
 		default:
 			next.ServeHTTP(w, r)
 		}
 	})
+}
+
+// RequireSecurity marca as operações de um grupo como autenticadas no OpenAPI.
+func RequireSecurity(op *huma.Operation) {
+	op.Security = []map[string][]string{{SecuritySchemeName: {}}}
 }

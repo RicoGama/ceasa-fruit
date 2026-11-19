@@ -317,10 +317,10 @@ func lower(s *string) *string {
 // ---------------------------------------------------------------------------
 
 // CreateParams monta os parâmetros do INSERT a partir dos campos já normalizados.
-func (f *Fields) CreateParams(organizationID int64) db.CreatePartyParams {
+func (f *Fields) CreateParams() db.CreatePartyParams {
 	a, p := f.Address, f.Payment
 	return db.CreatePartyParams{
-		OrganizationID: organizationID, PersonType: f.PersonType, Document: f.Document,
+		PersonType: f.PersonType, Document: f.Document,
 		LegalName: f.LegalName, TradeName: f.TradeName, StateRegistration: f.StateRegistration,
 		TaxpayerType: f.TaxpayerType, Email: f.Email, Phone: f.Phone, Whatsapp: f.Whatsapp,
 		PostalCode: a.PostalCode, Street: a.Street, Number: a.Number, Complement: a.Complement,
@@ -333,12 +333,12 @@ func (f *Fields) CreateParams(organizationID int64) db.CreatePartyParams {
 }
 
 // UpdateParams monta os parâmetros do UPDATE.
-func (f *Fields) UpdateParams(organizationID, id int64) db.UpdatePartyParams {
-	c := f.CreateParams(organizationID)
+func (f *Fields) UpdateParams(id int64) db.UpdatePartyParams {
+	c := f.CreateParams()
 	// As duas structs têm os mesmos campos (fora o ID); a conversão direta só
 	// funciona se forem idênticas, então copiamos campo a campo.
 	return db.UpdatePartyParams{
-		OrganizationID: organizationID, ID: id, PersonType: c.PersonType, Document: c.Document,
+		ID: id, PersonType: c.PersonType, Document: c.Document,
 		LegalName: c.LegalName, TradeName: c.TradeName, StateRegistration: c.StateRegistration,
 		TaxpayerType: c.TaxpayerType, Email: c.Email, Phone: c.Phone, Whatsapp: c.Whatsapp,
 		PostalCode: c.PostalCode, Street: c.Street, Number: c.Number, Complement: c.Complement,
@@ -381,22 +381,20 @@ func FromDB(p db.Party, cityName, cityState *string, contacts []db.PartyContact)
 
 // ContactStore é o que SaveContacts precisa do banco.
 type ContactStore interface {
-	DeletePartyContacts(ctx context.Context, arg db.DeletePartyContactsParams) error
+	DeletePartyContacts(ctx context.Context, partyID int64) error
 	CreatePartyContact(ctx context.Context, arg db.CreatePartyContactParams) error
 }
 
 // SaveContacts substitui todos os contatos da pessoa pelos recebidos.
 // Apagar e inserir de novo é mais simples que comparar item a item, e a
 // lista é pequena (no máximo 20).
-func SaveContacts(ctx context.Context, s ContactStore, organizationID, partyID int64, contacts []ContactInput) error {
-	if err := s.DeletePartyContacts(ctx, db.DeletePartyContactsParams{
-		OrganizationID: organizationID, PartyID: partyID,
-	}); err != nil {
+func SaveContacts(ctx context.Context, s ContactStore, partyID int64, contacts []ContactInput) error {
+	if err := s.DeletePartyContacts(ctx, partyID); err != nil {
 		return err
 	}
 	for i, c := range contacts {
 		if err := s.CreatePartyContact(ctx, db.CreatePartyContactParams{
-			OrganizationID: organizationID, PartyID: partyID, Name: c.Name, Role: c.Role,
+			PartyID: partyID, Name: c.Name, Role: c.Role,
 			Phone: c.Phone, IsWhatsapp: c.IsWhatsapp, Email: c.Email, Position: int32(i),
 		}); err != nil {
 			return err

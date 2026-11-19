@@ -22,7 +22,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/party"
 )
@@ -37,16 +36,16 @@ type Store interface {
 	UpdateParty(ctx context.Context, arg db.UpdatePartyParams) (int64, error)
 	CreateSupplier(ctx context.Context, arg db.CreateSupplierParams) error
 	UpdateSupplier(ctx context.Context, arg db.UpdateSupplierParams) (int64, error)
-	GetSupplier(ctx context.Context, arg db.GetSupplierParams) (db.GetSupplierRow, error)
+	GetSupplier(ctx context.Context, id int64) (db.GetSupplierRow, error)
 	ListSuppliers(ctx context.Context, arg db.ListSuppliersParams) ([]db.ListSuppliersRow, error)
 	CountSuppliers(ctx context.Context, arg db.CountSuppliersParams) (int64, error)
-	DeactivateSupplier(ctx context.Context, arg db.DeactivateSupplierParams) (int64, error)
-	ListPartyContacts(ctx context.Context, arg db.ListPartyContactsParams) ([]db.PartyContact, error)
+	DeactivateSupplier(ctx context.Context, partyID int64) (int64, error)
+	ListPartyContacts(ctx context.Context, partyID int64) ([]db.PartyContact, error)
 }
 
-// TxFunc abre uma transação presa à organização (com RLS) e entrega um Store
-// para usar dentro dela. Em produção é postgres.InTenant; nos testes, um falso.
-type TxFunc func(ctx context.Context, organizationID int64, fn func(Store) error) error
+// TxFunc abre uma transação e entrega um Store para usar dentro dela: ou tudo
+// dá certo, ou nada é gravado. Em produção usa o banco; nos testes, um falso.
+type TxFunc func(ctx context.Context, fn func(Store) error) error
 
 // ---------------------------------------------------------------------------
 // Tipos da API
@@ -183,7 +182,7 @@ type handler struct {
 }
 
 // Register adiciona todas as rotas de fornecedor na API do Huma.
-// A api recebida deve ser um grupo protegido por auth.RequireOrganization.
+// A api recebida deve ser um grupo que exige login.
 func Register(api huma.API, tx TxFunc) {
 	h := &handler{tx: tx}
 	tags := []string{"Suppliers"}
@@ -218,7 +217,6 @@ func Register(api huma.API, tx TxFunc) {
 
 // list é um *método* de handler: (h *handler) é o receiver, parecido com o "this".
 func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppliersOutput, error) {
-	orgID := auth.OrganizationID(ctx)
 
 	var search *string
 	if s := strings.TrimSpace(in.Search); s != "" {
@@ -232,18 +230,16 @@ func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppli
 	var rows []db.ListSuppliersRow
 	var total int64
 	// A função anônima "enxerga" rows e total de fora (closure) e os preenche.
-	err := h.tx(ctx, orgID, func(s Store) error {
+	err := h.tx(ctx, func(s Store) error {
 		var err error
 		rows, err = s.ListSuppliers(ctx, db.ListSuppliersParams{
-			OrganizationID: orgID, Search: search, Status: status,
+			Search: search, Status: status,
 			LimitRows: in.Limit, OffsetRows: in.Offset,
 		})
 		if err != nil {
 			return err
 		}
-		total, err = s.CountSuppliers(ctx, db.CountSuppliersParams{
-			OrganizationID: orgID, Search: search, Status: status,
-		})
+		total, err = s.CountSuppliers(ctx, db.CountSuppliersParams{Search: search, Status: status})
 		return err
 	})
 	if err != nil {
@@ -271,11 +267,10 @@ func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppli
 }
 
 func (h *handler) get(ctx context.Context, in *idInput) (*supplierOutput, error) {
-	orgID := auth.OrganizationID(ctx)
 	var out Supplier
-	err := h.tx(ctx, orgID, func(s Store) error {
+	err := h.tx(ctx, func(s Store) error {
 		var err error
-		out, err = load(ctx, s, orgID, in.ID)
+		out, err = load(ctx, s, in.ID)
 		return err
 	})
 	if err != nil {
@@ -286,16 +281,15 @@ func (h *handler) get(ctx context.Context, in *idInput) (*supplierOutput, error)
 
 // create grava pessoa + fornecedor + contatos na mesma transação: ou tudo, ou nada.
 func (h *handler) create(ctx context.Context, in *createInput) (*supplierOutput, error) {
-	orgID := auth.OrganizationID(ctx)
 	f := &in.Body
 	var out Supplier
-	err := h.tx(ctx, orgID, func(s Store) error {
-		partyID, err := s.CreateParty(ctx, f.CreateParams(orgID))
+	err := h.tx(ctx, func(s Store) error {
+		partyID, err := s.CreateParty(ctx, f.CreateParams())
 		if err != nil {
 			return err
 		}
 		err = s.CreateSupplier(ctx, db.CreateSupplierParams{
-			PartyID: partyID, OrganizationID: orgID, SupplierType: f.SupplierType,
+			PartyID: partyID, SupplierType: f.SupplierType,
 			DefaultPurchaseMode: f.DefaultPurchaseMode, ConsignmentCommission: f.ConsignmentCommission,
 			PaymentTermDays: f.PaymentTermDays, CeasaPavilion: f.CeasaPavilion, CeasaBox: f.CeasaBox,
 			Status: f.Status, BlockedReason: f.BlockedReason,
@@ -303,10 +297,10 @@ func (h *handler) create(ctx context.Context, in *createInput) (*supplierOutput,
 		if err != nil {
 			return err
 		}
-		if err := party.SaveContacts(ctx, s, orgID, partyID, f.Contacts); err != nil {
+		if err := party.SaveContacts(ctx, s, partyID, f.Contacts); err != nil {
 			return err
 		}
-		out, err = load(ctx, s, orgID, partyID)
+		out, err = load(ctx, s, partyID)
 		return err
 	})
 	if err != nil {
@@ -316,14 +310,13 @@ func (h *handler) create(ctx context.Context, in *createInput) (*supplierOutput,
 }
 
 func (h *handler) update(ctx context.Context, in *updateInput) (*supplierOutput, error) {
-	orgID := auth.OrganizationID(ctx)
 	f := &in.Body
 	var out Supplier
-	err := h.tx(ctx, orgID, func(s Store) error {
-		// Primeiro o fornecedor: se ele não existir (ou for de outra organização),
-		// nenhuma linha é alterada e respondemos 404 sem mexer na pessoa.
+	err := h.tx(ctx, func(s Store) error {
+		// Primeiro o fornecedor: se ele não existir, nenhuma linha é alterada e
+		// respondemos 404 sem mexer na pessoa.
 		n, err := s.UpdateSupplier(ctx, db.UpdateSupplierParams{
-			PartyID: in.ID, OrganizationID: orgID, SupplierType: f.SupplierType,
+			PartyID: in.ID, SupplierType: f.SupplierType,
 			DefaultPurchaseMode: f.DefaultPurchaseMode, ConsignmentCommission: f.ConsignmentCommission,
 			PaymentTermDays: f.PaymentTermDays, CeasaPavilion: f.CeasaPavilion, CeasaBox: f.CeasaBox,
 			Status: f.Status, BlockedReason: f.BlockedReason,
@@ -334,13 +327,13 @@ func (h *handler) update(ctx context.Context, in *updateInput) (*supplierOutput,
 		if n == 0 {
 			return pgx.ErrNoRows
 		}
-		if _, err := s.UpdateParty(ctx, f.UpdateParams(orgID, in.ID)); err != nil {
+		if _, err := s.UpdateParty(ctx, f.UpdateParams(in.ID)); err != nil {
 			return err
 		}
-		if err := party.SaveContacts(ctx, s, orgID, in.ID, f.Contacts); err != nil {
+		if err := party.SaveContacts(ctx, s, in.ID, f.Contacts); err != nil {
 			return err
 		}
-		out, err = load(ctx, s, orgID, in.ID)
+		out, err = load(ctx, s, in.ID)
 		return err
 	})
 	if err != nil {
@@ -351,11 +344,10 @@ func (h *handler) update(ctx context.Context, in *updateInput) (*supplierOutput,
 
 // deactivate devolve *struct{}: uma saída vazia, ou seja, resposta sem corpo.
 func (h *handler) deactivate(ctx context.Context, in *idInput) (*struct{}, error) {
-	orgID := auth.OrganizationID(ctx)
 	var n int64
-	err := h.tx(ctx, orgID, func(s Store) error {
+	err := h.tx(ctx, func(s Store) error {
 		var err error
-		n, err = s.DeactivateSupplier(ctx, db.DeactivateSupplierParams{OrganizationID: orgID, PartyID: in.ID})
+		n, err = s.DeactivateSupplier(ctx, in.ID)
 		return err
 	})
 	if err != nil {
@@ -372,12 +364,12 @@ func (h *handler) deactivate(ctx context.Context, in *idInput) (*struct{}, error
 // ---------------------------------------------------------------------------
 
 // load busca o fornecedor completo (com cidade e contatos).
-func load(ctx context.Context, s Store, orgID, id int64) (Supplier, error) {
-	row, err := s.GetSupplier(ctx, db.GetSupplierParams{OrganizationID: orgID, ID: id})
+func load(ctx context.Context, s Store, id int64) (Supplier, error) {
+	row, err := s.GetSupplier(ctx, id)
 	if err != nil {
 		return Supplier{}, err
 	}
-	contacts, err := s.ListPartyContacts(ctx, db.ListPartyContactsParams{OrganizationID: orgID, PartyID: id})
+	contacts, err := s.ListPartyContacts(ctx, id)
 	if err != nil {
 		return Supplier{}, err
 	}

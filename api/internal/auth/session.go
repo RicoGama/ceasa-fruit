@@ -1,12 +1,12 @@
-// Package auth cuida de login, sessões e do controle de acesso por organização.
+// Package auth cuida de login, sessões e do controle de acesso por papel.
 //
 // Fluxo resumido:
-//  1. Login/cadastro cria uma sessão: um token aleatório vai para o navegador
-//     num cookie HttpOnly e o hash do token vai para a tabela sessions.
+//  1. O login cria uma sessão: um token aleatório vai para o navegador num
+//     cookie HttpOnly e o hash do token vai para a tabela sessions.
 //  2. Em toda requisição, o middleware LoadSession lê o cookie, busca a sessão
-//     e coloca um *Session no context.Context.
-//  3. Os middlewares do Huma (RequireUser, RequireOrganization,
-//     RequirePlatformAdmin) barram quem não pode acessar cada grupo de rotas.
+//     (com o papel do usuário) e coloca um *Session no context.Context.
+//  3. Os middlewares do Huma (RequireUser, RequireRole) barram quem não pode
+//     acessar cada grupo de rotas.
 package auth
 
 import (
@@ -32,17 +32,15 @@ const (
 
 // Session é o usuário autenticado da requisição atual.
 type Session struct {
-	TokenHash       []byte
-	UserID          int64
-	UserName        string
-	UserEmail       string
-	IsPlatformAdmin bool
-
-	// Organização selecionada; nil se o usuário ainda não escolheu uma.
-	OrganizationID     *int64
-	Role               string // "owner", "admin" ou "member" (vazio sem organização)
-	OrganizationStatus string // "active" ou "suspended" (vazio sem organização)
+	TokenHash []byte
+	UserID    int64
+	UserName  string
+	UserEmail string
+	Role      string // ver roles.go
 }
+
+// IsAdmin diz se o usuário tem o papel de administrador.
+func (s *Session) IsAdmin() bool { return s.Role == RoleAdmin }
 
 // ---------------------------------------------------------------------------
 // Session no context.Context
@@ -60,19 +58,6 @@ func WithSession(ctx context.Context, s *Session) context.Context {
 func FromContext(ctx context.Context) (*Session, bool) {
 	s, ok := ctx.Value(ctxKey{}).(*Session)
 	return s, ok && s != nil
-}
-
-// OrganizationID devolve a organização ativa da requisição.
-//
-// Só pode ser chamada em rotas protegidas por RequireOrganization. Se não
-// houver organização, é erro de programação (alguém esqueceu o middleware),
-// então usamos panic: o middleware Recoverer transforma em 500 e o log mostra.
-func OrganizationID(ctx context.Context) int64 {
-	s, ok := FromContext(ctx)
-	if !ok || s.OrganizationID == nil {
-		panic("auth.OrganizationID called on a route without RequireOrganization")
-	}
-	return *s.OrganizationID
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +136,7 @@ func LoadSession(loader SessionLoader, logger *slog.Logger) func(http.Handler) h
 			hash := HashToken(cookie.Value)
 			row, err := loader.GetSession(r.Context(), hash)
 			if errors.Is(err, pgx.ErrNoRows) {
-				next.ServeHTTP(w, r) // sessão vencida ou inexistente: anônimo
+				next.ServeHTTP(w, r) // sessão vencida, inexistente ou usuário desativado
 				return
 			}
 			if err != nil {
@@ -160,22 +145,15 @@ func LoadSession(loader SessionLoader, logger *slog.Logger) func(http.Handler) h
 				return
 			}
 
+			// O papel vem do banco a cada requisição: se o admin mudar o papel
+			// de alguém, vale na hora, sem precisar sair e entrar de novo.
 			s := &Session{
-				TokenHash:       hash,
-				UserID:          row.UserID,
-				UserName:        row.UserName,
-				UserEmail:       row.UserEmail,
-				IsPlatformAdmin: row.IsPlatformAdmin,
+				TokenHash: hash,
+				UserID:    row.UserID,
+				UserName:  row.UserName,
+				UserEmail: row.UserEmail,
+				Role:      row.Role,
 			}
-			// Role vem de um LEFT JOIN: é nil se a organização da sessão não
-			// existe mais ou se o usuário foi removido dela. Nesse caso tratamos
-			// como "sem organização selecionada".
-			if row.OrganizationID != nil && row.Role != nil && row.OrganizationStatus != nil {
-				s.OrganizationID = row.OrganizationID
-				s.Role = *row.Role
-				s.OrganizationStatus = *row.OrganizationStatus
-			}
-
 			next.ServeHTTP(w, r.WithContext(WithSession(r.Context(), s)))
 		})
 	}

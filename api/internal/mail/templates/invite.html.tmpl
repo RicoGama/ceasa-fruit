@@ -1,0 +1,7 @@
+{{define "invite.html"}}{{template "layout.header" .}}
+<p>Olá, {{.Data.Name}}!</p>
+<p>Você recebeu acesso ao sistema CEASA Fruit. Para entrar, crie a sua senha:</p>
+{{template "layout.button" (dict "URL" .Data.ResetURL "Label" "Criar minha senha")}}
+<p style="font-size:13px;color:#52525b;">O link vale por {{.Data.ExpiresInDays}} dias e só pode ser usado uma vez.
+Se ele vencer, peça ao administrador para enviar um novo convite.</p>
+{{template "layout.footer" .}}{{end}}

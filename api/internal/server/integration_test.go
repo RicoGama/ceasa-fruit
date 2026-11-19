@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/mail"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
@@ -81,11 +82,6 @@ type integrationEnv struct {
 	pool   *pgxpool.Pool
 	queue  *queue.Queue
 	mailer *fakeMailer
-}
-
-func setupIntegration(t *testing.T) (*httptest.Server, *pgxpool.Pool) {
-	env := setupIntegrationEnv(t)
-	return env.srv, env.pool
 }
 
 func setupIntegrationEnv(t *testing.T) *integrationEnv {
@@ -176,206 +172,223 @@ func (c *client) expect(want int, method, path string, body any, out any) {
 
 type me struct {
 	User struct {
-		ID int64 `json:"id"`
+		ID   int64  `json:"id"`
+		Role string `json:"role"`
 	} `json:"user"`
-	Organizations []struct {
-		ID int64 `json:"id"`
-	} `json:"organizations"`
-	CurrentOrganizationID *int64 `json:"currentOrganizationId"`
+	Company *struct {
+		Name string `json:"name"`
+	} `json:"company"`
 }
 
 type idResp struct {
 	ID int64 `json:"id"`
 }
 
-type listResp struct {
-	Total int64 `json:"total"`
+// resetDatabase apaga os dados de negócio, para cada teste começar do zero
+// (os municípios ficam: vêm da migration).
+func resetDatabase(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	_, err := pool.Exec(context.Background(),
+		"TRUNCATE users, parties, company, river_job RESTART IDENTITY CASCADE")
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
-func TestIntegrationMultiTenancy(t *testing.T) {
-	srv, pool := setupIntegration(t)
+// createAdmin faz o mesmo que o `make seed`: empresa + primeiro admin.
+func createAdmin(t *testing.T, pool *pgxpool.Pool, email, password string) {
+	t.Helper()
 	ctx := context.Background()
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
 	q := db.New(pool)
+	if err := q.EnsureCompany(ctx, "Irmãos Faisão Frutícola"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := q.CreateUser(ctx, db.CreateUserParams{
+		Name: "Admin", Email: email, PasswordHash: hash, Role: auth.RoleAdmin,
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
 
-	// E-mails únicos por execução, para o teste poder rodar várias vezes no mesmo banco.
-	suffix := time.Now().UnixNano()
-	aliceEmail := fmt.Sprintf("alice-%d@test.com", suffix)
-	bobEmail := fmt.Sprintf("bob-%d@test.com", suffix)
+// tokenInLink pega o token do link de senha (rand.Text usa A-Z e 2-7).
+var tokenInLink = regexp.MustCompile(`reset-password\?token=([A-Z2-7]+)(&invite=1)?`)
 
-	// --- Sem login: rotas de negócio respondem 401 ----------------------------
-	anon := newClient(t, srv.URL)
-	anon.expect(http.StatusUnauthorized, "GET", "/suppliers", nil, nil)
+func TestIntegrationUsersAndRoles(t *testing.T) {
+	env := setupIntegrationEnv(t)
+	resetDatabase(t, env.pool)
+	createAdmin(t, env.pool, "admin@test.com", "admin-password")
+
+	// --- Sem login: 401 ---------------------------------------------------------
+	anon := newClient(t, env.srv.URL)
+	anon.expect(http.StatusUnauthorized, "GET", "/users", nil, nil)
 	anon.expect(http.StatusUnauthorized, "GET", "/auth/me", nil, nil)
+	anon.expect(http.StatusUnauthorized, "POST", "/auth/login",
+		map[string]any{"email": "admin@test.com", "password": "errada-123"}, nil)
 
-	// --- Alice cria conta + organização A e cadastra um fornecedor ------------
-	alice := newClient(t, srv.URL)
-	var aliceMe me
-	alice.expect(http.StatusCreated, "POST", "/auth/signup", map[string]any{
-		"name": "Alice", "email": aliceEmail, "password": "secret-password",
-		"organizationName": "Distribuidora A",
-	}, &aliceMe)
-	orgA := *aliceMe.CurrentOrganizationID
+	// --- Admin entra (e-mail em maiúsculas também vale) -------------------------
+	admin := newClient(t, env.srv.URL)
+	var adminMe me
+	admin.expect(http.StatusOK, "POST", "/auth/login",
+		map[string]any{"email": "ADMIN@test.com", "password": "admin-password"}, &adminMe)
+	if adminMe.User.Role != "admin" || adminMe.Company == nil || adminMe.Company.Name != "Irmãos Faisão Frutícola" {
+		t.Fatalf("me after login: %+v", adminMe)
+	}
 
-	var supplierA idResp
-	alice.expect(http.StatusCreated, "POST", "/suppliers", map[string]any{
+	// --- Empresa ------------------------------------------------------------------
+	admin.expect(http.StatusOK, "GET", "/company", nil, nil)
+	admin.expect(http.StatusUnprocessableEntity, "PUT", "/company",
+		map[string]any{"name": "Irmãos Faisão", "document": "11.111.111/1111-11"}, nil)
+	admin.expect(http.StatusUnprocessableEntity, "PUT", "/company",
+		map[string]any{"name": "Irmãos Faisão", "cityId": 9999999}, nil)
+	var company struct {
+		TradeName *string `json:"tradeName"`
+		City      *struct {
+			Name string `json:"name"`
+		} `json:"city"`
+	}
+	admin.expect(http.StatusOK, "PUT", "/company", map[string]any{
+		"name": "Irmãos Faisão Frutícola Ltda", "tradeName": "Irmãos Faisão",
+		"document": "11.222.333/0001-81", "taxRegime": "simples", "cityId": 3304557, // Rio de Janeiro
+	}, &company)
+	if company.City == nil || company.City.Name != "Rio de Janeiro" || company.TradeName == nil {
+		t.Fatalf("company: %+v", company)
+	}
+
+	// --- Criar vendedor sem senha: vai convite por e-mail -----------------------
+	var seller idResp
+	admin.expect(http.StatusCreated, "POST", "/users",
+		map[string]any{"name": "Vendedor", "email": "Vendedor@Test.com", "role": "seller"}, &seller)
+	admin.expect(http.StatusConflict, "POST", "/users",
+		map[string]any{"name": "Outro", "email": "vendedor@test.com", "role": "seller"}, nil)
+
+	invite := env.mailer.waitFor(t, "vendedor@test.com", "Seu acesso")
+	m := tokenInLink.FindStringSubmatch(invite.Text)
+	if m == nil || m[2] == "" {
+		t.Fatalf("no invite link in email: %s", invite.Text)
+	}
+	anon.expect(http.StatusNoContent, "POST", "/auth/password/reset",
+		map[string]any{"token": m[1], "password": "senha-do-vendedor"}, nil)
+
+	sellerClient := newClient(t, env.srv.URL)
+	var sellerMe me
+	sellerClient.expect(http.StatusOK, "POST", "/auth/login",
+		map[string]any{"email": "vendedor@test.com", "password": "senha-do-vendedor"}, &sellerMe)
+	if sellerMe.User.Role != "seller" {
+		t.Fatalf("seller role = %q", sellerMe.User.Role)
+	}
+
+	// --- Papéis: vendedor não mexe em usuários nem na empresa ------------------
+	sellerClient.expect(http.StatusForbidden, "GET", "/users", nil, nil)
+	sellerClient.expect(http.StatusForbidden, "PUT", "/company", map[string]any{"name": "Hack"}, nil)
+	sellerClient.expect(http.StatusOK, "GET", "/company", nil, nil)
+	sellerClient.expect(http.StatusOK, "GET", "/suppliers", nil, nil)
+
+	// --- Proteções do admin ------------------------------------------------------
+	admin.expect(http.StatusConflict, "PUT", fmt.Sprintf("/users/%d", adminMe.User.ID),
+		map[string]any{"name": "Admin", "role": "admin", "active": false}, nil)
+	admin.expect(http.StatusConflict, "PUT", fmt.Sprintf("/users/%d", adminMe.User.ID),
+		map[string]any{"name": "Admin", "role": "manager", "active": true}, nil)
+	admin.expect(http.StatusNotFound, "PUT", "/users/9999",
+		map[string]any{"name": "Ninguém", "role": "seller", "active": true}, nil)
+
+	// --- Desativar o vendedor derruba a sessão dele -----------------------------
+	admin.expect(http.StatusOK, "PUT", fmt.Sprintf("/users/%d", seller.ID),
+		map[string]any{"name": "Vendedor", "role": "seller", "active": false}, nil)
+	sellerClient.expect(http.StatusUnauthorized, "GET", "/auth/me", nil, nil)
+	anon.expect(http.StatusUnauthorized, "POST", "/auth/login",
+		map[string]any{"email": "vendedor@test.com", "password": "senha-do-vendedor"}, nil)
+	admin.expect(http.StatusConflict, "POST", fmt.Sprintf("/users/%d/invite", seller.ID), nil, nil)
+
+	var users struct {
+		Items []struct {
+			Email  string `json:"email"`
+			Active bool   `json:"active"`
+		} `json:"items"`
+	}
+	admin.expect(http.StatusOK, "GET", "/users", nil, &users)
+	if len(users.Items) != 2 {
+		t.Fatalf("users: %+v", users.Items)
+	}
+
+	// --- Logout -------------------------------------------------------------------
+	admin.expect(http.StatusNoContent, "POST", "/auth/logout", nil, nil)
+	admin.expect(http.StatusUnauthorized, "GET", "/auth/me", nil, nil)
+}
+
+func TestIntegrationSuppliers(t *testing.T) {
+	env := setupIntegrationEnv(t)
+	resetDatabase(t, env.pool)
+	createAdmin(t, env.pool, "admin@test.com", "admin-password")
+
+	c := newClient(t, env.srv.URL)
+	c.expect(http.StatusOK, "POST", "/auth/login",
+		map[string]any{"email": "admin@test.com", "password": "admin-password"}, nil)
+
+	body := map[string]any{
 		"personType": "individual", "legalName": "Sítio A", "document": "52998224725",
 		"address":  map[string]any{"cityId": 3305802}, // Teresópolis - RJ
 		"contacts": []map[string]any{{"name": "Dono do Sítio A", "isWhatsapp": true}},
-	}, &supplierA)
+	}
+	var created idResp
+	c.expect(http.StatusCreated, "POST", "/suppliers", body, &created)
+	// Documento repetido -> 409.
+	c.expect(http.StatusConflict, "POST", "/suppliers", body, nil)
 
 	// Fornecedor completo lido de volta, com cidade e contato.
-	var fullA struct {
+	var full struct {
 		Address struct {
 			City *struct {
-				Name  string `json:"name"`
-				State string `json:"state"`
+				Name string `json:"name"`
 			} `json:"city"`
 		} `json:"address"`
 		Contacts []struct {
 			Name string `json:"name"`
 		} `json:"contacts"`
 	}
-	alice.expect(http.StatusOK, "GET", fmt.Sprintf("/suppliers/%d", supplierA.ID), nil, &fullA)
-	if fullA.Address.City == nil || fullA.Address.City.Name != "Teresópolis" || len(fullA.Contacts) != 1 {
-		t.Fatalf("supplier not stored completely: %+v", fullA)
+	c.expect(http.StatusOK, "GET", fmt.Sprintf("/suppliers/%d", created.ID), nil, &full)
+	if full.Address.City == nil || full.Address.City.Name != "Teresópolis" || len(full.Contacts) != 1 {
+		t.Fatalf("supplier not stored completely: %+v", full)
 	}
 
 	// Município inexistente vira erro no campo (chave estrangeira do banco).
-	alice.expect(http.StatusUnprocessableEntity, "POST", "/suppliers", map[string]any{
+	c.expect(http.StatusUnprocessableEntity, "POST", "/suppliers", map[string]any{
 		"personType": "company", "legalName": "Box X", "address": map[string]any{"cityId": 9999999},
 	}, nil)
 
 	// Busca de municípios: sem acento, e quem começa com o texto vem primeiro.
 	var cities []struct {
-		ID    int    `json:"id"`
-		Name  string `json:"name"`
-		State string `json:"state"`
+		ID   int    `json:"id"`
+		Name string `json:"name"`
 	}
-	alice.expect(http.StatusOK, "GET", "/cities?search=teresop", nil, &cities)
-	if len(cities) == 0 || cities[0].Name != "Teresópolis" || cities[0].ID != 3305802 {
+	c.expect(http.StatusOK, "GET", "/cities?search=teresop", nil, &cities)
+	if len(cities) == 0 || cities[0].ID != 3305802 {
 		t.Fatalf("city search: %+v", cities)
 	}
-	anon.expect(http.StatusUnauthorized, "GET", "/cities?search=rio", nil, nil)
 
-	// E-mail repetido no cadastro -> 409.
-	newClient(t, srv.URL).expect(http.StatusConflict, "POST", "/auth/signup", map[string]any{
-		"name": "Alice 2", "email": aliceEmail, "password": "secret-password",
-		"organizationName": "Outra",
-	}, nil)
-
-	// --- Bob cria a organização B: não enxerga nada da A ----------------------
-	bob := newClient(t, srv.URL)
-	var bobMe me
-	bob.expect(http.StatusCreated, "POST", "/auth/signup", map[string]any{
-		"name": "Bob", "email": bobEmail, "password": "secret-password",
-		"organizationName": "Distribuidora B",
-	}, &bobMe)
-	orgB := *bobMe.CurrentOrganizationID
-
-	var list listResp
-	bob.expect(http.StatusOK, "GET", "/suppliers", nil, &list)
-	if list.Total != 0 {
-		t.Fatalf("org B sees %d suppliers from org A", list.Total)
+	// Desativar e listar por status.
+	c.expect(http.StatusNoContent, "DELETE", fmt.Sprintf("/suppliers/%d", created.ID), nil, nil)
+	var list struct {
+		Total int64 `json:"total"`
 	}
-	bob.expect(http.StatusNotFound, "GET", fmt.Sprintf("/suppliers/%d", supplierA.ID), nil, nil)
-	// Mesmo documento em outra organização é permitido.
-	bob.expect(http.StatusCreated, "POST", "/suppliers", map[string]any{
-		"personType": "individual", "legalName": "Sítio A (cadastro da B)", "document": "52998224725",
-	}, nil)
-
-	// --- RLS: mesmo SQL cru, SEM filtro, só enxerga a própria organização ---
-	t.Run("rls hides other organizations", func(t *testing.T) {
-		var visible, foreign int64
-		err := postgres.InTenantTx(ctx, pool, orgB, func(tx pgx.Tx) error {
-			// parties: a tabela com os dados pessoais, a mais sensível.
-			if err := tx.QueryRow(ctx, "SELECT count(*) FROM parties").Scan(&visible); err != nil {
-				return err
-			}
-			return tx.QueryRow(ctx,
-				"SELECT count(*) FROM party_contacts WHERE organization_id = $1", orgA).Scan(&foreign)
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if visible != 1 || foreign != 0 {
-			t.Errorf("org B tx sees %d rows total and %d rows of org A; want 1 and 0", visible, foreign)
-		}
-	})
-	t.Run("rls blocks writing into another organization", func(t *testing.T) {
-		err := postgres.InTenantTx(ctx, pool, orgB, func(tx pgx.Tx) error {
-			_, err := tx.Exec(ctx,
-				"INSERT INTO parties (organization_id, person_type, legal_name) VALUES ($1, 'company', 'x')", orgA)
-			return err
-		})
-		if err == nil {
-			t.Error("insert into org A from org B transaction should fail")
-		}
-	})
-
-	// --- Bob passa a participar da organização A e troca de organização -----
-	if err := q.CreateMembership(ctx, db.CreateMembershipParams{
-		OrganizationID: orgA, UserID: bobMe.User.ID, Role: "member",
-	}); err != nil {
-		t.Fatal(err)
+	c.expect(http.StatusOK, "GET", "/suppliers?status=inactive", nil, &list)
+	if list.Total != 1 {
+		t.Errorf("inactive total = %d, want 1", list.Total)
 	}
-	bob.expect(http.StatusOK, "PUT", "/auth/organization", map[string]any{"organizationId": orgA}, nil)
-	bob.expect(http.StatusOK, "GET", fmt.Sprintf("/suppliers/%d", supplierA.ID), nil, nil)
-
-	// Alice não participa da B.
-	alice.expect(http.StatusForbidden, "PUT", "/auth/organization", map[string]any{"organizationId": orgB}, nil)
-
-	// Login novo de Bob: com 2 organizações, nenhuma é selecionada automaticamente.
-	bob2 := newClient(t, srv.URL)
-	var bob2Me me
-	bob2.expect(http.StatusOK, "POST", "/auth/login",
-		map[string]any{"email": bobEmail, "password": "secret-password"}, &bob2Me)
-	if bob2Me.CurrentOrganizationID != nil || len(bob2Me.Organizations) != 2 {
-		t.Errorf("login with 2 orgs: current=%v orgs=%d", bob2Me.CurrentOrganizationID, len(bob2Me.Organizations))
-	}
-	bob2.expect(http.StatusForbidden, "GET", "/suppliers", nil, nil) // precisa escolher antes
-
-	// Senha errada e e-mail inexistente dão a mesma resposta.
-	anon.expect(http.StatusUnauthorized, "POST", "/auth/login",
-		map[string]any{"email": bobEmail, "password": "wrong-password"}, nil)
-	anon.expect(http.StatusUnauthorized, "POST", "/auth/login",
-		map[string]any{"email": "nobody@test.com", "password": "wrong-password"}, nil)
-
-	// --- Admin da plataforma -------------------------------------------------
-	alice.expect(http.StatusForbidden, "GET", "/admin/organizations", nil, nil)
-	if _, err := q.PromotePlatformAdmin(ctx, aliceEmail); err != nil {
-		t.Fatal(err)
-	}
-	alice.expect(http.StatusOK, "GET", "/admin/organizations", nil, nil)
-
-	// Suspender a organização B bloqueia quem está nela.
-	bob.expect(http.StatusOK, "PUT", "/auth/organization", map[string]any{"organizationId": orgB}, nil)
-	alice.expect(http.StatusOK, "PUT", fmt.Sprintf("/admin/organizations/%d/status", orgB),
-		map[string]any{"status": "suspended"}, nil)
-	bob.expect(http.StatusForbidden, "GET", "/suppliers", nil, nil)
-	bob.expect(http.StatusForbidden, "PUT", "/auth/organization", map[string]any{"organizationId": orgB}, nil)
-
-	// --- Logout --------------------------------------------------------------
-	alice.expect(http.StatusNoContent, "POST", "/auth/logout", nil, nil)
-	alice.expect(http.StatusUnauthorized, "GET", "/auth/me", nil, nil)
 }
 
-// tokenInLink pega o token do link de redefinição (rand.Text usa A-Z e 2-7).
-var tokenInLink = regexp.MustCompile(`reset-password\?token=([A-Z2-7]+)`)
-
-func TestIntegrationEmailQueue(t *testing.T) {
+func TestIntegrationPasswordReset(t *testing.T) {
 	env := setupIntegrationEnv(t)
+	resetDatabase(t, env.pool)
 	ctx := context.Background()
-	email := fmt.Sprintf("carla-%d@test.com", time.Now().UnixNano())
+	email := "carla@test.com"
+	createAdmin(t, env.pool, email, "senha-antiga-1")
 
-	// --- Cadastro: e-mail de boas-vindas pela fila ---------------------------
 	carla := newClient(t, env.srv.URL)
-	carla.expect(http.StatusCreated, "POST", "/auth/signup", map[string]any{
-		"name": "Carla", "email": email, "password": "senha-antiga-1", "organizationName": "Hortifruti Carla",
-	}, nil)
-	welcome := env.mailer.waitFor(t, email, "Bem-vindo")
-	if !strings.Contains(welcome.Text, "Hortifruti Carla") || !strings.Contains(welcome.HTML, "http://app.test/app") {
-		t.Errorf("welcome email content: %s", welcome.Text)
-	}
+	carla.expect(http.StatusOK, "POST", "/auth/login", map[string]any{"email": email, "password": "senha-antiga-1"}, nil)
 
 	// --- Esqueci a senha: e-mail desconhecido responde igual, sem enviar nada -
 	anon := newClient(t, env.srv.URL)
@@ -383,8 +396,8 @@ func TestIntegrationEmailQueue(t *testing.T) {
 	anon.expect(http.StatusAccepted, "POST", "/auth/password/forgot", map[string]any{"email": strings.ToUpper(email)}, nil)
 	reset := env.mailer.waitFor(t, email, "Redefinição de senha")
 	m := tokenInLink.FindStringSubmatch(reset.Text)
-	if m == nil {
-		t.Fatalf("no token link in email: %s", reset.Text)
+	if m == nil || m[2] != "" {
+		t.Fatalf("no reset link in email: %s", reset.Text)
 	}
 	token := m[1]
 	if env.mailer.count("ninguem@test.com") != 0 {
@@ -406,21 +419,17 @@ func TestIntegrationEmailQueue(t *testing.T) {
 	anon.expect(http.StatusUnauthorized, "POST", "/auth/login", map[string]any{"email": email, "password": "senha-antiga-1"}, nil)
 	anon.expect(http.StatusOK, "POST", "/auth/login", map[string]any{"email": email, "password": "senha-nova-123"}, nil)
 
-	// --- Enfileirar de dentro de uma transação de organização (RLS) ---------
-	var orgID int64
-	if err := env.pool.QueryRow(ctx, "SELECT id FROM organizations WHERE name = 'Hortifruti Carla' ORDER BY id DESC LIMIT 1").Scan(&orgID); err != nil {
-		t.Fatal(err)
-	}
-	err := postgres.InTenantTx(ctx, env.pool, orgID, func(tx pgx.Tx) error {
-		return env.queue.EnqueueEmail(ctx, tx, mail.Message{To: email, Subject: "Teste dentro do tenant", Text: "x", HTML: "x"})
+	// --- Enfileirar dentro de uma transação -----------------------------------
+	err := pgx.BeginFunc(ctx, env.pool, func(tx pgx.Tx) error {
+		return env.queue.EnqueueEmail(ctx, tx, mail.Message{To: email, Subject: "Teste na transação", Text: "x", HTML: "x"})
 	})
 	if err != nil {
-		t.Fatalf("enqueue inside tenant transaction: %v", err)
+		t.Fatalf("enqueue inside transaction: %v", err)
 	}
-	env.mailer.waitFor(t, email, "Teste dentro do tenant")
+	env.mailer.waitFor(t, email, "Teste na transação")
 
 	// --- Rollback: o job some junto com a transação --------------------------
-	_ = postgres.InTenantTx(ctx, env.pool, orgID, func(tx pgx.Tx) error {
+	_ = pgx.BeginFunc(ctx, env.pool, func(tx pgx.Tx) error {
 		if err := env.queue.EnqueueEmail(ctx, tx, mail.Message{To: email, Subject: "Nunca deve chegar", Text: "x", HTML: "x"}); err != nil {
 			return err
 		}

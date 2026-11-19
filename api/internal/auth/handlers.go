@@ -9,7 +9,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
@@ -20,27 +19,23 @@ import (
 // Tipos da API
 // ---------------------------------------------------------------------------
 
-// Me descreve o usuário logado, as organizações dele e qual está ativa.
+// Me descreve o usuário logado e a empresa da instalação.
 // É o que o front chama logo ao abrir para saber "quem sou eu".
 type Me struct {
-	User                  User                     `json:"user"`
-	Organizations         []OrganizationMembership `json:"organizations"`
-	CurrentOrganizationID *int64                   `json:"currentOrganizationId" doc:"null until the user selects an organization"`
+	User    CurrentUser  `json:"user"`
+	Company *CompanyName `json:"company" doc:"null until the company is configured (make seed)"`
 }
 
-type User struct {
-	ID              int64  `json:"id"`
-	Name            string `json:"name"`
-	Email           string `json:"email"`
-	IsPlatformAdmin bool   `json:"isPlatformAdmin"`
+type CurrentUser struct {
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Role  string `json:"role" enum:"admin,manager,seller,checker,finance,driver"`
 }
 
-// OrganizationMembership é uma organização da qual o usuário participa, com o papel dele.
-type OrganizationMembership struct {
-	ID     int64  `json:"id"`
-	Name   string `json:"name"`
-	Status string `json:"status" enum:"active,suspended"`
-	Role   string `json:"role" enum:"owner,admin,member"`
+type CompanyName struct {
+	Name      string  `json:"name"`
+	TradeName *string `json:"tradeName"`
 }
 
 // Saídas com e sem cookie. O campo com a tag header:"Set-Cookie" vira um
@@ -58,38 +53,12 @@ type logoutOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
 }
 
-type signupInput struct {
-	Body struct {
-		Name             string `json:"name" minLength:"2" maxLength:"120"`
-		Email            string `json:"email" format:"email" maxLength:"254"`
-		Password         string `json:"password" minLength:"8" maxLength:"128"`
-		OrganizationName string `json:"organizationName" minLength:"2" maxLength:"120" doc:"Company that is subscribing to the platform"`
-	}
-}
-
-func (in *signupInput) Resolve(huma.Context) []error {
-	in.Body.Name = strings.TrimSpace(in.Body.Name)
-	in.Body.Email = normalizeEmail(in.Body.Email)
-	in.Body.OrganizationName = strings.TrimSpace(in.Body.OrganizationName)
-	return nil
-}
-
 type loginInput struct {
 	Body struct {
 		Email    string `json:"email" maxLength:"254"`
 		Password string `json:"password" maxLength:"128"`
 	}
 }
-
-type switchOrganizationInput struct {
-	Body struct {
-		OrganizationID int64 `json:"organizationId" minimum:"1"`
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Registro das rotas
-// ---------------------------------------------------------------------------
 
 // EmailQueue é o que as rotas de autenticação precisam da fila: colocar um
 // e-mail para envio dentro de uma transação (*queue.Queue satisfaz).
@@ -115,8 +84,10 @@ type handler struct {
 }
 
 // Register adiciona as rotas de autenticação.
-//   - public: rotas sem login (cadastro, login, logout, recuperação de senha)
-//   - authed: rotas que exigem login, mas não organização (me, trocar organização)
+//   - public: rotas sem login (login, logout, recuperação de senha)
+//   - authed: rotas que exigem login (me)
+//
+// Não há cadastro público: quem cria usuários é o administrador (pacote user).
 func Register(public, authed huma.API, opts Options) {
 	h := &handler{
 		pool: opts.Pool, q: db.New(opts.Pool), cookies: opts.Cookies,
@@ -125,143 +96,44 @@ func Register(public, authed huma.API, opts Options) {
 	tags := []string{"Auth"}
 
 	huma.Register(public, huma.Operation{
-		OperationID:   "signup",
-		Method:        http.MethodPost,
-		Path:          "/auth/signup",
-		Summary:       "Create an account and a new organization",
-		Tags:          tags,
-		DefaultStatus: http.StatusCreated,
-	}, h.signup)
-
-	huma.Register(public, huma.Operation{
-		OperationID: "login",
-		Method:      http.MethodPost,
-		Path:        "/auth/login",
-		Summary:     "Log in",
-		Tags:        tags,
+		OperationID: "login", Method: http.MethodPost, Path: "/auth/login",
+		Summary: "Log in", Tags: tags,
 	}, h.login)
 
 	huma.Register(public, huma.Operation{
-		OperationID:   "logout",
-		Method:        http.MethodPost,
-		Path:          "/auth/logout",
-		Summary:       "Log out",
-		Tags:          tags,
-		DefaultStatus: http.StatusNoContent,
+		OperationID: "logout", Method: http.MethodPost, Path: "/auth/logout",
+		Summary: "Log out", Tags: tags, DefaultStatus: http.StatusNoContent,
 	}, h.logout)
 
 	huma.Register(public, huma.Operation{
-		OperationID:   "forgot-password",
-		Method:        http.MethodPost,
-		Path:          "/auth/password/forgot",
-		Summary:       "Request a password reset link by email",
-		Description:   "Always answers 202, whether the email exists or not, so it cannot be used to discover accounts.",
-		Tags:          tags,
-		DefaultStatus: http.StatusAccepted,
+		OperationID: "forgot-password", Method: http.MethodPost, Path: "/auth/password/forgot",
+		Summary:     "Request a password reset link by email",
+		Description: "Always answers 202, whether the email exists or not, so it cannot be used to discover accounts.",
+		Tags:        tags, DefaultStatus: http.StatusAccepted,
 	}, h.forgotPassword)
 
 	huma.Register(public, huma.Operation{
-		OperationID:   "reset-password",
-		Method:        http.MethodPost,
-		Path:          "/auth/password/reset",
-		Summary:       "Set a new password using the emailed token",
-		Description:   "Ends every session of the user; they must log in again.",
-		Tags:          tags,
-		DefaultStatus: http.StatusNoContent,
+		OperationID: "reset-password", Method: http.MethodPost, Path: "/auth/password/reset",
+		Summary:     "Set a new password using the emailed token (reset or invite)",
+		Description: "Ends every session of the user; they must log in again.",
+		Tags:        tags, DefaultStatus: http.StatusNoContent,
 	}, h.resetPassword)
 
 	huma.Register(authed, huma.Operation{
-		OperationID: "get-me",
-		Method:      http.MethodGet,
-		Path:        "/auth/me",
-		Summary:     "Current user and organizations",
-		Tags:        tags,
+		OperationID: "get-me", Method: http.MethodGet, Path: "/auth/me",
+		Summary: "Current user and company", Tags: tags,
 	}, h.me)
-
-	huma.Register(authed, huma.Operation{
-		OperationID: "switch-organization",
-		Method:      http.MethodPut,
-		Path:        "/auth/organization",
-		Summary:     "Select the active organization",
-		Tags:        tags,
-	}, h.switchOrganization)
 }
 
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
 
-// signup cria usuário + organização + vínculo de dono + sessão, tudo numa
-// transação: ou grava tudo, ou nada (sem usuário "órfão" se algo falhar no meio).
-func (h *handler) signup(ctx context.Context, in *signupInput) (*meWithCookieOutput, error) {
-	hash, err := HashPassword(in.Body.Password)
-	if err != nil {
-		return nil, err
-	}
-	token, tokenHash := NewToken()
-	expires := time.Now().Add(SessionTTL)
-
-	var user db.User
-	var org db.Organization
-
-	// pgx.BeginFunc abre a transação, roda a função e faz COMMIT se ela
-	// devolver nil, ou ROLLBACK se devolver erro.
-	err = pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
-		q := h.q.WithTx(tx) // mesmas queries, mas dentro da transação
-
-		var err error
-		user, err = q.CreateUser(ctx, db.CreateUserParams{
-			Name: in.Body.Name, Email: in.Body.Email, PasswordHash: hash,
-		})
-		if err != nil {
-			return err
-		}
-		org, err = q.CreateOrganization(ctx, in.Body.OrganizationName)
-		if err != nil {
-			return err
-		}
-		err = q.CreateMembership(ctx, db.CreateMembershipParams{
-			OrganizationID: org.ID, UserID: user.ID, Role: "owner",
-		})
-		if err != nil {
-			return err
-		}
-		err = q.CreateSession(ctx, db.CreateSessionParams{
-			TokenHash: tokenHash, UserID: user.ID, OrganizationID: &org.ID, ExpiresAt: expires,
-		})
-		if err != nil {
-			return err
-		}
-
-		// E-mail de boas-vindas: entra na fila NA MESMA transação. A resposta
-		// não espera o SMTP, e se o cadastro falhar o e-mail some junto.
-		msg, err := mail.Render("welcome", user.Email, user.Name, map[string]any{
-			"Name": user.Name, "OrganizationName": org.Name, "AppURL": h.appURL,
-		})
-		if err != nil {
-			return err
-		}
-		return h.emails.EnqueueEmail(ctx, tx, msg)
-	})
-	if isUniqueViolation(err) {
-		return nil, huma.Error409Conflict("email already registered")
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	me, err := h.buildMe(ctx, user.ID, user.Name, user.Email, user.IsPlatformAdmin, &org.ID)
-	if err != nil {
-		return nil, err
-	}
-	return &meWithCookieOutput{SetCookie: h.cookies.New(token, expires), Body: me}, nil
-}
-
 func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutput, error) {
 	// Mesma mensagem para todo tipo de falha: não revelamos se o e-mail existe.
 	invalid := huma.Error401Unauthorized("invalid email or password")
 
-	user, err := h.q.GetUserByEmail(ctx, normalizeEmail(in.Body.Email))
+	user, err := h.q.GetUserByEmail(ctx, NormalizeEmail(in.Body.Email))
 	if errors.Is(err, pgx.ErrNoRows) {
 		_, _ = VerifyPassword(dummyHash(), in.Body.Password) // gasta o mesmo tempo
 		return nil, invalid
@@ -278,30 +150,18 @@ func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutpu
 		return nil, invalid
 	}
 
-	orgs, err := h.q.ListUserOrganizations(ctx, user.ID)
-	if err != nil {
-		return nil, err
-	}
-	// Com uma organização só, já entra nela. Com várias, o front mostra a
-	// lista e chama PUT /auth/organization.
-	var current *int64
-	if len(orgs) == 1 {
-		current = &orgs[0].ID
-	}
-
 	token, tokenHash := NewToken()
 	expires := time.Now().Add(SessionTTL)
-	err = h.q.CreateSession(ctx, db.CreateSessionParams{
-		TokenHash: tokenHash, UserID: user.ID, OrganizationID: current, ExpiresAt: expires,
-	})
+	err = h.q.CreateSession(ctx, db.CreateSessionParams{TokenHash: tokenHash, UserID: user.ID, ExpiresAt: expires})
 	if err != nil {
 		return nil, err
 	}
 
-	return &meWithCookieOutput{
-		SetCookie: h.cookies.New(token, expires),
-		Body:      toMe(user.ID, user.Name, user.Email, user.IsPlatformAdmin, orgs, current),
-	}, nil
+	me, err := h.buildMe(ctx, CurrentUser{ID: user.ID, Name: user.Name, Email: user.Email, Role: user.Role})
+	if err != nil {
+		return nil, err
+	}
+	return &meWithCookieOutput{SetCookie: h.cookies.New(token, expires), Body: me}, nil
 }
 
 // logout apaga a sessão no banco (se houver) e manda o navegador apagar o cookie.
@@ -316,83 +176,32 @@ func (h *handler) logout(ctx context.Context, _ *struct{}) (*logoutOutput, error
 
 func (h *handler) me(ctx context.Context, _ *struct{}) (*meOutput, error) {
 	s, _ := FromContext(ctx) // RequireUser garante que existe
-	me, err := h.buildMe(ctx, s.UserID, s.UserName, s.UserEmail, s.IsPlatformAdmin, s.OrganizationID)
+	me, err := h.buildMe(ctx, CurrentUser{ID: s.UserID, Name: s.UserName, Email: s.UserEmail, Role: s.Role})
 	if err != nil {
 		return nil, err
 	}
 	return &meOutput{Body: me}, nil
 }
 
-func (h *handler) switchOrganization(ctx context.Context, in *switchOrganizationInput) (*meOutput, error) {
-	s, _ := FromContext(ctx)
-	orgID := in.Body.OrganizationID
-
-	m, err := h.q.GetMembership(ctx, db.GetMembershipParams{UserID: s.UserID, OrganizationID: orgID})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, huma.Error403Forbidden("not a member of this organization")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if m.OrganizationStatus != "active" {
-		return nil, huma.Error403Forbidden("organization is suspended")
-	}
-
-	err = h.q.SetSessionOrganization(ctx, db.SetSessionOrganizationParams{
-		TokenHash: s.TokenHash, OrganizationID: &orgID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	me, err := h.buildMe(ctx, s.UserID, s.UserName, s.UserEmail, s.IsPlatformAdmin, &orgID)
-	if err != nil {
-		return nil, err
-	}
-	return &meOutput{Body: me}, nil
-}
-
-// ---------------------------------------------------------------------------
-// Funções auxiliares
-// ---------------------------------------------------------------------------
-
-func (h *handler) buildMe(ctx context.Context, userID int64, name, email string, admin bool, current *int64) (Me, error) {
-	orgs, err := h.q.ListUserOrganizations(ctx, userID)
-	if err != nil {
+func (h *handler) buildMe(ctx context.Context, u CurrentUser) (Me, error) {
+	me := Me{User: u}
+	c, err := h.q.GetCompany(ctx)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows): // empresa ainda não configurada
+	case err != nil:
 		return Me{}, err
+	default:
+		me.Company = &CompanyName{Name: c.Name, TradeName: c.TradeName}
 	}
-	return toMe(userID, name, email, admin, orgs, current), nil
-}
-
-func toMe(userID int64, name, email string, admin bool, orgs []db.ListUserOrganizationsRow, current *int64) Me {
-	me := Me{
-		User:                  User{ID: userID, Name: name, Email: email, IsPlatformAdmin: admin},
-		Organizations:         make([]OrganizationMembership, 0, len(orgs)),
-		CurrentOrganizationID: current,
-	}
-	for _, o := range orgs {
-		me.Organizations = append(me.Organizations, OrganizationMembership{
-			ID: o.ID, Name: o.Name, Status: o.Status, Role: o.Role,
-		})
-	}
-	return me
-}
-
-func normalizeEmail(email string) string {
-	return strings.ToLower(strings.TrimSpace(email))
-}
-
-func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+	return me, nil
 }
 
 // ---------------------------------------------------------------------------
 // Recuperação de senha
 // ---------------------------------------------------------------------------
 
-// passwordResetTTL é quanto tempo o link de redefinição vale.
-const passwordResetTTL = time.Hour
+// PasswordResetTTL é quanto tempo o link de redefinição vale.
+const PasswordResetTTL = time.Hour
 
 type forgotPasswordInput struct {
 	Body struct {
@@ -410,7 +219,7 @@ type resetPasswordInput struct {
 // forgotPassword responde sempre 202, exista o e-mail ou não. Se a resposta
 // mudasse, qualquer um descobriria quais e-mails têm conta no sistema.
 func (h *handler) forgotPassword(ctx context.Context, in *forgotPasswordInput) (*struct{}, error) {
-	user, err := h.q.GetUserByEmail(ctx, normalizeEmail(in.Body.Email))
+	user, err := h.q.GetUserByEmail(ctx, NormalizeEmail(in.Body.Email))
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !user.Active) {
 		return nil, nil
 	}
@@ -418,23 +227,8 @@ func (h *handler) forgotPassword(ctx context.Context, in *forgotPasswordInput) (
 		return nil, err
 	}
 
-	token, tokenHash := NewToken()
 	err = pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
-		err := h.q.WithTx(tx).CreatePasswordResetToken(ctx, db.CreatePasswordResetTokenParams{
-			TokenHash: tokenHash, UserID: user.ID, ExpiresAt: time.Now().Add(passwordResetTTL),
-		})
-		if err != nil {
-			return err
-		}
-		msg, err := mail.Render("password_reset", user.Email, user.Name, map[string]any{
-			"Name":             user.Name,
-			"ResetURL":         h.appURL + "/reset-password?token=" + token,
-			"ExpiresInMinutes": int(passwordResetTTL.Minutes()),
-		})
-		if err != nil {
-			return err
-		}
-		return h.emails.EnqueueEmail(ctx, tx, msg)
+		return SendPasswordLink(ctx, tx, h.emails, h.appURL, user, PasswordLinkReset)
 	})
 	return nil, err
 }
@@ -466,4 +260,50 @@ func (h *handler) resetPassword(ctx context.Context, in *resetPasswordInput) (*s
 		return nil, huma.Error400BadRequest("invalid or expired token")
 	}
 	return nil, err
+}
+
+// ---------------------------------------------------------------------------
+// Link de senha por e-mail (redefinição ou convite)
+// ---------------------------------------------------------------------------
+
+// PasswordLinkKind diferencia o e-mail de "esqueci a senha" do de convite.
+type PasswordLinkKind int
+
+const (
+	PasswordLinkReset  PasswordLinkKind = iota // vale 1 hora
+	PasswordLinkInvite                         // vale 3 dias: novo usuário cria a senha
+)
+
+// SendPasswordLink cria um token de uso único e coloca na fila o e-mail com o
+// link para criar ou redefinir a senha, tudo dentro da transação tx.
+// Usado aqui ("esqueci a senha") e pelo cadastro de usuários (convite).
+func SendPasswordLink(ctx context.Context, tx pgx.Tx, emails EmailQueue, appURL string, user db.User, kind PasswordLinkKind) error {
+	ttl, template, query := PasswordResetTTL, "password_reset", ""
+	if kind == PasswordLinkInvite {
+		ttl, template, query = 72*time.Hour, "invite", "&invite=1"
+	}
+
+	token, tokenHash := NewToken()
+	err := db.New(tx).CreatePasswordResetToken(ctx, db.CreatePasswordResetTokenParams{
+		TokenHash: tokenHash, UserID: user.ID, ExpiresAt: time.Now().Add(ttl),
+	})
+	if err != nil {
+		return err
+	}
+	msg, err := mail.Render(template, user.Email, user.Name, map[string]any{
+		"Name":             user.Name,
+		"ResetURL":         appURL + "/reset-password?token=" + token + query,
+		"ExpiresInMinutes": int(ttl.Minutes()),
+		"ExpiresInDays":    int(ttl.Hours() / 24),
+		"AppURL":           appURL,
+	})
+	if err != nil {
+		return err
+	}
+	return emails.EnqueueEmail(ctx, tx, msg)
+}
+
+// NormalizeEmail tira espaços e deixa em minúsculas (como o banco exige).
+func NormalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
 }

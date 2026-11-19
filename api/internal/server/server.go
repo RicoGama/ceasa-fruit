@@ -14,15 +14,16 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/RicoGama/ceasa-fruit/api/internal/admin"
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/city"
+	"github.com/RicoGama/ceasa-fruit/api/internal/company"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
-	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
+	"github.com/RicoGama/ceasa-fruit/api/internal/user"
 )
 
 func init() {
@@ -93,9 +94,9 @@ func build(d Deps) (http.Handler, huma.API) {
 	r.Get("/health", healthHandler(d.Pool))
 
 	// Painel das filas. É um http.Handler pronto (do River UI); só colocamos
-	// a proteção na frente: apenas o administrador da plataforma entra.
+	// a proteção na frente: apenas o administrador entra.
 	if d.QueueUI != nil {
-		ui := auth.RequirePlatformAdminHTTP(d.QueueUI)
+		ui := auth.RequireAdminHTTP(d.QueueUI)
 		r.Handle("/admin/queues", ui)
 		r.Handle("/admin/queues/*", ui)
 	}
@@ -114,17 +115,13 @@ func build(d Deps) (http.Handler, huma.API) {
 	// porque a rota é registrada já dentro do grupo certo.
 	public := huma.NewGroup(api)
 
-	authed := huma.NewGroup(api) // exige login
+	authed := huma.NewGroup(api) // exige login (qualquer papel)
 	authed.UseMiddleware(auth.RequireUser(api))
 	authed.UseSimpleModifier(auth.RequireSecurity)
 
-	tenant := huma.NewGroup(api) // exige login + organização ativa
-	tenant.UseMiddleware(auth.RequireOrganization(api))
-	tenant.UseSimpleModifier(auth.RequireSecurity)
-
-	platformAdmin := huma.NewGroup(api) // exige administrador da plataforma
-	platformAdmin.UseMiddleware(auth.RequirePlatformAdmin(api))
-	platformAdmin.UseSimpleModifier(auth.RequireSecurity)
+	adminOnly := huma.NewGroup(api) // exige o papel de administrador
+	adminOnly.UseMiddleware(auth.RequireRole(api, auth.RoleAdmin))
+	adminOnly.UseSimpleModifier(auth.RequireSecurity)
 
 	// Cuidado com uma pegadinha do Go: um *queue.Queue nil guardado numa
 	// interface NÃO é uma interface nil. Por isso só atribuímos se existir.
@@ -135,14 +132,17 @@ func build(d Deps) (http.Handler, huma.API) {
 	auth.Register(public, authed, auth.Options{
 		Pool: d.Pool, Cookies: auth.Cookies{Secure: d.CookieSecure}, Emails: emails, AppURL: d.AppURL,
 	})
-	admin.Register(platformAdmin, queries)
+	user.Register(adminOnly, user.Options{Pool: d.Pool, Emails: emails, AppURL: d.AppURL})
+	company.Register(authed, adminOnly, queries)
 	city.Register(authed, queries)
 
-	// Rotas de negócio: cada requisição roda numa transação com RLS da organização.
-	tenantTx := func(ctx context.Context, orgID int64, fn func(supplier.Store) error) error {
-		return postgres.InTenant(ctx, d.Pool, orgID, func(q *db.Queries) error { return fn(q) })
+	// Fornecedores: por enquanto qualquer papel; as permissões por papel
+	// (ex.: motorista só consulta) entram quando forem definidas.
+	// Cada gravação roda numa transação: ou tudo dá certo, ou nada é gravado.
+	inTx := func(ctx context.Context, fn func(supplier.Store) error) error {
+		return pgx.BeginFunc(ctx, d.Pool, func(tx pgx.Tx) error { return fn(queries.WithTx(tx)) })
 	}
-	supplier.Register(tenant, tenantTx)
+	supplier.Register(authed, inTx)
 
 	return r, api
 }

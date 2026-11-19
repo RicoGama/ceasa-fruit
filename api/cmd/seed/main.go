@@ -1,6 +1,7 @@
-// Command seed prepara um ambiente de desenvolvimento: cria (ou atualiza) um
-// usuário administrador da plataforma, com uma organização onde ele é dono.
-// Pode rodar quantas vezes quiser: se o usuário já existe, só troca a senha.
+// Command seed prepara a instalação: cria a empresa (se ainda não existir) e
+// cria ou atualiza um usuário administrador.
+// Pode rodar quantas vezes quiser: se o usuário já existe, troca a senha e
+// garante que ele é administrador e está ativo.
 //
 // Uso: make seed
 //
@@ -31,17 +32,17 @@ import (
 func main() {
 	email := flag.String("email", "admin@ceasafruit.test", "admin email")
 	name := flag.String("name", "Administrador", "admin name")
-	org := flag.String("org", "Irmãos Faisão Frutícola", "organization created when the admin has none")
+	company := flag.String("company", "Irmãos Faisão Frutícola", "company name (only used if the company does not exist yet)")
 	password := flag.String("password", "", "password (random when empty)")
 	flag.Parse()
 
-	if err := run(*email, *name, *org, *password); err != nil {
+	if err := run(*email, *name, *company, *password); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
-func run(email, name, orgName, password string) error {
+func run(email, name, companyName, password string) error {
 	ctx := context.Background()
 	email = strings.ToLower(strings.TrimSpace(email))
 	if password == "" {
@@ -74,39 +75,24 @@ func run(email, name, orgName, password string) error {
 	err = pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
 		q := db.New(tx)
 
+		if err := q.EnsureCompany(ctx, companyName); err != nil {
+			return err
+		}
+
 		user, err := q.GetUserByEmail(ctx, email)
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
-			user, err = q.CreateUser(ctx, db.CreateUserParams{Name: name, Email: email, PasswordHash: hash})
-			if err != nil {
-				return err
-			}
+			_, err = q.CreateUser(ctx, db.CreateUserParams{Name: name, Email: email, PasswordHash: hash, Role: auth.RoleAdmin})
 			created = true
+			return err
 		case err != nil:
 			return err
-		default:
-			if err := q.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{ID: user.ID, PasswordHash: hash}); err != nil {
-				return err
-			}
 		}
-
-		if _, err := q.PromotePlatformAdmin(ctx, email); err != nil {
+		if err := q.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{ID: user.ID, PasswordHash: hash}); err != nil {
 			return err
 		}
-
-		// Sem nenhuma organização, cria uma com ele como dono.
-		orgs, err := q.ListUserOrganizations(ctx, user.ID)
-		if err != nil {
-			return err
-		}
-		if len(orgs) == 0 {
-			o, err := q.CreateOrganization(ctx, orgName)
-			if err != nil {
-				return err
-			}
-			return q.CreateMembership(ctx, db.CreateMembershipParams{OrganizationID: o.ID, UserID: user.ID, Role: "owner"})
-		}
-		return nil
+		_, err = q.UpdateUser(ctx, db.UpdateUserParams{ID: user.ID, Name: user.Name, Role: auth.RoleAdmin, Active: true})
+		return err
 	})
 	if err != nil {
 		return err
@@ -116,6 +102,6 @@ func run(email, name, orgName, password string) error {
 	if created {
 		action = "created"
 	}
-	fmt.Printf("Platform admin %s.\n\n  E-mail: %s\n  Senha:  %s\n\n", action, email, password)
+	fmt.Printf("Admin %s.\n\n  E-mail: %s\n  Senha:  %s\n\n", action, email, password)
 	return nil
 }

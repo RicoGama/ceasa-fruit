@@ -1,0 +1,9 @@
+{{define "invite.subject"}}Seu acesso ao CEASA Fruit{{end}}
+{{define "invite.text"}}Olá, {{.Name}}!
+
+Você recebeu acesso ao sistema CEASA Fruit. Para entrar, crie a sua senha neste link:
+{{.ResetURL}}
+
+O link vale por {{.ExpiresInDays}} dias e só pode ser usado uma vez.
+Se ele vencer, peça ao administrador para enviar um novo convite.
+{{end}}

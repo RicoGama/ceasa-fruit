@@ -2,7 +2,7 @@
 -- 27 UFs e 5571 municípios. Não edite à mão.
 
 -- +goose Up
--- Tabelas de referência, iguais para todas as organizações (sem RLS).
+-- Tabelas de referência (lista oficial do IBGE).
 CREATE TABLE states (
     code    TEXT     PRIMARY KEY CHECK (code ~ '^[A-Z]{2}$'), -- sigla: RJ, SP...
     ibge_id SMALLINT NOT NULL UNIQUE,                         -- código IBGE da UF: 33 = RJ
@@ -17,9 +17,6 @@ CREATE TABLE cities (
     state_code TEXT    NOT NULL REFERENCES states (code)
 );
 CREATE INDEX cities_state_idx ON cities (state_code);
-
--- As transações de organização (papel ceasa_app) também leem estas tabelas.
-GRANT SELECT ON states, cities TO ceasa_app;
 
 INSERT INTO states (code, ibge_id, name) VALUES
     ('AC', 12, 'Acre'),

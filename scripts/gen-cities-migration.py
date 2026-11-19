@@ -2,7 +2,7 @@
 """Gera a migration de estados e municípios a partir da lista oficial do IBGE.
 
 Uso:
-    python3 scripts/gen-cities-migration.py municipios.json > api/internal/postgres/migrations/00003_create_states_and_cities.sql
+    python3 scripts/gen-cities-migration.py municipios.json > api/internal/postgres/migrations/00001_create_states_and_cities.sql
 
 O JSON vem de https://servicodados.ibge.gov.br/api/v1/localidades/municipios
 (salve a resposta como arquivo). Para atualizar a lista no futuro (município
@@ -39,7 +39,7 @@ def main():
     out.append(f"-- {len(states)} UFs e {len(cities)} municípios. Não edite à mão.")
     out.append("")
     out.append("-- +goose Up")
-    out.append("""-- Tabelas de referência, iguais para todas as organizações (sem RLS).
+    out.append("""-- Tabelas de referência (lista oficial do IBGE).
 CREATE TABLE states (
     code    TEXT     PRIMARY KEY CHECK (code ~ '^[A-Z]{2}$'), -- sigla: RJ, SP...
     ibge_id SMALLINT NOT NULL UNIQUE,                         -- código IBGE da UF: 33 = RJ
@@ -54,9 +54,6 @@ CREATE TABLE cities (
     state_code TEXT    NOT NULL REFERENCES states (code)
 );
 CREATE INDEX cities_state_idx ON cities (state_code);
-
--- As transações de organização (papel ceasa_app) também leem estas tabelas.
-GRANT SELECT ON states, cities TO ceasa_app;
 """)
     out.append("INSERT INTO states (code, ibge_id, name) VALUES")
     rows = [f"    ({sql_str(code)}, {sid}, {sql_str(name)})" for code, (sid, name) in sorted(states.items())]

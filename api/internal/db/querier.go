@@ -9,51 +9,49 @@ import (
 )
 
 type Querier interface {
-	AdminCountOrganizations(ctx context.Context) (int64, error)
-	// Queries do painel do administrador da plataforma (o dono do SaaS).
-	AdminListOrganizations(ctx context.Context, arg AdminListOrganizationsParams) ([]AdminListOrganizationsRow, error)
-	AdminSetOrganizationStatus(ctx context.Context, arg AdminSetOrganizationStatusParams) (Organization, error)
 	// Marca o token como usado e devolve o usuário, numa operação só: dois
 	// pedidos simultâneos com o mesmo link não conseguem usá-lo duas vezes.
 	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) (int64, error)
+	// Usada para impedir que o sistema fique sem nenhum administrador ativo.
+	CountActiveAdmins(ctx context.Context) (int64, error)
 	CountSuppliers(ctx context.Context, arg CountSuppliersParams) (int64, error)
-	CreateMembership(ctx context.Context, arg CreateMembershipParams) error
-	CreateOrganization(ctx context.Context, name string) (Organization, error)
-	// Toda query filtra por organization_id explicitamente, MESMO com o RLS ativo.
 	// @nome é atalho do sqlc para sqlc.arg('nome'); sqlc.narg = pode ser NULL.
 	CreateParty(ctx context.Context, arg CreatePartyParams) (int64, error)
 	CreatePartyContact(ctx context.Context, arg CreatePartyContactParams) error
 	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) error
 	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	CreateSupplier(ctx context.Context, arg CreateSupplierParams) error
-	// Queries de autenticação. Estas tabelas não têm RLS: são usadas antes de
-	// sabermos qual organização está ativa.
+	// Queries de autenticação e senha.
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
-	DeactivateSupplier(ctx context.Context, arg DeactivateSupplierParams) (int64, error)
-	DeletePartyContacts(ctx context.Context, arg DeletePartyContactsParams) error
+	DeactivateSupplier(ctx context.Context, partyID int64) (int64, error)
+	DeletePartyContacts(ctx context.Context, partyID int64) error
 	DeleteSession(ctx context.Context, tokenHash []byte) error
-	// Encerra todas as sessões do usuário (ex.: depois de trocar a senha).
+	// Encerra todas as sessões do usuário (ex.: troca de senha, usuário desativado).
 	DeleteUserSessions(ctx context.Context, userID int64) error
-	GetMembership(ctx context.Context, arg GetMembershipParams) (GetMembershipRow, error)
-	// Carrega tudo o que uma requisição autenticada precisa numa consulta só.
-	// LEFT JOIN: a sessão pode ainda não ter organização selecionada.
+	// Cria a empresa só com o nome, se ainda não existir (usado pelo make seed).
+	EnsureCompany(ctx context.Context, name string) error
+	// Empresa desta instalação (um registro só, id = 1).
+	GetCompany(ctx context.Context) (GetCompanyRow, error)
+	// Carrega o que uma requisição autenticada precisa numa consulta só.
 	GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error)
 	// sqlc.embed devolve as colunas de cada tabela agrupadas (row.Party, row.Supplier).
-	GetSupplier(ctx context.Context, arg GetSupplierParams) (GetSupplierRow, error)
+	GetSupplier(ctx context.Context, id int64) (GetSupplierRow, error)
+	GetUser(ctx context.Context, id int64) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	// Depois de redefinir, os outros links pendentes deixam de valer.
 	InvalidatePasswordResetTokens(ctx context.Context, userID int64) error
-	ListPartyContacts(ctx context.Context, arg ListPartyContactsParams) ([]PartyContact, error)
+	ListPartyContacts(ctx context.Context, partyID int64) ([]PartyContact, error)
 	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]ListSuppliersRow, error)
-	ListUserOrganizations(ctx context.Context, userID int64) ([]ListUserOrganizationsRow, error)
-	PromotePlatformAdmin(ctx context.Context, email string) (int64, error)
+	// Gestão de usuários (tela do administrador).
+	ListUsers(ctx context.Context) ([]User, error)
 	// Municípios do IBGE (tabela de referência, sem organização).
 	// Busca sem acento; quem começa com o texto aparece primeiro.
 	SearchCities(ctx context.Context, arg SearchCitiesParams) ([]City, error)
-	SetSessionOrganization(ctx context.Context, arg SetSessionOrganizationParams) error
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (int64, error)
 	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (int64, error)
+	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	UpsertCompany(ctx context.Context, arg UpsertCompanyParams) error
 }
 
 var _ Querier = (*Queries)(nil)
