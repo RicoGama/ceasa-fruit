@@ -29,11 +29,42 @@ const translations: Record<string, string> = {
   'company not configured': 'Os dados da empresa ainda não foram cadastrados',
   'invalid CNPJ': 'CNPJ inválido',
   'validation failed': 'Verifique os campos destacados',
+  'authentication required': 'Sua sessão expirou. Entre de novo.',
+  'invalid CPF': 'CPF inválido',
+  'invalid document': 'Documento inválido',
+  'invalid length': 'Tamanho inválido',
+  'commission over 100': 'A comissão não pode passar de 100%',
 }
 
+// Mensagens de validação automáticas da API (Huma), que trazem números ou
+// nomes no meio. Cada regra vira um texto em português.
+const patterns: [RegExp, (...m: string[]) => string][] = [
+  [/^expected required property \S+ to be present$/, () => 'Campo obrigatório'],
+  [/^expected length >= (\d+)$/, n => `Use pelo menos ${n} caracteres`],
+  [/^expected length <= (\d+)$/, n => `Use no máximo ${n} caracteres`],
+  [/^expected number >= (\S+)$/, n => `O valor mínimo é ${n}`],
+  [/^expected number <= (\S+)$/, n => `O valor máximo é ${n}`],
+  [/^expected array length >= (\d+)$/, n => `Adicione pelo menos ${n} item(ns)`],
+  [/^expected value to be one of/, () => 'Escolha uma das opções'],
+  [/email/i, () => 'E-mail inválido'],
+  [/^expected (string|number|integer|boolean|object|array)/, () => 'Valor inválido'],
+  [/^unexpected property/, () => 'Campo não reconhecido'],
+]
+
+// Nada da API chega em inglês na tela: o que não estiver traduzido vira um
+// texto genérico (e o original vai para o console, para a gente traduzir).
+const fallback = 'Não foi possível concluir a operação. Tente novamente.'
+
 export function translateApiMessage(message?: string | null): string {
-  if (!message) return 'Erro inesperado. Tente novamente.'
-  return translations[message] ?? message
+  if (!message) return fallback
+  const known = translations[message]
+  if (known) return known
+  for (const [re, text] of patterns) {
+    const m = message.match(re)
+    if (m) return text(...m.slice(1))
+  }
+  console.warn('[api] mensagem sem tradução:', message)
+  return fallback
 }
 
 // Mensagem principal de um erro da API (formato RFC 9457 do Huma).
