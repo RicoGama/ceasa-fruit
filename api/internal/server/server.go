@@ -21,6 +21,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/company"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
+	"github.com/RicoGama/ceasa-fruit/api/internal/product"
 	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
 	"github.com/RicoGama/ceasa-fruit/api/internal/user"
@@ -147,6 +148,10 @@ func build(d Deps) (http.Handler, huma.API) {
 	adminOnly.UseMiddleware(auth.RequireRole(api, auth.RoleAdmin))
 	adminOnly.UseSimpleModifier(auth.RequireSecurity)
 
+	managers := huma.NewGroup(api) // gerente (e administrador, que sempre passa)
+	managers.UseMiddleware(auth.RequireRole(api, auth.RoleManager))
+	managers.UseSimpleModifier(auth.RequireSecurity)
+
 	// Cuidado com uma pegadinha do Go: um *queue.Queue nil guardado numa
 	// interface NÃO é uma interface nil. Por isso só atribuímos se existir.
 	var emails auth.EmailQueue
@@ -159,6 +164,8 @@ func build(d Deps) (http.Handler, huma.API) {
 	user.Register(adminOnly, user.Options{DB: database, Emails: emails, AppURL: d.AppURL})
 	company.Register(authed, adminOnly, database)
 	city.Register(authed, database)
+	// Produtos: todos consultam; só gerente e administrador alteram o catálogo.
+	product.Register(authed, managers, database)
 
 	// Fornecedores: por enquanto qualquer papel; as permissões por papel
 	// (ex.: motorista só consulta) entram quando forem definidas.

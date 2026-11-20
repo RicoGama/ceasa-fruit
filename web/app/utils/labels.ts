@@ -27,6 +27,61 @@ export const taxRegimeLabels = {
   real: 'Lucro Real',
 } as const
 
+// --- Produtos -------------------------------------------------------------------
+
+export const productCategoryLabels = {
+  fruit: 'Fruta',
+  vegetable: 'Legume',
+  leafy: 'Verdura',
+  egg: 'Ovos',
+  other: 'Outros',
+} as const
+
+export const productCategoryColors = {
+  fruit: 'warning',
+  vegetable: 'success',
+  leafy: 'primary',
+  egg: 'neutral',
+  other: 'neutral',
+} as const
+
+// Unidade de estoque: o que se CONTA no box.
+export const stockUnitLabels = {
+  box: 'Caixa',
+  kg: 'Quilo (kg)',
+  unit: 'Unidade',
+  dozen: 'Dúzia',
+  bag: 'Saco',
+  bunch: 'Maço',
+  tray: 'Bandeja',
+  pack: 'Pacote',
+} as const
+
+// Abreviações para listas e etiquetas ("18 kg por cx").
+export const stockUnitShort = {
+  box: 'cx',
+  kg: 'kg',
+  unit: 'un',
+  dozen: 'dz',
+  bag: 'sc',
+  bunch: 'mç',
+  tray: 'bdj',
+  pack: 'pct',
+} as const
+
+// Origem da mercadoria na NF-e (tabela oficial, resumida).
+export const productOriginLabels: Record<number, string> = {
+  0: '0 - Nacional',
+  1: '1 - Estrangeira, importação direta',
+  2: '2 - Estrangeira, comprada no mercado interno',
+  3: '3 - Nacional, com mais de 40% de conteúdo importado',
+  4: '4 - Nacional, processo produtivo básico',
+  5: '5 - Nacional, até 40% de conteúdo importado',
+  6: '6 - Estrangeira, importação direta, sem similar nacional',
+  7: '7 - Estrangeira, mercado interno, sem similar nacional',
+  8: '8 - Nacional, mais de 70% de conteúdo importado',
+}
+
 export const personTypeLabels = {
   company: 'Pessoa jurídica',
   individual: 'Pessoa física',

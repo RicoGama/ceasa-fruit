@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/money"
+	"github.com/RicoGama/ceasa-fruit/api/internal/quantity"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -85,6 +86,33 @@ type PasswordResetToken struct {
 	ExpiresAt time.Time
 	UsedAt    pgtype.Timestamptz
 	CreatedAt time.Time
+}
+
+type Product struct {
+	ID              int64
+	Code            *string
+	Name            string
+	Variety         *string
+	Grade           *string
+	Category        string
+	StockUnit       string
+	NominalWeightKg *quantity.Quantity
+	SellsByWeight   bool
+	Ncm             *string
+	Origin          int16
+	Active          bool
+	Notes           *string
+	Version         int32
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type ProductPackaging struct {
+	ID        int64
+	ProductID int64
+	Name      string
+	Quantity  *quantity.Quantity
+	Position  int16
 }
 
 type Session struct {

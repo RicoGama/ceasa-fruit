@@ -11,6 +11,7 @@ confiável): um servidor e um banco por cliente, sem multi-tenant.
 0. Login, papéis (admin, gerente, vendedor, conferente, financeiro, motorista), usuários com convite por e-mail, dados da empresa ✅ (API + telas)
 1. Controle de vendas de LFV
 2. Cadastro de fornecedores ✅ (API + tela)
+2b. Cadastro de produtos com embalagens ✅ (API + tela; gerente e admin editam)
 3. Cadastro de clientes
 4. Controle de estoque com aviso de perda
 5. Venda

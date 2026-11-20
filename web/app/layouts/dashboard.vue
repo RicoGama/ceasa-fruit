@@ -22,6 +22,7 @@ const commercialLinks: NavigationMenuItem[] = [
 
 const registryLinks: NavigationMenuItem[] = [
   { label: 'Cadastros', type: 'label' },
+  { label: 'Produtos', icon: 'i-lucide-apple', to: '/app/products' },
   { label: 'Fornecedores', icon: 'i-lucide-truck', to: '/app/suppliers' },
   { label: 'Clientes', icon: 'i-lucide-users', ...soon },
 ]

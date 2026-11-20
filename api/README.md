@@ -23,6 +23,7 @@ na ordem abaixo; os comentários no código explicam cada conceito.
 | 13 | `internal/user/user.go` | CRUD de usuários só para admin, convite por e-mail na mesma transação |
 | 14 | `internal/party/party.go` | dados comuns de pessoa (endereço, contatos, PIX), normalização, structs aninhadas |
 | 15 | `internal/supplier/supplier.go` | Huma: struct tags, validação, interfaces, embedding, closures, transação com várias tabelas |
+| 15b | `internal/product/product.go` | cadastro com lista filha (embalagens): atualizar, criar e remover numa transação; papéis na rota |
 | 16 | `internal/city/city.go` | uma rota pequena de consulta (municípios do IBGE) |
 | 17 | `internal/company/company.go` | registro único (singleton), `Resolve()` para validar, erro de chave estrangeira |
 | 18 | `internal/mail/` | e-mail por SMTP, modelos com `html/template` e `text/template`, `//go:embed` |
@@ -52,6 +53,8 @@ não existe "organização" nas tabelas: o banco inteiro é de uma empresa só.
 | Pessoa (física/jurídica) | `parties` | dados comuns: documento, nomes, endereço, PIX/banco |
 | Contatos da pessoa | `party_contacts` | dono, gerente, motorista... |
 | Fornecedor | `suppliers` | papel "fornecedor" de uma pessoa (consignação, prazo, box) |
+| Produto | `products` | nome + variedade + classificação, unidade de estoque, peso médio, NCM |
+| Embalagem | `product_packagings` | pilha, pallet, caixa de 30: quantas unidades cabem (vazio = varia) |
 | Cliente | `customers` | *(próximo passo: outro papel da mesma pessoa)* |
 | Municípios/UFs | `cities`, `states` | lista oficial do IBGE |
 
@@ -76,7 +79,8 @@ módulo (ex.: motorista só consulta).
 | Grupo | Exige | Rotas |
 |---|---|---|
 | `public` | nada | `POST /auth/login`, `POST /auth/logout`, `POST /auth/password/forgot`, `POST /auth/password/reset` |
-| `authed` | login | `GET /auth/me`, `GET /company`, `/cities`, `/suppliers/...` |
+| `authed` | login | `GET /auth/me`, `GET /company`, `/cities`, `/suppliers/...`, `GET /products...` |
+| `managers` | papel `manager` (e `admin`) | `POST/PUT/DELETE /products` |
 | `adminOnly` | papel `admin` | `/users/...`, `PUT /company` |
 
 ### Login

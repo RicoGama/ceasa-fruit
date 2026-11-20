@@ -63,6 +63,7 @@ func (q Quantity) Sub(o Quantity) Quantity { return q - o }
 func (q Quantity) Neg() Quantity           { return -q }
 func (q Quantity) IsZero() bool            { return q == 0 }
 func (q Quantity) IsNegative() bool        { return q < 0 }
+func (q Quantity) IsPositive() bool        { return q > 0 }
 
 // IsWhole diz se não tem parte fracionária (útil para "caixa não se vende pela metade").
 func (q Quantity) IsWhole() bool { return q%One == 0 }

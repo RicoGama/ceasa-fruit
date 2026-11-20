@@ -23,6 +23,12 @@ export function formatPostalCode(value?: string | null): string {
   return d.length === 8 ? `${d.slice(0, 5)}-${d.slice(5)}` : (value ?? '')
 }
 
+// NCM: 0702.00.00
+export function formatNcm(value?: string | null): string {
+  const d = onlyDigits(value)
+  return d.length === 8 ? `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6)}` : (value ?? '')
+}
+
 // Na CEASA todo mundo é conhecido pelo apelido: ele aparece primeiro.
 export function displayName(p: { tradeName?: string | null, legalName: string }): string {
   return p.tradeName || p.legalName

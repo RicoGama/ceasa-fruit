@@ -130,6 +130,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List products */
+        get: operations["list-products"];
+        put?: never;
+        /** Create a product */
+        post: operations["create-product"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a product with its packagings */
+        get: operations["get-product"];
+        /**
+         * Update a product
+         * @description Packagings: items with id are updated, items without id are created, missing ones are removed.
+         */
+        put: operations["update-product"];
+        post?: never;
+        /** Deactivate a product (it is never deleted) */
+        delete: operations["deactivate-product"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/suppliers": {
         parameters: {
             query?: never;
@@ -400,6 +440,21 @@ export interface components {
             readonly $schema?: string;
             items: components["schemas"]["User"][];
         };
+        ListOutputBody1: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListOutputBody1.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ProductSummary"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
         ListSuppliersOutputBody: {
             /**
              * Format: uri
@@ -436,6 +491,29 @@ export interface components {
             company: components["schemas"]["CompanyName"];
             user: components["schemas"]["CurrentUser"];
         };
+        Packaging: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /**
+             * @description Stock units per packaging; null = varies, informed at sale
+             * @example 12.5
+             */
+            quantity: string;
+        };
+        PackagingInput: {
+            /**
+             * Format: int64
+             * @description Existing packaging id; omit for a new one
+             */
+            id?: number;
+            name: string;
+            /**
+             * @description Stock units per packaging; omit if it varies
+             * @example 12.5
+             */
+            quantity?: string;
+        };
         Payment: {
             bank: string | null;
             bankAccount: string | null;
@@ -459,6 +537,148 @@ export interface components {
             pixKey?: string;
             /** @enum {string} */
             pixKeyType?: "cpf" | "cnpj" | "email" | "phone" | "random";
+        };
+        Product: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Product.json
+             */
+            readonly $schema?: string;
+            active: boolean;
+            /** @enum {string} */
+            category: "fruit" | "vegetable" | "leafy" | "egg" | "other";
+            code: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Name + variety + grade, e.g. Tomate Italiano Extra AA */
+            displayName: string;
+            grade: string | null;
+            /** Format: int64 */
+            id: number;
+            name: string;
+            ncm: string | null;
+            /**
+             * @description Decimal quantity with up to 3 places, dot as separator
+             * @example 12.5
+             */
+            nominalWeightKg: string;
+            notes: string | null;
+            /** Format: int32 */
+            origin: number;
+            packagings: components["schemas"]["Packaging"][];
+            sellsByWeight: boolean;
+            /** @enum {string} */
+            stockUnit: "box" | "kg" | "unit" | "dozen" | "bag" | "bunch" | "tray" | "pack";
+            /** Format: date-time */
+            updatedAt: string;
+            variety: string | null;
+            /** Format: int32 */
+            version: number;
+        };
+        ProductFields: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProductFields.json
+             */
+            readonly $schema?: string;
+            /** @description Default true */
+            active?: boolean;
+            /** @enum {string} */
+            category: "fruit" | "vegetable" | "leafy" | "egg" | "other";
+            /** @description Optional short code typed at the counter */
+            code?: string;
+            /** @description Classification, e.g. Extra AA */
+            grade?: string;
+            /** @description e.g. Tomate */
+            name: string;
+            /** @description NCM code, 8 digits (dots allowed) */
+            ncm?: string;
+            /**
+             * @description Average weight (kg) of one stock unit
+             * @example 12.5
+             */
+            nominalWeightKg?: string;
+            notes?: string;
+            /**
+             * Format: int32
+             * @description NF-e goods origin (0 = national)
+             */
+            origin?: number;
+            packagings?: components["schemas"]["PackagingInput"][];
+            /** @description Can be sold per kg (uses the average weight) */
+            sellsByWeight?: boolean;
+            /**
+             * @description What is counted in stock
+             * @enum {string}
+             */
+            stockUnit: "box" | "kg" | "unit" | "dozen" | "bag" | "bunch" | "tray" | "pack";
+            /** @description e.g. Italiano */
+            variety?: string;
+        };
+        ProductSummary: {
+            active: boolean;
+            /** @enum {string} */
+            category: "fruit" | "vegetable" | "leafy" | "egg" | "other";
+            code: string | null;
+            displayName: string;
+            /** Format: int64 */
+            id: number;
+            /**
+             * @description Decimal quantity with up to 3 places, dot as separator
+             * @example 12.5
+             */
+            nominalWeightKg: string;
+            sellsByWeight: boolean;
+            /** @enum {string} */
+            stockUnit: "box" | "kg" | "unit" | "dozen" | "bag" | "bunch" | "tray" | "pack";
+        };
+        ProductUpdate: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProductUpdate.json
+             */
+            readonly $schema?: string;
+            /** @description Default true */
+            active?: boolean;
+            /** @enum {string} */
+            category: "fruit" | "vegetable" | "leafy" | "egg" | "other";
+            /** @description Optional short code typed at the counter */
+            code?: string;
+            /** @description Classification, e.g. Extra AA */
+            grade?: string;
+            /** @description e.g. Tomate */
+            name: string;
+            /** @description NCM code, 8 digits (dots allowed) */
+            ncm?: string;
+            /**
+             * @description Average weight (kg) of one stock unit
+             * @example 12.5
+             */
+            nominalWeightKg?: string;
+            notes?: string;
+            /**
+             * Format: int32
+             * @description NF-e goods origin (0 = national)
+             */
+            origin?: number;
+            packagings?: components["schemas"]["PackagingInput"][];
+            /** @description Can be sold per kg (uses the average weight) */
+            sellsByWeight?: boolean;
+            /**
+             * @description What is counted in stock
+             * @enum {string}
+             */
+            stockUnit: "box" | "kg" | "unit" | "dozen" | "bag" | "bunch" | "tray" | "pack";
+            /** @description e.g. Italiano */
+            variety?: string;
+            /**
+             * Format: int32
+             * @description The version read; 409 if someone saved in between
+             */
+            version: number;
         };
         ResetPasswordInputBody: {
             /**
@@ -982,6 +1202,170 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Company"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-products": {
+        parameters: {
+            query?: {
+                /** @description Name, variety or grade (contains, accent-insensitive) or code (prefix) */
+                search?: string;
+                category?: "fruit" | "vegetable" | "leafy" | "egg" | "other";
+                status?: "active" | "inactive" | "all";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOutputBody1"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "create-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductFields"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "update-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "deactivate-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

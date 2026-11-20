@@ -21,17 +21,26 @@ type Querier interface {
 	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) (int64, error)
 	// Usada para impedir que o sistema fique sem nenhum administrador ativo.
 	CountActiveAdmins(ctx context.Context) (int64, error)
+	CountProducts(ctx context.Context, arg CountProductsParams) (int64, error)
 	CountSuppliers(ctx context.Context, arg CountSuppliersParams) (int64, error)
 	// @nome é atalho do sqlc para sqlc.arg('nome'); sqlc.narg = pode ser NULL.
 	CreateParty(ctx context.Context, arg CreatePartyParams) (int64, error)
 	CreatePartyContact(ctx context.Context, arg CreatePartyContactParams) error
 	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) error
+	// Cadastro de produtos e suas embalagens.
+	CreateProduct(ctx context.Context, arg CreateProductParams) (int64, error)
+	CreateProductPackaging(ctx context.Context, arg CreateProductPackagingParams) error
 	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	CreateSupplier(ctx context.Context, arg CreateSupplierParams) error
 	// Queries de autenticação e senha.
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	// Inativa (não apaga: estoque e vendas vão apontar para o produto) e muda a
+	// versão, para quem estiver com a tela aberta não reativar sem perceber.
+	DeactivateProduct(ctx context.Context, id int64) (int64, error)
 	DeactivateSupplier(ctx context.Context, partyID int64) (int64, error)
 	DeletePartyContacts(ctx context.Context, partyID int64) error
+	// Apaga as embalagens que saíram da lista (as que ficaram vêm em keep_ids).
+	DeleteProductPackagingsExcept(ctx context.Context, arg DeleteProductPackagingsExceptParams) error
 	DeleteSession(ctx context.Context, tokenHash []byte) error
 	// Encerra todas as sessões do usuário (ex.: troca de senha, usuário desativado).
 	DeleteUserSessions(ctx context.Context, userID int64) error
@@ -39,6 +48,7 @@ type Querier interface {
 	EnsureCompany(ctx context.Context, name string) error
 	// Empresa desta instalação (um registro só, id = 1).
 	GetCompany(ctx context.Context) (GetCompanyRow, error)
+	GetProduct(ctx context.Context, id int64) (Product, error)
 	// Carrega o que uma requisição autenticada precisa numa consulta só.
 	GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error)
 	// sqlc.embed devolve as colunas de cada tabela agrupadas (row.Party, row.Supplier).
@@ -48,6 +58,8 @@ type Querier interface {
 	// Depois de redefinir, os outros links pendentes deixam de valer.
 	InvalidatePasswordResetTokens(ctx context.Context, userID int64) error
 	ListPartyContacts(ctx context.Context, partyID int64) ([]PartyContact, error)
+	ListProductPackagings(ctx context.Context, productID int64) ([]ProductPackaging, error)
+	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
 	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]ListSuppliersRow, error)
 	// Gestão de usuários (tela do administrador).
 	ListUsers(ctx context.Context) ([]User, error)
@@ -61,6 +73,9 @@ type Querier interface {
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (int64, error)
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (int64, error)
+	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
+	UpdateProduct(ctx context.Context, arg UpdateProductParams) (int64, error)
+	UpdateProductPackaging(ctx context.Context, arg UpdateProductPackagingParams) (int64, error)
 	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (int64, error)
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
