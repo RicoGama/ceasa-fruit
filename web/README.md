@@ -94,6 +94,7 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
   Componente em subpasta ganha o prefixo da pasta: `components/suppliers/SupplierFormModal.vue`
   vira `<SuppliersSupplierFormModal>`.
 - Textos da tela em português; código em inglês; comentários em português.
+- Dinheiro, quantidade e percentual chegam da API como texto (`"1234.56"`): formate com `formatMoney`, `formatQuantity`, `formatPercent` e leia o que o usuário digitou com `parseDecimalInput` (`app/utils/decimal.ts`). Nunca converta dinheiro para `number`.
 - Erros da API chegam em inglês e são traduzidos em `app/utils/api-error.ts`.
 - Valores de enum da API (`consignment`, `producer`...) ganham nome em português em `app/utils/labels.ts`.
 - O CEP é consultado no ViaCEP direto do navegador (`app/composables/useCep.ts`); sem internet, o usuário preenche à mão.

@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/money"
 )
 
 // fakeStore é um Store em memória. Como os handlers dependem da interface
@@ -203,7 +204,7 @@ func fullBody() map[string]any {
 		"address":      map[string]any{"postalCode": "25960-000", "street": "Estrada da Barragem", "number": "s/n", "cityId": 3305802},
 		"payment":      map[string]any{"pixKeyType": "cpf", "pixKey": "529.982.247-25"},
 		"contacts":     []map[string]any{{"name": "José", "role": "dono", "phone": "21999990000", "isWhatsapp": true}, {"name": "Maria", "role": "filha"}},
-		"supplierType": "producer", "defaultPurchaseMode": "consignment", "consignmentCommission": 12.5,
+		"supplierType": "producer", "defaultPurchaseMode": "consignment", "consignmentCommission": "12.5",
 		"paymentTermDays": 7, "ceasaPavilion": "21", "ceasaBox": "14",
 	}
 }
@@ -223,7 +224,7 @@ func TestCreateFullSupplier(t *testing.T) {
 	if got.Address.City == nil || got.Address.City.Name != "Teresópolis" || got.Address.City.State != "RJ" {
 		t.Errorf("city not resolved: %+v", got.Address.City)
 	}
-	if got.DefaultPurchaseMode != "consignment" || *got.ConsignmentCommission != 12.5 {
+	if got.DefaultPurchaseMode != "consignment" || *got.ConsignmentCommission != money.MustParsePercent("12.5") {
 		t.Errorf("purchase mode not saved: %s %v", got.DefaultPurchaseMode, got.ConsignmentCommission)
 	}
 	if len(got.Contacts) != 2 || got.Contacts[0].Name != "José" || !got.Contacts[0].IsWhatsapp {
@@ -256,7 +257,9 @@ func TestCreateSupplierValidation(t *testing.T) {
 		want   string // trecho esperado na resposta de erro
 	}{
 		{"consignment without commission", func(b map[string]any) { delete(b, "consignmentCommission") }, "body.consignmentCommission"},
-		{"commission over 100", func(b map[string]any) { b["consignmentCommission"] = 150 }, "body.consignmentCommission"},
+		{"commission over 100", func(b map[string]any) { b["consignmentCommission"] = "150" }, "body.consignmentCommission"},
+		{"commission as JSON number", func(b map[string]any) { b["consignmentCommission"] = 12.5 }, "body.consignmentCommission"},
+		{"commission with comma", func(b map[string]any) { b["consignmentCommission"] = "12,5" }, "body.consignmentCommission"},
 		{"blocked without reason", func(b map[string]any) { b["status"] = "blocked" }, "body.blockedReason"},
 		{"document does not match person type", func(b map[string]any) { b["personType"] = "company" }, "a company must have a CNPJ"},
 		{"invalid postal code", func(b map[string]any) { b["address"].(map[string]any)["postalCode"] = "123" }, "body.address.postalCode"},

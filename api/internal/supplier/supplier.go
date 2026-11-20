@@ -23,6 +23,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/money"
 	"github.com/RicoGama/ceasa-fruit/api/internal/party"
 )
 
@@ -56,14 +57,14 @@ type TxFunc func(ctx context.Context, fn func(Store) error) error
 type SupplierFields struct {
 	party.Fields
 
-	SupplierType          string   `json:"supplierType,omitempty" enum:"producer,wholesaler,cooperative,importer,other" default:"producer"`
-	DefaultPurchaseMode   string   `json:"defaultPurchaseMode,omitempty" enum:"direct,consignment" default:"direct" doc:"direct = buys the goods; consignment = sells first and pays later minus commission"`
-	ConsignmentCommission *float64 `json:"consignmentCommission,omitempty" minimum:"0" maximum:"100" doc:"Commission in % kept on consignment sales"`
-	PaymentTermDays       int32    `json:"paymentTermDays,omitempty" minimum:"0" maximum:"365" default:"0" doc:"Default payment term in days (0 = cash)"`
-	CeasaPavilion         *string  `json:"ceasaPavilion,omitempty" maxLength:"30"`
-	CeasaBox              *string  `json:"ceasaBox,omitempty" maxLength:"30"`
-	Status                string   `json:"status,omitempty" enum:"active,inactive,blocked" default:"active"`
-	BlockedReason         *string  `json:"blockedReason,omitempty" maxLength:"500"`
+	SupplierType          string         `json:"supplierType,omitempty" enum:"producer,wholesaler,cooperative,importer,other" default:"producer"`
+	DefaultPurchaseMode   string         `json:"defaultPurchaseMode,omitempty" enum:"direct,consignment" default:"direct" doc:"direct = buys the goods; consignment = sells first and pays later minus commission"`
+	ConsignmentCommission *money.Percent `json:"consignmentCommission,omitempty" doc:"Commission in % kept on consignment sales (\"12.5\" = 12.5%)"`
+	PaymentTermDays       int32          `json:"paymentTermDays,omitempty" minimum:"0" maximum:"365" default:"0" doc:"Default payment term in days (0 = cash)"`
+	CeasaPavilion         *string        `json:"ceasaPavilion,omitempty" maxLength:"30"`
+	CeasaBox              *string        `json:"ceasaBox,omitempty" maxLength:"30"`
+	Status                string         `json:"status,omitempty" enum:"active,inactive,blocked" default:"active"`
+	BlockedReason         *string        `json:"blockedReason,omitempty" maxLength:"500"`
 }
 
 // normalize valida a pessoa e as regras de fornecedor.
@@ -89,6 +90,9 @@ func (f *SupplierFields) normalize() []error {
 	if f.DefaultPurchaseMode == "consignment" && f.ConsignmentCommission == nil {
 		fail("consignmentCommission", "commission is required for consignment")
 	}
+	if c := f.ConsignmentCommission; c != nil && !c.Between(0, money.PercentFromInt(100)) {
+		fail("consignmentCommission", "commission must be between 0 and 100")
+	}
 	if f.Status == "blocked" && f.BlockedReason == nil {
 		fail("blockedReason", "reason is required when blocked")
 	}
@@ -102,14 +106,14 @@ func (f *SupplierFields) normalize() []error {
 type Supplier struct {
 	ID int64 `json:"id"`
 	party.Party
-	SupplierType          string   `json:"supplierType" enum:"producer,wholesaler,cooperative,importer,other"`
-	DefaultPurchaseMode   string   `json:"defaultPurchaseMode" enum:"direct,consignment"`
-	ConsignmentCommission *float64 `json:"consignmentCommission"`
-	PaymentTermDays       int32    `json:"paymentTermDays"`
-	CeasaPavilion         *string  `json:"ceasaPavilion"`
-	CeasaBox              *string  `json:"ceasaBox"`
-	Status                string   `json:"status" enum:"active,inactive,blocked"`
-	BlockedReason         *string  `json:"blockedReason"`
+	SupplierType          string         `json:"supplierType" enum:"producer,wholesaler,cooperative,importer,other"`
+	DefaultPurchaseMode   string         `json:"defaultPurchaseMode" enum:"direct,consignment"`
+	ConsignmentCommission *money.Percent `json:"consignmentCommission"`
+	PaymentTermDays       int32          `json:"paymentTermDays"`
+	CeasaPavilion         *string        `json:"ceasaPavilion"`
+	CeasaBox              *string        `json:"ceasaBox"`
+	Status                string         `json:"status" enum:"active,inactive,blocked"`
+	BlockedReason         *string        `json:"blockedReason"`
 	party.Timestamps
 }
 

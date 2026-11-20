@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/RicoGama/ceasa-fruit/api/internal/money"
 )
 
 const countSuppliers = `-- name: CountSuppliers :one
@@ -154,7 +156,7 @@ type CreateSupplierParams struct {
 	PartyID               int64
 	SupplierType          string
 	DefaultPurchaseMode   string
-	ConsignmentCommission *float64
+	ConsignmentCommission *money.Percent
 	PaymentTermDays       int32
 	CeasaPavilion         *string
 	CeasaBox              *string
@@ -467,7 +469,7 @@ WHERE party_id = $9
 type UpdateSupplierParams struct {
 	SupplierType          string
 	DefaultPurchaseMode   string
-	ConsignmentCommission *float64
+	ConsignmentCommission *money.Percent
 	PaymentTermDays       int32
 	CeasaPavilion         *string
 	CeasaBox              *string

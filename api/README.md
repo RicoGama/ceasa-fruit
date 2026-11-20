@@ -14,6 +14,7 @@ na ordem abaixo; os comentários no código explicam cada conceito.
 | 5 | `internal/db/queries/*.sql` | SQL que o sqlc transforma em Go |
 | 6 | `internal/db/*.go` | código **gerado** — leia, mas nunca edite à mão |
 | 7 | `internal/document/document.go` | pacote "puro", `rune`, `strings.Builder`, `range` |
+| 7b | `internal/fixed`, `internal/money`, `internal/quantity` | tipos próprios (`type Money int64`), métodos, interfaces do JSON/Huma/pgx, `math/big` |
 | 8 | `internal/server/server.go` | `net/http` cru (health check), middlewares, closures, chi, grupos de rotas do Huma |
 | 9 | `internal/auth/password.go` | hash de senha (Argon2id), comparação em tempo constante, `sync.OnceValue` |
 | 10 | `internal/auth/session.go` | tokens, cookies, valores no `context.Context`, middleware net/http |
@@ -100,6 +101,31 @@ make seed email=voce@exemplo.com password=uma-senha-boa
 O seed é idempotente: rodar de novo só redefine a senha e garante que o
 usuário é admin ativo. Os dados completos da empresa (CNPJ, IE, endereço) são
 preenchidos na tela *Administração → Dados da empresa*.
+
+## Dinheiro, quantidade e percentual
+
+**Nunca `float64` para valores.** Em float, `0.1 + 0.2` dá `0.30000000000000004`;
+em nota fiscal isso vira rejeição na SEFAZ, e no caixa, centavo sobrando.
+
+| Tipo Go | Guarda | Coluna no banco | JSON da API |
+|---|---|---|---|
+| `money.Money` | centavos (`int64`): R$ 12,34 = 1234 | `money_amount` (NUMERIC(14,2)) | `"12.34"` |
+| `quantity.Quantity` | milésimos: 1,5 kg = 1500 | `quantity_amount` (NUMERIC(14,3)) | `"1.5"` |
+| `money.Percent` | 4 casas: 12,5% = 125000 | `percent_rate` (NUMERIC(7,4)) | `"12.5"` |
+
+- As colunas usam esses **domains** (migration `00003`) e o sqlc gera o tipo Go
+  certo sozinho. `NUMERIC` sem domain vira `pgtype.Numeric`: sinal de que a
+  coluna deveria usar um dos três.
+- No JSON o valor vai como **texto** com ponto decimal, porque o JavaScript
+  também usa float. O front só formata (`app/utils/decimal.ts`); contas de
+  dinheiro são feitas aqui.
+- Soma e subtração são exatas. Só multiplicação arredonda, sempre "meio para
+  cima", num lugar só (`fixed.MulDiv`):
+  `preço.Times(quantidade)` (o valor do item na NF-e), `valor.Percent(p)`.
+- `valor.Allocate(n)` divide em parcelas que somam exatamente o total
+  (R$ 100 em 3 = 33,34 + 33,33 + 33,33).
+- Mais casas que a escala é **erro**, não arredondamento escondido
+  (`"1.005"` em reais é recusado).
 
 ## Fila de jobs (River) e e-mail
 

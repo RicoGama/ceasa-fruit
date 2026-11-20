@@ -34,6 +34,7 @@ const translations: Record<string, string> = {
   'invalid document': 'Documento inválido',
   'invalid length': 'Tamanho inválido',
   'commission over 100': 'A comissão não pode passar de 100%',
+  'commission must be between 0 and 100': 'A comissão deve ficar entre 0% e 100%',
 }
 
 // Mensagens de validação automáticas da API (Huma), que trazem números ou
@@ -46,6 +47,8 @@ const patterns: [RegExp, (...m: string[]) => string][] = [
   [/^expected number <= (\S+)$/, n => `O valor máximo é ${n}`],
   [/^expected array length >= (\d+)$/, n => `Adicione pelo menos ${n} item(ns)`],
   [/^expected value to be one of/, () => 'Escolha uma das opções'],
+  [/^expected string to match pattern/, () => 'Número inválido'],
+  [/decimal|decimal places|out of range/, () => 'Número inválido'],
   [/email/i, () => 'E-mail inválido'],
   [/^expected (string|number|integer|boolean|object|array)/, () => 'Valor inválido'],
   [/^unexpected property/, () => 'Campo não reconhecido'],

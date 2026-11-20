@@ -476,8 +476,11 @@ export interface components {
             blockedReason: string | null;
             ceasaBox: string | null;
             ceasaPavilion: string | null;
-            /** Format: double */
-            consignmentCommission: number | null;
+            /**
+             * @description Percentage (12.5 = 12.5%), dot as decimal separator, up to 4 places
+             * @example 12.5
+             */
+            consignmentCommission: string;
             contacts: components["schemas"]["Contact"][];
             /** Format: date-time */
             createdAt: string;
@@ -519,10 +522,10 @@ export interface components {
             ceasaBox?: string;
             ceasaPavilion?: string;
             /**
-             * Format: double
-             * @description Commission in % kept on consignment sales
+             * @description Commission in % kept on consignment sales ("12.5" = 12.5%)
+             * @example 12.5
              */
-            consignmentCommission?: number;
+            consignmentCommission?: string;
             contacts?: components["schemas"]["ContactInput"][];
             /**
              * @description direct = buys the goods; consignment = sells first and pays later minus commission

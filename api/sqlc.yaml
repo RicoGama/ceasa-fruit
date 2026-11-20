@@ -17,12 +17,28 @@ sql:
         overrides:
           - db_type: timestamptz
             go_type: time.Time
-          # Percentuais (comissão) como float64. Valores em dinheiro, quando
-          # vierem, vão usar um tipo decimal de verdade (float tem arredondamento).
-          - db_type: pg_catalog.numeric
-            go_type: float64
-          - db_type: pg_catalog.numeric
+          # Tipos decimais (ver migration 00003). Nunca float64 para dinheiro.
+          - db_type: money_amount
+            go_type: github.com/RicoGama/ceasa-fruit/api/internal/money.Money
+          - db_type: money_amount
             nullable: true
             go_type:
-              type: float64
+              import: github.com/RicoGama/ceasa-fruit/api/internal/money
+              type: Money
+              pointer: true
+          - db_type: percent_rate
+            go_type: github.com/RicoGama/ceasa-fruit/api/internal/money.Percent
+          - db_type: percent_rate
+            nullable: true
+            go_type:
+              import: github.com/RicoGama/ceasa-fruit/api/internal/money
+              type: Percent
+              pointer: true
+          - db_type: quantity_amount
+            go_type: github.com/RicoGama/ceasa-fruit/api/internal/quantity.Quantity
+          - db_type: quantity_amount
+            nullable: true
+            go_type:
+              import: github.com/RicoGama/ceasa-fruit/api/internal/quantity
+              type: Quantity
               pointer: true

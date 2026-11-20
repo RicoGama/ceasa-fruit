@@ -7,6 +7,7 @@ package db
 import (
 	"time"
 
+	"github.com/RicoGama/ceasa-fruit/api/internal/money"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -101,7 +102,7 @@ type Supplier struct {
 	PartyID               int64
 	SupplierType          string
 	DefaultPurchaseMode   string
-	ConsignmentCommission *float64
+	ConsignmentCommission *money.Percent
 	PaymentTermDays       int32
 	CeasaPavilion         *string
 	CeasaBox              *string
