@@ -16,10 +16,10 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 )
 
 // User é o usuário como a API devolve (nunca com a senha).
@@ -74,21 +74,20 @@ type idInput struct {
 
 // Options agrupa as dependências.
 type Options struct {
-	Pool   *pgxpool.Pool
+	DB     postgres.DB
 	Emails auth.EmailQueue
 	AppURL string
 }
 
 type handler struct {
-	pool   *pgxpool.Pool
-	q      *db.Queries
+	db     postgres.DB
 	emails auth.EmailQueue
 	appURL string
 }
 
 // Register adiciona as rotas. A api recebida deve ser o grupo do administrador.
 func Register(api huma.API, opts Options) {
-	h := &handler{pool: opts.Pool, q: db.New(opts.Pool), emails: opts.Emails, appURL: opts.AppURL}
+	h := &handler{db: opts.DB, emails: opts.Emails, appURL: opts.AppURL}
 	tags := []string{"Users"}
 
 	huma.Register(api, huma.Operation{
@@ -116,7 +115,12 @@ func Register(api huma.API, opts Options) {
 }
 
 func (h *handler) list(ctx context.Context, _ *struct{}) (*listOutput, error) {
-	rows, err := h.q.ListUsers(ctx)
+	var rows []db.User
+	err := h.db.InReadTx(ctx, func(tx postgres.Tx) error {
+		var err error
+		rows, err = tx.ListUsers(ctx)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -143,9 +147,9 @@ func (h *handler) create(ctx context.Context, in *createUserInput) (*userOutput,
 	}
 
 	var created db.User
-	err = pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
+	err = h.db.InTx(ctx, func(tx postgres.Tx) error {
 		var err error
-		created, err = h.q.WithTx(tx).CreateUser(ctx, db.CreateUserParams{
+		created, err = tx.CreateUser(ctx, db.CreateUserParams{
 			Name: b.Name, Email: b.Email, PasswordHash: hash, Role: b.Role,
 		})
 		if err != nil {
@@ -175,8 +179,7 @@ func (h *handler) update(ctx context.Context, in *updateUserInput) (*userOutput,
 	}
 
 	var updated db.User
-	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
-		q := h.q.WithTx(tx)
+	err := h.db.InTx(ctx, func(q postgres.Tx) error {
 		current, err := q.GetUser(ctx, in.ID)
 		if err != nil {
 			return err
@@ -215,8 +218,8 @@ func (h *handler) update(ctx context.Context, in *updateUserInput) (*userOutput,
 }
 
 func (h *handler) resendInvite(ctx context.Context, in *idInput) (*struct{}, error) {
-	err := pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
-		u, err := h.q.WithTx(tx).GetUser(ctx, in.ID)
+	err := h.db.InTx(ctx, func(tx postgres.Tx) error {
+		u, err := tx.GetUser(ctx, in.ID)
 		if err != nil {
 			return err
 		}

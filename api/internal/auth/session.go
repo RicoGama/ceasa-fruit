@@ -116,10 +116,9 @@ func (c Cookies) Clear() http.Cookie {
 // Middleware (chi / net/http)
 // ---------------------------------------------------------------------------
 
-// SessionLoader é o que o middleware precisa do banco.
-type SessionLoader interface {
-	GetSession(ctx context.Context, tokenHash []byte) (db.GetSessionRow, error)
-}
+// SessionLoader busca a sessão pelo hash do token. É uma função (e não o
+// banco direto) para o servidor decidir como ler: numa transação só de leitura.
+type SessionLoader func(ctx context.Context, tokenHash []byte) (db.GetSessionRow, error)
 
 // LoadSession lê o cookie e, se a sessão for válida, coloca-a no context.
 // Ele NÃO bloqueia ninguém: quem decide se a rota exige login são os
@@ -134,7 +133,7 @@ func LoadSession(loader SessionLoader, logger *slog.Logger) func(http.Handler) h
 			}
 
 			hash := HashToken(cookie.Value)
-			row, err := loader.GetSession(r.Context(), hash)
+			row, err := loader(r.Context(), hash)
 			if errors.Is(err, pgx.ErrNoRows) {
 				next.ServeHTTP(w, r) // sessão vencida, inexistente ou usuário desativado
 				return

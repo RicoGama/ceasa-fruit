@@ -14,13 +14,13 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/city"
 	"github.com/RicoGama/ceasa-fruit/api/internal/company"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
 	"github.com/RicoGama/ceasa-fruit/api/internal/user"
@@ -71,7 +71,8 @@ func OpenAPISpec() ([]byte, error) {
 // build monta o roteador e devolve também a API do Huma (para o OpenAPISpec).
 func build(d Deps) (http.Handler, huma.API) {
 	r := chi.NewRouter()
-	queries := db.New(d.Pool)
+	// Todo acesso ao banco passa por transação (ver internal/postgres/tx.go).
+	database := postgres.NewDB(d.Pool)
 
 	// Middlewares envolvem cada requisição, na ordem em que são adicionados.
 	r.Use(middleware.RequestID) // adiciona um X-Request-Id em cada requisição
@@ -88,7 +89,17 @@ func build(d Deps) (http.Handler, huma.API) {
 		MaxAge:           300,
 	}))
 	// Lê o cookie de sessão (se houver) e coloca o usuário no context.
-	r.Use(auth.LoadSession(queries, d.Logger))
+	// A sessão é lida a cada requisição, numa transação só de leitura.
+	loadSession := func(ctx context.Context, tokenHash []byte) (db.GetSessionRow, error) {
+		var row db.GetSessionRow
+		err := database.InReadTx(ctx, func(tx postgres.Tx) error {
+			var err error
+			row, err = tx.GetSession(ctx, tokenHash)
+			return err
+		})
+		return row, err
+	}
+	r.Use(auth.LoadSession(loadSession, d.Logger))
 
 	// Rota com chi + net/http puro, escrita à mão de propósito (ver healthHandler).
 	r.Get("/health", healthHandler(d.Pool))
@@ -130,17 +141,18 @@ func build(d Deps) (http.Handler, huma.API) {
 		emails = d.Queue
 	}
 	auth.Register(public, authed, auth.Options{
-		Pool: d.Pool, Cookies: auth.Cookies{Secure: d.CookieSecure}, Emails: emails, AppURL: d.AppURL,
+		DB: database, Cookies: auth.Cookies{Secure: d.CookieSecure}, Emails: emails, AppURL: d.AppURL,
 	})
-	user.Register(adminOnly, user.Options{Pool: d.Pool, Emails: emails, AppURL: d.AppURL})
-	company.Register(authed, adminOnly, queries)
-	city.Register(authed, queries)
+	user.Register(adminOnly, user.Options{DB: database, Emails: emails, AppURL: d.AppURL})
+	company.Register(authed, adminOnly, database)
+	city.Register(authed, database)
 
 	// Fornecedores: por enquanto qualquer papel; as permissões por papel
 	// (ex.: motorista só consulta) entram quando forem definidas.
-	// Cada gravação roda numa transação: ou tudo dá certo, ou nada é gravado.
+	// O pacote supplier recebe o Store (uma interface) para os testes usarem
+	// um banco falso; aqui ligamos esse Store às transações de verdade.
 	inTx := func(ctx context.Context, fn func(supplier.Store) error) error {
-		return pgx.BeginFunc(ctx, d.Pool, func(tx pgx.Tx) error { return fn(queries.WithTx(tx)) })
+		return database.InTx(ctx, func(tx postgres.Tx) error { return fn(tx) })
 	}
 	supplier.Register(authed, inTx)
 

@@ -60,8 +60,7 @@ func run(email, password string) error {
 		return err
 	}
 
-	err = pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
-		q := db.New(tx)
+	err = postgres.NewDB(pool).InTx(ctx, func(q postgres.Tx) error {
 		user, err := q.GetUserByEmail(ctx, email)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("no user with email %q", email)

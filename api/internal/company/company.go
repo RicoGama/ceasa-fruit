@@ -17,13 +17,8 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/document"
 	"github.com/RicoGama/ceasa-fruit/api/internal/party"
+	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 )
-
-// Store é o que as rotas precisam do banco (*db.Queries satisfaz).
-type Store interface {
-	GetCompany(ctx context.Context) (db.GetCompanyRow, error)
-	UpsertCompany(ctx context.Context, arg db.UpsertCompanyParams) error
-}
 
 // Company é a empresa como a API devolve.
 type Company struct {
@@ -95,12 +90,15 @@ func (in *updateCompanyInput) Resolve(huma.Context) []error {
 	return errs
 }
 
-type handler struct{ store Store }
+type handler struct{ db postgres.DB }
+
+// errNotConfigured: a empresa ainda não foi criada (make seed).
+var errNotConfigured = huma.Error404NotFound("company not configured")
 
 // Register adiciona as rotas: leitura para qualquer usuário logado, alteração
 // só para o administrador.
-func Register(authed, admin huma.API, store Store) {
-	h := &handler{store: store}
+func Register(authed, admin huma.API, database postgres.DB) {
+	h := &handler{db: database}
 	tags := []string{"Company"}
 
 	huma.Register(authed, huma.Operation{
@@ -115,12 +113,54 @@ func Register(authed, admin huma.API, store Store) {
 }
 
 func (h *handler) get(ctx context.Context, _ *struct{}) (*companyOutput, error) {
-	c, err := h.store.GetCompany(ctx)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, huma.Error404NotFound("company not configured")
+	var out Company
+	err := h.db.InReadTx(ctx, func(tx postgres.Tx) error {
+		var err error
+		out, err = load(ctx, tx)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &companyOutput{Body: out}, nil
+}
+
+// update grava e lê de volta na MESMA transação: a resposta é exatamente o
+// que ficou gravado.
+func (h *handler) update(ctx context.Context, in *updateCompanyInput) (*companyOutput, error) {
+	b := in.Body
+	var out Company
+	err := h.db.InTx(ctx, func(tx postgres.Tx) error {
+		err := tx.UpsertCompany(ctx, db.UpsertCompanyParams{
+			Name: b.Name, TradeName: b.TradeName, Document: b.Document, StateRegistration: b.StateRegistration,
+			TaxRegime: b.TaxRegime, Phone: b.Phone, Email: b.Email, PostalCode: b.PostalCode,
+			Street: b.Street, Number: b.Number, Complement: b.Complement, District: b.District, CityID: b.CityID,
+		})
+		if err != nil {
+			return err
+		}
+		out, err = load(ctx, tx)
+		return err
+	})
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		return nil, huma.Error422UnprocessableEntity("validation failed",
+			&huma.ErrorDetail{Location: "body.cityId", Message: "city not found"})
 	}
 	if err != nil {
 		return nil, err
+	}
+	return &companyOutput{Body: out}, nil
+}
+
+// load lê a empresa e converte para o formato da API.
+func load(ctx context.Context, tx postgres.Tx) (Company, error) {
+	c, err := tx.GetCompany(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Company{}, errNotConfigured
+	}
+	if err != nil {
+		return Company{}, err
 	}
 	out := Company{
 		Name: c.Name, TradeName: c.TradeName, Document: c.Document, StateRegistration: c.StateRegistration,
@@ -131,25 +171,7 @@ func (h *handler) get(ctx context.Context, _ *struct{}) (*companyOutput, error) 
 	if c.CityID != nil && c.CityName != nil && c.CityState != nil {
 		out.City = &party.City{ID: *c.CityID, Name: *c.CityName, State: *c.CityState}
 	}
-	return &companyOutput{Body: out}, nil
-}
-
-func (h *handler) update(ctx context.Context, in *updateCompanyInput) (*companyOutput, error) {
-	b := in.Body
-	err := h.store.UpsertCompany(ctx, db.UpsertCompanyParams{
-		Name: b.Name, TradeName: b.TradeName, Document: b.Document, StateRegistration: b.StateRegistration,
-		TaxRegime: b.TaxRegime, Phone: b.Phone, Email: b.Email, PostalCode: b.PostalCode,
-		Street: b.Street, Number: b.Number, Complement: b.Complement, District: b.District, CityID: b.CityID,
-	})
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-		return nil, huma.Error422UnprocessableEntity("validation failed",
-			&huma.ErrorDetail{Location: "body.cityId", Message: "city not found"})
-	}
-	if err != nil {
-		return nil, err
-	}
-	return h.get(ctx, nil)
+	return out, nil
 }
 
 func clean(s *string) *string {

@@ -9,10 +9,10 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/mail"
+	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 )
 
 // ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ type EmailQueue interface {
 
 // Options agrupa as dependências das rotas de autenticação.
 type Options struct {
-	Pool    *pgxpool.Pool
+	DB      postgres.DB
 	Cookies Cookies
 	Emails  EmailQueue
 	// AppURL é o endereço do front, usado nos links dos e-mails.
@@ -76,8 +76,7 @@ type Options struct {
 }
 
 type handler struct {
-	pool    *pgxpool.Pool
-	q       *db.Queries
+	db      postgres.DB
 	cookies Cookies
 	emails  EmailQueue
 	appURL  string
@@ -90,7 +89,7 @@ type handler struct {
 // Não há cadastro público: quem cria usuários é o administrador (pacote user).
 func Register(public, authed huma.API, opts Options) {
 	h := &handler{
-		pool: opts.Pool, q: db.New(opts.Pool), cookies: opts.Cookies,
+		db: opts.DB, cookies: opts.Cookies,
 		emails: opts.Emails, appURL: opts.AppURL,
 	}
 	tags := []string{"Auth"}
@@ -133,31 +132,39 @@ func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutpu
 	// Mesma mensagem para todo tipo de falha: não revelamos se o e-mail existe.
 	invalid := huma.Error401Unauthorized("invalid email or password")
 
-	user, err := h.q.GetUserByEmail(ctx, NormalizeEmail(in.Body.Email))
-	if errors.Is(err, pgx.ErrNoRows) {
-		_, _ = VerifyPassword(dummyHash(), in.Body.Password) // gasta o mesmo tempo
-		return nil, invalid
-	}
-	if err != nil {
-		return nil, err
-	}
+	var (
+		token   string
+		expires time.Time
+		me      Me
+	)
+	err := h.db.InTx(ctx, func(tx postgres.Tx) error {
+		user, err := tx.GetUserByEmail(ctx, NormalizeEmail(in.Body.Email))
+		if errors.Is(err, pgx.ErrNoRows) {
+			_, _ = VerifyPassword(dummyHash(), in.Body.Password) // gasta o mesmo tempo
+			return invalid
+		}
+		if err != nil {
+			return err
+		}
 
-	ok, err := VerifyPassword(user.PasswordHash, in.Body.Password)
-	if err != nil {
-		return nil, err
-	}
-	if !ok || !user.Active {
-		return nil, invalid
-	}
+		ok, err := VerifyPassword(user.PasswordHash, in.Body.Password)
+		if err != nil {
+			return err
+		}
+		if !ok || !user.Active {
+			return invalid
+		}
 
-	token, tokenHash := NewToken()
-	expires := time.Now().Add(SessionTTL)
-	err = h.q.CreateSession(ctx, db.CreateSessionParams{TokenHash: tokenHash, UserID: user.ID, ExpiresAt: expires})
-	if err != nil {
-		return nil, err
-	}
-
-	me, err := h.buildMe(ctx, CurrentUser{ID: user.ID, Name: user.Name, Email: user.Email, Role: user.Role})
+		var tokenHash []byte
+		token, tokenHash = NewToken()
+		expires = time.Now().Add(SessionTTL)
+		err = tx.CreateSession(ctx, db.CreateSessionParams{TokenHash: tokenHash, UserID: user.ID, ExpiresAt: expires})
+		if err != nil {
+			return err
+		}
+		me, err = buildMe(ctx, tx, CurrentUser{ID: user.ID, Name: user.Name, Email: user.Email, Role: user.Role})
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +174,10 @@ func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutpu
 // logout apaga a sessão no banco (se houver) e manda o navegador apagar o cookie.
 func (h *handler) logout(ctx context.Context, _ *struct{}) (*logoutOutput, error) {
 	if s, ok := FromContext(ctx); ok {
-		if err := h.q.DeleteSession(ctx, s.TokenHash); err != nil {
+		err := h.db.InTx(ctx, func(tx postgres.Tx) error {
+			return tx.DeleteSession(ctx, s.TokenHash)
+		})
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -176,16 +186,21 @@ func (h *handler) logout(ctx context.Context, _ *struct{}) (*logoutOutput, error
 
 func (h *handler) me(ctx context.Context, _ *struct{}) (*meOutput, error) {
 	s, _ := FromContext(ctx) // RequireUser garante que existe
-	me, err := h.buildMe(ctx, CurrentUser{ID: s.UserID, Name: s.UserName, Email: s.UserEmail, Role: s.Role})
+	var me Me
+	err := h.db.InReadTx(ctx, func(tx postgres.Tx) error {
+		var err error
+		me, err = buildMe(ctx, tx, CurrentUser{ID: s.UserID, Name: s.UserName, Email: s.UserEmail, Role: s.Role})
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
 	return &meOutput{Body: me}, nil
 }
 
-func (h *handler) buildMe(ctx context.Context, u CurrentUser) (Me, error) {
+func buildMe(ctx context.Context, tx postgres.Tx, u CurrentUser) (Me, error) {
 	me := Me{User: u}
-	c, err := h.q.GetCompany(ctx)
+	c, err := tx.GetCompany(ctx)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows): // empresa ainda não configurada
 	case err != nil:
@@ -219,15 +234,14 @@ type resetPasswordInput struct {
 // forgotPassword responde sempre 202, exista o e-mail ou não. Se a resposta
 // mudasse, qualquer um descobriria quais e-mails têm conta no sistema.
 func (h *handler) forgotPassword(ctx context.Context, in *forgotPasswordInput) (*struct{}, error) {
-	user, err := h.q.GetUserByEmail(ctx, NormalizeEmail(in.Body.Email))
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !user.Active) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	err = pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
+	err := h.db.InTx(ctx, func(tx postgres.Tx) error {
+		user, err := tx.GetUserByEmail(ctx, NormalizeEmail(in.Body.Email))
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && !user.Active) {
+			return nil // e-mail desconhecido: não faz nada, e responde igual
+		}
+		if err != nil {
+			return err
+		}
 		return SendPasswordLink(ctx, tx, h.emails, h.appURL, user, PasswordLinkReset)
 	})
 	return nil, err
@@ -242,8 +256,7 @@ func (h *handler) resetPassword(ctx context.Context, in *resetPasswordInput) (*s
 		return nil, err
 	}
 
-	err = pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
-		q := h.q.WithTx(tx)
+	err = h.db.InTx(ctx, func(q postgres.Tx) error {
 		userID, err := q.ConsumePasswordResetToken(ctx, HashToken(strings.TrimSpace(in.Body.Token)))
 		if err != nil {
 			return err
@@ -277,14 +290,14 @@ const (
 // SendPasswordLink cria um token de uso único e coloca na fila o e-mail com o
 // link para criar ou redefinir a senha, tudo dentro da transação tx.
 // Usado aqui ("esqueci a senha") e pelo cadastro de usuários (convite).
-func SendPasswordLink(ctx context.Context, tx pgx.Tx, emails EmailQueue, appURL string, user db.User, kind PasswordLinkKind) error {
+func SendPasswordLink(ctx context.Context, tx postgres.Tx, emails EmailQueue, appURL string, user db.User, kind PasswordLinkKind) error {
 	ttl, template, query := PasswordResetTTL, "password_reset", ""
 	if kind == PasswordLinkInvite {
 		ttl, template, query = 72*time.Hour, "invite", "&invite=1"
 	}
 
 	token, tokenHash := NewToken()
-	err := db.New(tx).CreatePasswordResetToken(ctx, db.CreatePasswordResetTokenParams{
+	err := tx.CreatePasswordResetToken(ctx, db.CreatePasswordResetTokenParams{
 		TokenHash: tokenHash, UserID: user.ID, ExpiresAt: time.Now().Add(ttl),
 	})
 	if err != nil {
@@ -300,7 +313,7 @@ func SendPasswordLink(ctx context.Context, tx pgx.Tx, emails EmailQueue, appURL 
 	if err != nil {
 		return err
 	}
-	return emails.EnqueueEmail(ctx, tx, msg)
+	return emails.EnqueueEmail(ctx, tx.Raw, msg)
 }
 
 // NormalizeEmail tira espaços e deixa em minúsculas (como o banco exige).

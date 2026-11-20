@@ -9,7 +9,7 @@ na ordem abaixo; os comentários no código explicam cada conceito.
 |---|---|---|
 | 1 | `cmd/api/main.go` | `package main`, `func main`, tratamento de erro com `if err != nil`, `defer`, goroutines, channels, `select`, graceful shutdown |
 | 2 | `internal/config/config.go` | structs, exportado vs. privado (maiúscula/minúscula), variáveis de ambiente |
-| 3 | `internal/postgres/postgres.go` | `context.Context`, pool de conexões, `//go:embed`, erros com `%w` |
+| 3 | `internal/postgres/postgres.go`, `tx.go` | `context.Context`, pool de conexões, `//go:embed`, erros com `%w`, **transações** (a regra do projeto) |
 | 4 | `internal/postgres/migrations/*.sql` | migrations com goose (`-- +goose Up/Down`), `CHECK`, índices parciais |
 | 5 | `internal/db/queries/*.sql` | SQL que o sqlc transforma em Go |
 | 6 | `internal/db/*.go` | código **gerado** — leia, mas nunca edite à mão |
@@ -102,6 +102,31 @@ O seed é idempotente: rodar de novo só redefine a senha e garante que o
 usuário é admin ativo. Os dados completos da empresa (CNPJ, IE, endereço) são
 preenchidos na tela *Administração → Dados da empresa*.
 
+## Regra: transação para tudo
+
+**Todo acesso ao banco acontece dentro de uma transação**, inclusive leituras.
+
+```go
+// gravação (READ COMMITTED): tudo ou nada
+err := h.db.InTx(ctx, func(tx postgres.Tx) error {
+    user, err := tx.CreateUser(ctx, ...)            // queries do sqlc
+    ...
+    return emails.EnqueueEmail(ctx, tx.Raw, msg)    // a fila entra junto
+})
+
+// leitura (REPEATABLE READ, só leitura): todas as consultas veem o mesmo instante
+err := h.db.InReadTx(ctx, func(tx postgres.Tx) error { ... })
+```
+
+- Os pacotes de negócio recebem um `postgres.DB`, nunca o pool nem as queries
+  soltas: sem transação, não há como chegar no banco.
+- Devolver erro dentro da função = `ROLLBACK` de tudo; devolver `nil` = `COMMIT`.
+- Disputa pela mesma linha (estoque, número da nota): `SELECT ... FOR UPDATE`
+  na query, dentro do `InTx`.
+- O teste `internal/postgres/rules_test.go` lê o código e reprova quem abrir
+  transação por conta própria (`pgx.BeginFunc`, `.Begin`), criar queries
+  soltas (`db.New`) ou receber o `pgxpool` num pacote de negócio.
+
 ## Dinheiro, quantidade e percentual
 
 **Nunca `float64` para valores.** Em float, `0.1 + 0.2` dá `0.30000000000000004`;
@@ -163,7 +188,7 @@ Regras do projeto:
 ```
 HTTP → chi (request id, log, recover, CORS, LoadSession: cookie → sessão no context)
      → Huma (grupo: Require* barra quem não pode → valida tags → Resolve())
-     → handler (supplier.go) → transação (pgx.BeginFunc) → sqlc → PostgreSQL
+     → handler (supplier.go) → DB.InTx / DB.InReadTx (transação) → sqlc → PostgreSQL
      ← Huma serializa a resposta (ou o erro no formato RFC 9457)
 ```
 
@@ -191,7 +216,8 @@ make help
    (veja `suppliers` na migration `00002` como modelo).
 2. Queries em `internal/db/queries/customers.sql`.
 3. `make sqlc`.
-4. `internal/customer/customer.go` seguindo o modelo de `supplier` (`Store` + `TxFunc`).
+4. `internal/customer/customer.go` recebendo um `postgres.DB` e acessando o banco só por `InTx`/`InReadTx`
+   (ou, como `supplier`, um `Store` + `TxFunc` quando quiser testar com banco falso).
 5. Registre no grupo certo em `internal/server/server.go` (`authed`, ou um
    grupo com `auth.RequireRole(...)` se só alguns papéis podem usar).
 6. Testes em `internal/customer/customer_test.go` e um caso no teste de integração.

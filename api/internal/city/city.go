@@ -11,12 +11,8 @@ import (
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/party"
+	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 )
-
-// Store é o que a rota precisa do banco (*db.Queries satisfaz).
-type Store interface {
-	SearchCities(ctx context.Context, arg db.SearchCitiesParams) ([]db.City, error)
-}
 
 type searchInput struct {
 	Search string `query:"search" minLength:"2" maxLength:"60" required:"true" doc:"Part of the city name (accent-insensitive)"`
@@ -30,7 +26,7 @@ type searchOutput struct {
 
 // Register adiciona a rota. Municípios são dados públicos, mas a rota fica no
 // grupo de usuários logados para não virar uma API aberta na internet.
-func Register(api huma.API, store Store) {
+func Register(api huma.API, database postgres.DB) {
 	huma.Register(api, huma.Operation{
 		OperationID: "search-cities",
 		Method:      http.MethodGet,
@@ -43,8 +39,13 @@ func Register(api huma.API, store Store) {
 			s := strings.ToUpper(in.State)
 			state = &s
 		}
-		rows, err := store.SearchCities(ctx, db.SearchCitiesParams{
-			Search: strings.TrimSpace(in.Search), State: state, LimitRows: in.Limit,
+		var rows []db.City
+		err := database.InReadTx(ctx, func(tx postgres.Tx) error {
+			var err error
+			rows, err = tx.SearchCities(ctx, db.SearchCitiesParams{
+				Search: strings.TrimSpace(in.Search), State: state, LimitRows: in.Limit,
+			})
+			return err
 		})
 		if err != nil {
 			return nil, err

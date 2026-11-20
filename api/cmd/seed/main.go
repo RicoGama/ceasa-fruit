@@ -72,8 +72,7 @@ func run(email, name, companyName, password string) error {
 	}
 
 	created := false
-	err = pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
-		q := db.New(tx)
+	err = postgres.NewDB(pool).InTx(ctx, func(q postgres.Tx) error {
 
 		if err := q.EnsureCompany(ctx, companyName); err != nil {
 			return err
