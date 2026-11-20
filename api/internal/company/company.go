@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/document"
 	"github.com/RicoGama/ceasa-fruit/api/internal/party"
@@ -97,21 +98,21 @@ type handler struct{ db postgres.DB }
 // errNotConfigured: a empresa ainda não foi criada (make seed).
 var errNotConfigured = huma.Error404NotFound("company not configured")
 
-// Register adiciona as rotas: leitura para qualquer usuário logado, alteração
-// só para o administrador.
-func Register(authed, admin huma.API, database postgres.DB) {
+// Register adiciona as rotas: qualquer usuário logado vê os dados da empresa;
+// alterar exige a permissão company.edit.
+func Register(api huma.API, database postgres.DB) {
 	h := &handler{db: database}
 	tags := []string{"Company"}
 
-	huma.Register(authed, huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "get-company", Method: http.MethodGet, Path: "/company",
 		Summary: "Company of this installation", Tags: tags,
 	}, h.get)
 
-	huma.Register(admin, huma.Operation{
+	huma.Register(api, auth.Protect(api, huma.Operation{
 		OperationID: "update-company", Method: http.MethodPut, Path: "/company",
 		Summary: "Update the company profile", Tags: tags,
-	}, h.update)
+	}, auth.CompanyEdit), h.update)
 }
 
 func (h *handler) get(ctx context.Context, _ *struct{}) (*companyOutput, error) {

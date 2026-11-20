@@ -27,7 +27,7 @@ func TestConcurrentLastAdmin(t *testing.T) {
 		createAdmin(t, env.pool, "a@test.com", "senha-do-a-123")
 		hash, _ := auth.HashPassword("senha-do-b-123")
 		if _, err := db.New(env.pool).CreateUser(ctx, db.CreateUserParams{
-			Name: "Admin B", Email: "b@test.com", PasswordHash: hash, Role: auth.RoleAdmin,
+			Name: "Admin B", Email: "b@test.com", PasswordHash: hash, RoleID: roleID(t, env.pool, auth.RoleKeyAdmin),
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -56,7 +56,7 @@ func TestConcurrentLastAdmin(t *testing.T) {
 			defer wg.Done()
 			<-start
 			statuses[i] = c.do("PUT", fmt.Sprintf("/users/%d", target.User.ID),
-				map[string]any{"name": name, "role": "manager", "active": true, "version": version[target.User.ID]}, nil)
+				map[string]any{"name": name, "roleId": roleID(t, env.pool, "manager"), "active": true, "version": version[target.User.ID]}, nil)
 		}
 		wg.Add(2)
 		go demote(0, a, meB, "Admin B")

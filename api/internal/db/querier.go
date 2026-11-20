@@ -9,6 +9,7 @@ import (
 )
 
 type Querier interface {
+	AddRolePermissions(ctx context.Context, arg AddRolePermissionsParams) error
 	// Soma 1 na versão sem conferir (ações que não vêm de um formulário, como
 	// inativar): quem estiver com a tela aberta recebe 409 ao salvar.
 	BumpPartyVersion(ctx context.Context, id int64) error
@@ -30,6 +31,7 @@ type Querier interface {
 	// Cadastro de produtos e suas embalagens.
 	CreateProduct(ctx context.Context, arg CreateProductParams) (int64, error)
 	CreateProductPackaging(ctx context.Context, arg CreateProductPackagingParams) error
+	CreateRole(ctx context.Context, arg CreateRoleParams) (int64, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	CreateSupplier(ctx context.Context, arg CreateSupplierParams) error
 	// Queries de autenticação e senha.
@@ -41,6 +43,9 @@ type Querier interface {
 	DeletePartyContacts(ctx context.Context, partyID int64) error
 	// Apaga as embalagens que saíram da lista (as que ficaram vêm em keep_ids).
 	DeleteProductPackagingsExcept(ctx context.Context, arg DeleteProductPackagingsExceptParams) error
+	// Só apaga papel sem nenhum usuário (nem desativado) e que não seja o admin.
+	DeleteRole(ctx context.Context, id int64) (int64, error)
+	DeleteRolePermissions(ctx context.Context, roleID int64) error
 	DeleteSession(ctx context.Context, tokenHash []byte) error
 	// Encerra todas as sessões do usuário (ex.: troca de senha, usuário desativado).
 	DeleteUserSessions(ctx context.Context, userID int64) error
@@ -49,20 +54,26 @@ type Querier interface {
 	// Empresa desta instalação (um registro só, id = 1).
 	GetCompany(ctx context.Context) (GetCompanyRow, error)
 	GetProduct(ctx context.Context, id int64) (Product, error)
-	// Carrega o que uma requisição autenticada precisa numa consulta só.
+	GetRole(ctx context.Context, id int64) (GetRoleRow, error)
+	GetRoleIDByKey(ctx context.Context, key *string) (int64, error)
+	// Carrega o que uma requisição autenticada precisa numa consulta só,
+	// inclusive as permissões do papel: mudar um papel vale na próxima requisição.
 	GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error)
 	// sqlc.embed devolve as colunas de cada tabela agrupadas (row.Party, row.Supplier).
 	GetSupplier(ctx context.Context, id int64) (GetSupplierRow, error)
 	GetUser(ctx context.Context, id int64) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
+	GetUserWithRole(ctx context.Context, id int64) (GetUserWithRoleRow, error)
 	// Depois de redefinir, os outros links pendentes deixam de valer.
 	InvalidatePasswordResetTokens(ctx context.Context, userID int64) error
 	ListPartyContacts(ctx context.Context, partyID int64) ([]PartyContact, error)
 	ListProductPackagings(ctx context.Context, productID int64) ([]ProductPackaging, error)
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
+	// Papéis de acesso e suas permissões (ver migration 00006).
+	ListRoles(ctx context.Context) ([]ListRolesRow, error)
 	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]ListSuppliersRow, error)
 	// Gestão de usuários (tela do administrador).
-	ListUsers(ctx context.Context) ([]User, error)
+	ListUsers(ctx context.Context) ([]ListUsersRow, error)
 	// Trava as linhas dos administradores ativos até o fim da transação.
 	// Quem chegar depois ESPERA, e só então enxerga o que mudou. Ordenado por id
 	// para todas as transações travarem na mesma ordem (evita deadlock).
@@ -76,6 +87,8 @@ type Querier interface {
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (int64, error)
 	UpdateProductPackaging(ctx context.Context, arg UpdateProductPackagingParams) (int64, error)
+	// Papel do sistema (key = 'admin') nunca é alterado por aqui.
+	UpdateRole(ctx context.Context, arg UpdateRoleParams) (int64, error)
 	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (int64, error)
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)

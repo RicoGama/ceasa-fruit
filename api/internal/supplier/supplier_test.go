@@ -9,10 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/money"
 )
@@ -196,6 +198,13 @@ type testEnv struct {
 func newTestEnv(t *testing.T) *testEnv {
 	_, api := humatest.New(t)
 	env := &testEnv{api: api, store: newFakeStore()}
+
+	// As rotas exigem permissão: aqui todo pedido entra como administrador.
+	adminKey := auth.RoleKeyAdmin
+	api.UseMiddleware(func(ctx huma.Context, next func(huma.Context)) {
+		s := &auth.Session{UserID: 1, RoleKey: &adminKey, RoleName: "Administrador"}
+		next(huma.WithContext(ctx, auth.WithSession(ctx.Context(), s)))
+	})
 
 	// TxFunc falso: sem transação, só entrega o store em memória.
 	tx := func(_ context.Context, fn func(Store) error) error { return fn(env.store) }

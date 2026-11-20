@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/money"
 	"github.com/RicoGama/ceasa-fruit/api/internal/party"
@@ -200,32 +201,32 @@ func Register(api huma.API, tx TxFunc) {
 	h := &handler{tx: tx}
 	tags := []string{"Suppliers"}
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, auth.Protect(api, huma.Operation{
 		OperationID: "list-suppliers", Method: http.MethodGet, Path: "/suppliers",
 		Summary: "List suppliers", Tags: tags,
-	}, h.list)
+	}, auth.SuppliersView), h.list)
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, auth.Protect(api, huma.Operation{
 		OperationID: "get-supplier", Method: http.MethodGet, Path: "/suppliers/{id}",
 		Summary: "Get a supplier", Tags: tags,
-	}, h.get)
+	}, auth.SuppliersView), h.get)
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, auth.Protect(api, huma.Operation{
 		OperationID: "create-supplier", Method: http.MethodPost, Path: "/suppliers",
 		Summary: "Create a supplier", Tags: tags, DefaultStatus: http.StatusCreated,
-	}, h.create)
+	}, auth.SuppliersEdit), h.create)
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, auth.Protect(api, huma.Operation{
 		OperationID: "update-supplier", Method: http.MethodPut, Path: "/suppliers/{id}",
 		Summary: "Update a supplier", Tags: tags,
-	}, h.update)
+	}, auth.SuppliersEdit), h.update)
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, auth.Protect(api, huma.Operation{
 		OperationID: "deactivate-supplier", Method: http.MethodDelete, Path: "/suppliers/{id}",
 		Summary:     "Deactivate a supplier",
 		Description: "Soft delete: the supplier is marked inactive, never removed, to preserve history.",
 		Tags:        tags, DefaultStatus: http.StatusNoContent,
-	}, h.deactivate)
+	}, auth.SuppliersEdit), h.deactivate)
 }
 
 // list é um *método* de handler: (h *handler) é o receiver, parecido com o "this".

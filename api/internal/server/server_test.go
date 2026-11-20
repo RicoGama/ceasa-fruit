@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -107,5 +108,48 @@ func TestClientIPCannotBeSpoofed(t *testing.T) {
 				t.Errorf("log = %s, want it to contain %s", logs.String(), c.want)
 			}
 		})
+	}
+}
+
+// TestEveryRouteHasPermission garante que nenhuma rota de negócio fica sem
+// permissão: toda rota que exige login precisa ter x-permissions no OpenAPI
+// (anotado por auth.Protect), a não ser as poucas que valem para qualquer
+// usuário logado, listadas aqui de propósito.
+func TestEveryRouteHasPermission(t *testing.T) {
+	anyLoggedUser := map[string]bool{
+		"get-me":        true, // quem sou eu
+		"search-cities": true, // lista pública do IBGE, usada em vários formulários
+		"get-company":   true, // nome da empresa no menu e nos documentos
+	}
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	rec := httptest.NewRecorder()
+	New(Deps{Logger: logger}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/openapi.json", nil))
+
+	var spec struct {
+		Paths map[string]map[string]struct {
+			OperationID string           `json:"operationId"`
+			Security    []map[string]any `json:"security"`
+			Permissions []string         `json:"x-permissions"`
+		} `json:"paths"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &spec); err != nil {
+		t.Fatal(err)
+	}
+	checked := 0
+	for path, ops := range spec.Paths {
+		for method, op := range ops {
+			if len(op.Security) == 0 || anyLoggedUser[op.OperationID] {
+				continue // rota pública (login, senha) ou liberada de propósito
+			}
+			checked++
+			if len(op.Permissions) == 0 {
+				t.Errorf("%s %s (%s) requires login but declares no permission; wrap it with auth.Protect",
+					strings.ToUpper(method), path, op.OperationID)
+			}
+		}
+	}
+	if checked < 15 {
+		t.Fatalf("only %d protected operations found; is the spec being read?", checked)
 	}
 }

@@ -49,6 +49,7 @@ não existe "organização" nas tabelas: o banco inteiro é de uma empresa só.
 |---|---|---|
 | Empresa | `company` | a dona do servidor; uma linha só (`id = 1`, garantido por `CHECK`) |
 | Usuário | `users` | quem faz login, com **um papel** e ativo/desativado |
+| Papel | `roles`, `role_permissions` | conjunto de permissões, editável pela tela |
 | Sessão | `sessions` | login ativo (só o hash do token) |
 | Pessoa (física/jurídica) | `parties` | dados comuns: documento, nomes, endereço, PIX/banco |
 | Contatos da pessoa | `party_contacts` | dono, gerente, motorista... |
@@ -58,30 +59,43 @@ não existe "organização" nas tabelas: o banco inteiro é de uma empresa só.
 | Cliente | `customers` | *(próximo passo: outro papel da mesma pessoa)* |
 | Municípios/UFs | `cities`, `states` | lista oficial do IBGE |
 
-### Papéis
+### Papéis e permissões
 
-| Papel | Código | Para quem |
-|---|---|---|
-| Administrador | `admin` | acesso total; único que gerencia usuários e dados da empresa |
-| Gerente | `manager` | acompanha a operação, preços e relatórios |
-| Vendedor | `seller` | atende clientes e lança pedidos |
-| Conferente | `checker` | confere entrada e saída de mercadoria |
-| Financeiro | `finance` | boletos, cheques, contas a pagar e receber |
-| Motorista | `driver` | vê as entregas da sua rota |
+- **Permissões ficam no código** (`internal/auth/permissions.go`): uma permissão
+  só tem efeito se alguma rota a conferir. O catálogo hoje:
 
-Nas rotas, `auth.RequireRole(api, auth.RoleFinance, ...)` libera só os papéis
-listados; o **admin sempre passa**. Por enquanto, fora as telas de
-administração, todos os papéis podem tudo; as permissões finas entram com cada
-módulo (ex.: motorista só consulta).
+  | Permissão | O que libera |
+  |---|---|
+  | `suppliers.view` / `suppliers.edit` | ver / cadastrar, editar e inativar fornecedores |
+  | `products.view` / `products.edit` | ver / cadastrar, editar e inativar produtos |
+  | `users.manage` | usuários, papéis e permissões |
+  | `company.edit` | alterar os dados da empresa |
+  | `queues.view` | painel da fila de tarefas (River UI) |
 
-### Grupos de rotas (`server.go`)
+- **Papéis ficam no banco** (`roles`, `role_permissions`) e o administrador cria
+  e edita pela tela *Administração → Papéis e permissões*. Cada usuário tem
+  **um** papel (`users.role_id`). Os seis papéis iniciais (Administrador,
+  Gerente, Vendedor, Conferente, Financeiro, Motorista) vêm da migration `00006`.
+- O **Administrador** (`key = 'admin'`) é do sistema: tem todas as permissões,
+  não pode ser alterado nem excluído, e o sistema não deixa ficar sem nenhum ativo.
+- Permissões são lidas **junto com a sessão, a cada requisição**: mudar um papel
+  vale na hora para todos os usuários dele.
+- `edit` implica `view` (quem edita fornecedores também os vê): `auth.Implies`.
 
-| Grupo | Exige | Rotas |
-|---|---|---|
-| `public` | nada | `POST /auth/login`, `POST /auth/logout`, `POST /auth/password/forgot`, `POST /auth/password/reset` |
-| `authed` | login | `GET /auth/me`, `GET /company`, `/cities`, `/suppliers/...`, `GET /products...` |
-| `managers` | papel `manager` (e `admin`) | `POST/PUT/DELETE /products` |
-| `adminOnly` | papel `admin` | `/users/...`, `PUT /company` |
+Na rota:
+
+```go
+huma.Register(api, auth.Protect(api, huma.Operation{...}, auth.ProductsEdit), h.update)
+```
+
+`Protect` barra quem não tem (403) e anota `x-permissions` no OpenAPI. O teste
+`TestEveryRouteHasPermission` reprova qualquer rota que exige login sem
+declarar permissão (fora as poucas liberadas para todo usuário logado:
+`/auth/me`, `/cities`, `GET /company`).
+
+**Permissão nova:** constante + `All` em `permissions.go`, `auth.Protect` na
+rota, e o texto em português em `web/app/utils/permissions.ts` (o TypeScript
+não compila enquanto faltar).
 
 ### Login
 
@@ -258,8 +272,8 @@ make help
 3. `make sqlc`.
 4. `internal/customer/customer.go` recebendo um `postgres.DB` e acessando o banco só por `InTx`/`InReadTx`
    (ou, como `supplier`, um `Store` + `TxFunc` quando quiser testar com banco falso).
-5. Registre no grupo certo em `internal/server/server.go` (`authed`, ou um
-   grupo com `auth.RequireRole(...)` se só alguns papéis podem usar).
+5. Crie as permissões do módulo (`internal/auth/permissions.go`), proteja cada
+   rota com `auth.Protect` e registre no grupo `authed` em `internal/server/server.go`.
 6. Testes em `internal/customer/customer_test.go` e um caso no teste de integração.
 
 ## Decisões

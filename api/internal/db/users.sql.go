@@ -10,8 +10,9 @@ import (
 )
 
 const countActiveAdmins = `-- name: CountActiveAdmins :one
-SELECT count(*) FROM users
-WHERE role = 'admin' AND active
+SELECT count(*) FROM users u
+JOIN roles r ON r.id = u.role_id
+WHERE r.key = 'admin' AND u.active
 `
 
 // Usada para impedir que o sistema fique sem nenhum administrador ativo.
@@ -23,7 +24,7 @@ func (q *Queries) CountActiveAdmins(ctx context.Context) (int64, error) {
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, name, email, password_hash, role, active, created_at, updated_at, version FROM users
+SELECT id, name, email, password_hash, active, created_at, updated_at, version, role_id FROM users
 WHERE id = $1
 `
 
@@ -35,41 +36,81 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.Name,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.RoleID,
+	)
+	return i, err
+}
+
+const getUserWithRole = `-- name: GetUserWithRole :one
+SELECT u.id, u.name, u.email, u.password_hash, u.active, u.created_at, u.updated_at, u.version, u.role_id, r.name AS role_name, r.key AS role_key
+FROM users u
+JOIN roles r ON r.id = u.role_id
+WHERE u.id = $1
+`
+
+type GetUserWithRoleRow struct {
+	User     User
+	RoleName string
+	RoleKey  *string
+}
+
+func (q *Queries) GetUserWithRole(ctx context.Context, id int64) (GetUserWithRoleRow, error) {
+	row := q.db.QueryRow(ctx, getUserWithRole, id)
+	var i GetUserWithRoleRow
+	err := row.Scan(
+		&i.User.ID,
+		&i.User.Name,
+		&i.User.Email,
+		&i.User.PasswordHash,
+		&i.User.Active,
+		&i.User.CreatedAt,
+		&i.User.UpdatedAt,
+		&i.User.Version,
+		&i.User.RoleID,
+		&i.RoleName,
+		&i.RoleKey,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
 
-SELECT id, name, email, password_hash, role, active, created_at, updated_at, version FROM users
-ORDER BY active DESC, lower(name), id
+SELECT u.id, u.name, u.email, u.password_hash, u.active, u.created_at, u.updated_at, u.version, u.role_id, r.name AS role_name
+FROM users u
+JOIN roles r ON r.id = u.role_id
+ORDER BY u.active DESC, lower(u.name), u.id
 `
 
+type ListUsersRow struct {
+	User     User
+	RoleName string
+}
+
 // Gestão de usuários (tela do administrador).
-func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
+func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 	rows, err := q.db.Query(ctx, listUsers)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	var items []ListUsersRow
 	for rows.Next() {
-		var i User
+		var i ListUsersRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Email,
-			&i.PasswordHash,
-			&i.Role,
-			&i.Active,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Version,
+			&i.User.ID,
+			&i.User.Name,
+			&i.User.Email,
+			&i.User.PasswordHash,
+			&i.User.Active,
+			&i.User.CreatedAt,
+			&i.User.UpdatedAt,
+			&i.User.Version,
+			&i.User.RoleID,
+			&i.RoleName,
 		); err != nil {
 			return nil, err
 		}
@@ -82,10 +123,11 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 }
 
 const lockActiveAdmins = `-- name: LockActiveAdmins :many
-SELECT id FROM users
-WHERE role = 'admin' AND active
-ORDER BY id
-FOR UPDATE
+SELECT u.id FROM users u
+JOIN roles r ON r.id = u.role_id
+WHERE r.key = 'admin' AND u.active
+ORDER BY u.id
+FOR UPDATE OF u
 `
 
 // Trava as linhas dos administradores ativos até o fim da transação.
@@ -113,15 +155,15 @@ func (q *Queries) LockActiveAdmins(ctx context.Context) ([]int64, error) {
 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
-SET name = $1, role = $2, active = $3,
+SET name = $1, role_id = $2, active = $3,
     version = version + 1, updated_at = now()
 WHERE id = $4 AND version = $5
-RETURNING id, name, email, password_hash, role, active, created_at, updated_at, version
+RETURNING id, name, email, password_hash, active, created_at, updated_at, version, role_id
 `
 
 type UpdateUserParams struct {
 	Name    string
-	Role    string
+	RoleID  int64
 	Active  bool
 	ID      int64
 	Version int32
@@ -131,7 +173,7 @@ type UpdateUserParams struct {
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, updateUser,
 		arg.Name,
-		arg.Role,
+		arg.RoleID,
 		arg.Active,
 		arg.ID,
 		arg.Version,
@@ -142,11 +184,11 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Name,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.RoleID,
 	)
 	return i, err
 }

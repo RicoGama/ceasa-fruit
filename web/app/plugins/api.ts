@@ -17,6 +17,12 @@ export default defineNuxtPlugin((nuxtApp) => {
       const isAuthCall = new URL(request.url).pathname.startsWith('/api/auth/')
       if (isAuthCall) return
 
+      // 403: as permissões da pessoa mudaram (o admin mexeu no papel dela).
+      // Relê o "quem sou eu" para os menus e botões refletirem na hora.
+      if (response.status === 403) {
+        nuxtApp.runWithContext(() => useAuthStore().fetchMe())
+      }
+
       if (response.status === 401) {
         nuxtApp.runWithContext(() => {
           useAuthStore().reset()

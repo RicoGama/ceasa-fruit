@@ -16,6 +16,7 @@ const registries: Crumb = { label: 'Cadastros' }
 const admin: Crumb = { label: 'Administração' }
 const suppliers: Crumb = { label: 'Fornecedores', to: '/app/suppliers' }
 const products: Crumb = { label: 'Produtos', to: '/app/products' }
+const roles: Crumb = { label: 'Papéis e permissões', to: '/app/settings/roles' }
 
 const rules: [RegExp, Crumb[]][] = [
   [/^\/app\/?$/, [{ ...home, label: 'Visão geral' }]],
@@ -27,6 +28,9 @@ const rules: [RegExp, Crumb[]][] = [
   [/^\/app\/products\/[^/]+$/, [home, registries, products, { label: 'Produto' }]],
   [/^\/app\/settings\/users$/, [home, admin, { label: 'Usuários' }]],
   [/^\/app\/settings\/company$/, [home, admin, { label: 'Dados da empresa' }]],
+  [/^\/app\/settings\/roles\/?$/, [home, admin, { label: 'Papéis e permissões' }]],
+  [/^\/app\/settings\/roles\/new$/, [home, admin, roles, { label: 'Novo papel' }]],
+  [/^\/app\/settings\/roles\/[^/]+$/, [home, admin, roles, { label: 'Papel' }]],
 ]
 
 // breadcrumbTrail('/app/suppliers/42', 'Sítio do Zé')

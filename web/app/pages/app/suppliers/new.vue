@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'dashboard' })
+definePageMeta({ layout: 'dashboard', permission: 'suppliers.edit' })
 useHead({ title: 'Novo fornecedor · CEASA Fruit' })
 </script>
 

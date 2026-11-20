@@ -2,7 +2,7 @@
 // Decide quem pode ver o quê:
 //   /login, /forgot-password, /reset-password -> só para quem NÃO está logado
 //   /app/**                                    -> exige login
-//   /app/settings/**                           -> exige papel admin
+//   páginas com definePageMeta({ permission }) -> exigem a permissão
 export default defineNuxtRouteMiddleware(async (to) => {
   const guestPages = ['/login', '/forgot-password', '/reset-password']
   const isGuestPage = guestPages.includes(to.path)
@@ -20,7 +20,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo({ path: '/login', query: { redirect: to.fullPath } })
   }
 
-  if (to.path.startsWith('/app/settings') && !auth.isAdmin) {
+  if (to.meta.permission && !auth.can(to.meta.permission)) {
     return navigateTo('/app')
   }
 })

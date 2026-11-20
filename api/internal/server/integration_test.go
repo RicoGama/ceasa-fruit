@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -172,8 +173,13 @@ func (c *client) expect(want int, method, path string, body any, out any) {
 
 type me struct {
 	User struct {
-		ID   int64  `json:"id"`
-		Role string `json:"role"`
+		ID   int64 `json:"id"`
+		Role struct {
+			ID      int64  `json:"id"`
+			Name    string `json:"name"`
+			IsAdmin bool   `json:"isAdmin"`
+		} `json:"role"`
+		Permissions []string `json:"permissions"`
 	} `json:"user"`
 	Company *struct {
 		Name string `json:"name"`
@@ -195,6 +201,16 @@ func resetDatabase(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
+// roleID busca o id de um dos papéis que vêm com o sistema (migration 00006).
+func roleID(t *testing.T, pool *pgxpool.Pool, key string) int64 {
+	t.Helper()
+	id, err := db.New(pool).GetRoleIDByKey(context.Background(), &key)
+	if err != nil {
+		t.Fatalf("role %s: %v", key, err)
+	}
+	return id
+}
+
 // createAdmin faz o mesmo que o `make seed`: empresa + primeiro admin.
 func createAdmin(t *testing.T, pool *pgxpool.Pool, email, password string) {
 	t.Helper()
@@ -208,7 +224,7 @@ func createAdmin(t *testing.T, pool *pgxpool.Pool, email, password string) {
 		t.Fatal(err)
 	}
 	if _, err := q.CreateUser(ctx, db.CreateUserParams{
-		Name: "Admin", Email: email, PasswordHash: hash, Role: auth.RoleAdmin,
+		Name: "Admin", Email: email, PasswordHash: hash, RoleID: roleID(t, pool, auth.RoleKeyAdmin),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -221,6 +237,9 @@ func TestIntegrationUsersAndRoles(t *testing.T) {
 	env := setupIntegrationEnv(t)
 	resetDatabase(t, env.pool)
 	createAdmin(t, env.pool, "admin@test.com", "admin-password")
+	adminRole := roleID(t, env.pool, auth.RoleKeyAdmin)
+	managerRole := roleID(t, env.pool, "manager")
+	sellerRole := roleID(t, env.pool, "seller")
 
 	// --- Sem login: 401 ---------------------------------------------------------
 	anon := newClient(t, env.srv.URL)
@@ -234,7 +253,7 @@ func TestIntegrationUsersAndRoles(t *testing.T) {
 	var adminMe me
 	admin.expect(http.StatusOK, "POST", "/auth/login",
 		map[string]any{"email": "ADMIN@test.com", "password": "admin-password"}, &adminMe)
-	if adminMe.User.Role != "admin" || adminMe.Company == nil || adminMe.Company.Name != "Irmãos Faisão Frutícola" {
+	if !adminMe.User.Role.IsAdmin || len(adminMe.User.Permissions) == 0 || adminMe.Company == nil || adminMe.Company.Name != "Irmãos Faisão Frutícola" {
 		t.Fatalf("me after login: %+v", adminMe)
 	}
 
@@ -265,9 +284,9 @@ func TestIntegrationUsersAndRoles(t *testing.T) {
 	// --- Criar vendedor sem senha: vai convite por e-mail -----------------------
 	var seller idResp
 	admin.expect(http.StatusCreated, "POST", "/users",
-		map[string]any{"name": "Vendedor", "email": "Vendedor@Test.com", "role": "seller"}, &seller)
+		map[string]any{"name": "Vendedor", "email": "Vendedor@Test.com", "roleId": sellerRole}, &seller)
 	admin.expect(http.StatusConflict, "POST", "/users",
-		map[string]any{"name": "Outro", "email": "vendedor@test.com", "role": "seller"}, nil)
+		map[string]any{"name": "Outro", "email": "vendedor@test.com", "roleId": sellerRole}, nil)
 
 	invite := env.mailer.waitFor(t, "vendedor@test.com", "Seu acesso")
 	m := tokenInLink.FindStringSubmatch(invite.Text)
@@ -281,8 +300,9 @@ func TestIntegrationUsersAndRoles(t *testing.T) {
 	var sellerMe me
 	sellerClient.expect(http.StatusOK, "POST", "/auth/login",
 		map[string]any{"email": "vendedor@test.com", "password": "senha-do-vendedor"}, &sellerMe)
-	if sellerMe.User.Role != "seller" {
-		t.Fatalf("seller role = %q", sellerMe.User.Role)
+	if sellerMe.User.Role.Name != "Vendedor" || sellerMe.User.Role.IsAdmin ||
+		!slices.Equal(sellerMe.User.Permissions, []string{"products.view", "suppliers.view"}) {
+		t.Fatalf("seller me: %+v", sellerMe.User)
 	}
 
 	// --- Papéis: vendedor não mexe em usuários nem na empresa ------------------
@@ -290,18 +310,20 @@ func TestIntegrationUsersAndRoles(t *testing.T) {
 	sellerClient.expect(http.StatusForbidden, "PUT", "/company", map[string]any{"name": "Hack", "version": 2}, nil)
 	sellerClient.expect(http.StatusOK, "GET", "/company", nil, nil)
 	sellerClient.expect(http.StatusOK, "GET", "/suppliers", nil, nil)
+	// Vendedor só VÊ fornecedores (papel padrão): cadastrar é proibido.
+	sellerClient.expect(http.StatusForbidden, "POST", "/suppliers", map[string]any{"personType": "company", "legalName": "X"}, nil)
 
 	// --- Proteções do admin ------------------------------------------------------
 	admin.expect(http.StatusConflict, "PUT", fmt.Sprintf("/users/%d", adminMe.User.ID),
-		map[string]any{"name": "Admin", "role": "admin", "active": false, "version": 1}, nil)
+		map[string]any{"name": "Admin", "roleId": adminRole, "active": false, "version": 1}, nil)
 	admin.expect(http.StatusConflict, "PUT", fmt.Sprintf("/users/%d", adminMe.User.ID),
-		map[string]any{"name": "Admin", "role": "manager", "active": true, "version": 1}, nil)
+		map[string]any{"name": "Admin", "roleId": managerRole, "active": true, "version": 1}, nil)
 	admin.expect(http.StatusNotFound, "PUT", "/users/9999",
-		map[string]any{"name": "Ninguém", "role": "seller", "active": true, "version": 1}, nil)
+		map[string]any{"name": "Ninguém", "roleId": sellerRole, "active": true, "version": 1}, nil)
 
 	// --- Desativar o vendedor derruba a sessão dele -----------------------------
 	admin.expect(http.StatusOK, "PUT", fmt.Sprintf("/users/%d", seller.ID),
-		map[string]any{"name": "Vendedor", "role": "seller", "active": false, "version": 1}, nil)
+		map[string]any{"name": "Vendedor", "roleId": sellerRole, "active": false, "version": 1}, nil)
 	sellerClient.expect(http.StatusUnauthorized, "GET", "/auth/me", nil, nil)
 	anon.expect(http.StatusUnauthorized, "POST", "/auth/login",
 		map[string]any{"email": "vendedor@test.com", "password": "senha-do-vendedor"}, nil)

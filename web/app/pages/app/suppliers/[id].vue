@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'dashboard' })
+definePageMeta({ layout: 'dashboard', permission: 'suppliers.view' })
 
 // [id] no nome do arquivo vira um parâmetro da rota: /app/suppliers/42 -> id = "42".
 const route = useRoute()

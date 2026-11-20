@@ -1,26 +1,6 @@
 // Textos em português para os valores que a API usa em inglês (enums).
 // Um lugar só para todas as telas usarem os mesmos nomes.
 
-// Papéis de usuário. O admin pode tudo; os outros vão ganhando permissões
-// conforme os módulos forem construídos.
-export const roleLabels = {
-  admin: 'Administrador',
-  manager: 'Gerente',
-  seller: 'Vendedor',
-  checker: 'Conferente',
-  finance: 'Financeiro',
-  driver: 'Motorista',
-} as const
-
-export const roleDescriptions = {
-  admin: 'Acesso total, inclusive usuários e dados da empresa',
-  manager: 'Acompanha a operação, preços e relatórios',
-  seller: 'Atende clientes e lança pedidos',
-  checker: 'Confere entrada e saída de mercadoria',
-  finance: 'Boletos, cheques, contas a pagar e receber',
-  driver: 'Vê as entregas da sua rota',
-} as const
-
 export const taxRegimeLabels = {
   simples: 'Simples Nacional',
   presumido: 'Lucro Presumido',

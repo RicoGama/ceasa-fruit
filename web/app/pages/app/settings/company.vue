@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { City, Company } from '~/types'
 
-definePageMeta({ layout: 'dashboard' })
+definePageMeta({ layout: 'dashboard', permission: 'company.edit' })
 useHead({ title: 'Dados da empresa · CEASA Fruit' })
 
 const api = useApi()

@@ -20,25 +20,28 @@ const commercialLinks: NavigationMenuItem[] = [
   { label: 'Diagnóstico operacional', icon: 'i-lucide-clipboard-check', ...soon },
 ]
 
-const registryLinks: NavigationMenuItem[] = [
+// Cada item só aparece para quem tem a permissão (computed: muda sozinho se
+// o papel da pessoa mudar).
+const registryLinks = computed<NavigationMenuItem[]>(() => [
   { label: 'Cadastros', type: 'label' },
-  { label: 'Produtos', icon: 'i-lucide-apple', to: '/app/products' },
-  { label: 'Fornecedores', icon: 'i-lucide-truck', to: '/app/suppliers' },
+  ...(auth.can('products.view') ? [{ label: 'Produtos', icon: 'i-lucide-apple', to: '/app/products' }] : []),
+  ...(auth.can('suppliers.view') ? [{ label: 'Fornecedores', icon: 'i-lucide-truck', to: '/app/suppliers' }] : []),
   { label: 'Clientes', icon: 'i-lucide-users', ...soon },
-]
+])
 
-// computed: recalcula sozinho quando o store muda (ex.: depois do login).
-const adminLinks = computed<NavigationMenuItem[]>(() =>
-  auth.isAdmin
-    ? [
-        { label: 'Administração', type: 'label' },
-        { label: 'Usuários', icon: 'i-lucide-user-cog', to: '/app/settings/users' },
-        { label: 'Dados da empresa', icon: 'i-lucide-building-2', to: '/app/settings/company' },
-        // Painel do River (fora do Nuxt): abre em outra aba.
-        { label: 'Filas', icon: 'i-lucide-list-checks', to: '/admin/queues', external: true, target: '_blank' },
-      ]
-    : [],
-)
+const adminLinks = computed<NavigationMenuItem[]>(() => {
+  const items: NavigationMenuItem[] = []
+  if (auth.can('users.manage')) {
+    items.push(
+      { label: 'Usuários', icon: 'i-lucide-user-cog', to: '/app/settings/users' },
+      { label: 'Papéis e permissões', icon: 'i-lucide-shield-check', to: '/app/settings/roles' },
+    )
+  }
+  if (auth.can('company.edit')) items.push({ label: 'Dados da empresa', icon: 'i-lucide-building-2', to: '/app/settings/company' })
+  // Painel do River (fora do Nuxt): abre em outra aba.
+  if (auth.can('queues.view')) items.push({ label: 'Filas', icon: 'i-lucide-list-checks', to: '/admin/queues', external: true, target: '_blank' })
+  return items.length ? [{ label: 'Administração', type: 'label' }, ...items] : []
+})
 
 // Estilo dos itens do menu: o item ativo ganha fundo suave na cor do tema.
 const menuUi = {

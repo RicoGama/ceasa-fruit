@@ -27,10 +27,29 @@ type Me struct {
 }
 
 type CurrentUser struct {
-	ID    int64  `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Role  string `json:"role" enum:"admin,manager,seller,checker,finance,driver"`
+	ID    int64    `json:"id"`
+	Name  string   `json:"name"`
+	Email string   `json:"email"`
+	Role  RoleName `json:"role"`
+	// O que esta pessoa pode fazer (no administrador, o catálogo inteiro).
+	// O front usa para mostrar ou esconder menus e botões; quem barra de
+	// verdade é a API.
+	Permissions []Permission `json:"permissions"`
+}
+
+// RoleName é o papel do usuário, resumido.
+type RoleName struct {
+	ID      int64  `json:"id"`
+	Name    string `json:"name"`
+	IsAdmin bool   `json:"isAdmin" doc:"System role with every permission"`
+}
+
+func currentUser(s *Session) CurrentUser {
+	return CurrentUser{
+		ID: s.UserID, Name: s.UserName, Email: s.UserEmail,
+		Role:        RoleName{ID: s.RoleID, Name: s.RoleName, IsAdmin: s.IsAdmin()},
+		Permissions: s.EffectivePermissions(),
+	}
 }
 
 type CompanyName struct {
@@ -162,7 +181,12 @@ func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutpu
 		if err != nil {
 			return err
 		}
-		me, err = buildMe(ctx, tx, CurrentUser{ID: user.ID, Name: user.Name, Email: user.Email, Role: user.Role})
+		// Lê a sessão recém-criada: traz papel e permissões numa consulta só.
+		row, err := tx.GetSession(ctx, tokenHash)
+		if err != nil {
+			return err
+		}
+		me, err = buildMe(ctx, tx, currentUser(SessionFromRow(tokenHash, row)))
 		return err
 	})
 	if err != nil {
@@ -189,7 +213,7 @@ func (h *handler) me(ctx context.Context, _ *struct{}) (*meOutput, error) {
 	var me Me
 	err := h.db.InReadTx(ctx, func(tx postgres.Tx) error {
 		var err error
-		me, err = buildMe(ctx, tx, CurrentUser{ID: s.UserID, Name: s.UserName, Email: s.UserEmail, Role: s.Role})
+		me, err = buildMe(ctx, tx, currentUser(s))
 		return err
 	})
 	if err != nil {

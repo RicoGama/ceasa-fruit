@@ -5,7 +5,9 @@ import type { components } from './api'
 type Schemas = components['schemas']
 
 export type Me = Schemas['Me']
-export type Role = Schemas['CurrentUser']['role']
+// Permissão: a API manda a lista válida (catálogo em internal/auth/permissions.go).
+export type Permission = Schemas['CurrentUser']['permissions'][number]
+export type Role = Schemas['Role']
 export type User = Schemas['User']
 export type Company = Schemas['Company']
 export type Supplier = Schemas['Supplier']

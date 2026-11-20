@@ -170,6 +170,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List roles with their permissions */
+        get: operations["list-roles"];
+        put?: never;
+        /** Create a role */
+        post: operations["create-role"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a role */
+        get: operations["get-role"];
+        /**
+         * Update a role's name, description and permissions
+         * @description Takes effect immediately for every user with this role.
+         */
+        put: operations["update-role"];
+        post?: never;
+        /** Delete a role that has no users */
+        delete: operations["delete-role"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/suppliers": {
         parameters: {
             query?: never;
@@ -364,16 +404,16 @@ export interface components {
             email: string;
             name: string;
             password?: string;
-            /** @enum {string} */
-            role: "admin" | "manager" | "seller" | "checker" | "finance" | "driver";
+            /** Format: int64 */
+            roleId: number;
         };
         CurrentUser: {
             email: string;
             /** Format: int64 */
             id: number;
             name: string;
-            /** @enum {string} */
-            role: "admin" | "manager" | "seller" | "checker" | "finance" | "driver";
+            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view")[];
+            role: components["schemas"]["RoleName"];
         };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
@@ -445,6 +485,15 @@ export interface components {
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              * @example https://example.com/schemas/ListOutputBody1.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["Role"][];
+        };
+        ListOutputBody2: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListOutputBody2.json
              */
             readonly $schema?: string;
             items: components["schemas"]["ProductSummary"][];
@@ -690,6 +739,64 @@ export interface components {
             password: string;
             token: string;
         };
+        Role: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Role.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            activeUsers: number;
+            /** Format: date-time */
+            createdAt: string;
+            description: string | null;
+            /** Format: int64 */
+            id: number;
+            /** @description System role: every permission, cannot be changed or deleted */
+            isAdmin: boolean;
+            name: string;
+            /** @description For the admin role, the whole catalog */
+            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view")[];
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: int32 */
+            version: number;
+        };
+        RoleFields: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RoleFields.json
+             */
+            readonly $schema?: string;
+            description?: string;
+            name: string;
+            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view")[];
+        };
+        RoleName: {
+            /** Format: int64 */
+            id: number;
+            /** @description System role with every permission */
+            isAdmin: boolean;
+            name: string;
+        };
+        RoleUpdate: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RoleUpdate.json
+             */
+            readonly $schema?: string;
+            description?: string;
+            name: string;
+            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view")[];
+            /**
+             * Format: int32
+             * @description The version read; 409 if someone saved in between
+             */
+            version: number;
+        };
         Supplier: {
             /**
              * Format: uri
@@ -926,8 +1033,8 @@ export interface components {
             readonly $schema?: string;
             active: boolean;
             name: string;
-            /** @enum {string} */
-            role: "admin" | "manager" | "seller" | "checker" | "finance" | "driver";
+            /** Format: int64 */
+            roleId: number;
             /** Format: int32 */
             version: number;
         };
@@ -945,8 +1052,9 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
-            /** @enum {string} */
-            role: "admin" | "manager" | "seller" | "checker" | "finance" | "driver";
+            /** Format: int64 */
+            roleId: number;
+            roleName: string;
             /** Format: date-time */
             updatedAt: string;
             /**
@@ -1236,7 +1344,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody1"];
+                    "application/json": components["schemas"]["ListOutputBody2"];
                 };
             };
             /** @description Error */
@@ -1350,6 +1458,163 @@ export interface operations {
         };
     };
     "deactivate-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOutputBody1"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "create-role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleFields"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "update-role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "delete-role": {
         parameters: {
             query?: never;
             header?: never;

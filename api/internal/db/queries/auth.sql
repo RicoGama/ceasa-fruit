@@ -1,8 +1,8 @@
 -- Queries de autenticação e senha.
 
 -- name: CreateUser :one
-INSERT INTO users (name, email, password_hash, role)
-VALUES (@name, @email, @password_hash, @role)
+INSERT INTO users (name, email, password_hash, role_id)
+VALUES (@name, @email, @password_hash, @role_id)
 RETURNING *;
 
 -- name: GetUserByEmail :one
@@ -13,11 +13,16 @@ WHERE email = @email;
 INSERT INTO sessions (token_hash, user_id, expires_at)
 VALUES (@token_hash, @user_id, @expires_at);
 
--- Carrega o que uma requisição autenticada precisa numa consulta só.
+-- Carrega o que uma requisição autenticada precisa numa consulta só,
+-- inclusive as permissões do papel: mudar um papel vale na próxima requisição.
 -- name: GetSession :one
-SELECT u.id AS user_id, u.name AS user_name, u.email AS user_email, u.role
+SELECT u.id AS user_id, u.name AS user_name, u.email AS user_email,
+       r.id AS role_id, r.key AS role_key, r.name AS role_name,
+       ARRAY(SELECT rp.permission FROM role_permissions rp
+             WHERE rp.role_id = r.id ORDER BY rp.permission)::text[] AS permissions
 FROM sessions s
 JOIN users u ON u.id = s.user_id
+JOIN roles r ON r.id = u.role_id
 WHERE s.token_hash = @token_hash
   AND s.expires_at > now()
   AND u.active;

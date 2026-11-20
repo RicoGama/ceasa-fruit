@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import type { DropdownMenuItem, FormSubmitEvent, TableColumn } from '@nuxt/ui'
-import type { Role, User } from '~/types'
+import type { User } from '~/types'
 
-definePageMeta({ layout: 'dashboard' })
+definePageMeta({ layout: 'dashboard', permission: 'users.manage' })
 useHead({ title: 'Usuários · CEASA Fruit' })
 
 const api = useApi()
@@ -17,12 +17,24 @@ const { data, status, error, refresh } = await useAsyncData('users', async () =>
   return data.items
 })
 
+// Papéis para o campo "Papel" (os criados na tela de papéis aparecem aqui).
+const { data: roles } = await useAsyncData('roles-for-users', async () => {
+  const { data } = await api.GET('/roles')
+  return data?.items ?? []
+})
+const roleItems = computed(() => (roles.value ?? []).map(r => ({
+  value: r.id,
+  label: r.name,
+  description: r.description ?? undefined,
+})))
+const roleDescription = (id: number) => roles.value?.find(r => r.id === id)?.description
+
 const showInactive = ref(false)
 const users = computed(() => (data.value ?? []).filter(u => showInactive.value || u.active))
 
 const columns: TableColumn<User>[] = [
   { accessorKey: 'name', header: 'Usuário' },
-  { accessorKey: 'role', header: 'Papel' },
+  { accessorKey: 'roleName', header: 'Papel' },
   { accessorKey: 'createdAt', header: 'Desde', meta: { class: { th: 'hidden md:table-cell', td: 'hidden md:table-cell' } } },
   { accessorKey: 'active', header: 'Situação' },
   { id: 'actions' },
@@ -38,44 +50,40 @@ function rowActions(u: User): DropdownMenuItem[] {
 }
 
 // --- Modal de criar/editar ----------------------------------------------------
-const roleItems = (Object.keys(roleLabels) as Role[]).map(value => ({
-  value,
-  label: roleLabels[value],
-  description: roleDescriptions[value],
-}))
-
 const schema = z.object({
   name: z.string().trim().min(2, 'Informe o nome'),
   email: z.email('E-mail inválido'),
-  role: z.enum(Object.keys(roleLabels) as [Role, ...Role[]]),
+  roleId: z.number({ error: 'Escolha o papel' }).int().positive('Escolha o papel'),
   active: z.boolean(),
 })
 type Schema = z.output<typeof schema>
 
 const modalOpen = ref(false)
 const editing = ref<User | null>(null) // null = criando
-const form = reactive<Schema>({ name: '', email: '', role: 'seller', active: true })
+const form = reactive<Schema>({ name: '', email: '', roleId: 0, active: true })
+// Papel sugerido para usuário novo: Vendedor, se existir.
+const defaultRoleId = () => roles.value?.find(r => r.name === 'Vendedor')?.id ?? 0
 const formRef = useTemplateRef('formRef')
 const saving = ref(false)
 
 function openCreate() {
   editing.value = null
-  Object.assign(form, { name: '', email: '', role: 'seller', active: true })
+  Object.assign(form, { name: '', email: '', roleId: defaultRoleId(), active: true })
   modalOpen.value = true
 }
 
 function openEdit(u: User) {
   editing.value = u
-  Object.assign(form, { name: u.name, email: u.email, role: u.role, active: u.active })
+  Object.assign(form, { name: u.name, email: u.email, roleId: u.roleId, active: u.active })
   modalOpen.value = true
 }
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   saving.value = true
-  const { name, email, role, active } = event.data
+  const { name, email, roleId, active } = event.data
   const { error } = editing.value
-    ? await api.PUT('/users/{id}', { params: { path: { id: editing.value.id } }, body: { name, role, active, version: editing.value.version } })
-    : await api.POST('/users', { body: { name, email, role } })
+    ? await api.PUT('/users/{id}', { params: { path: { id: editing.value.id } }, body: { name, roleId, active, version: editing.value.version } })
+    : await api.POST('/users', { body: { name, email, roleId } })
   saving.value = false
 
   if (error) {
@@ -150,8 +158,8 @@ async function resendInvite(u: User) {
             </p>
           </button>
         </template>
-        <template #role-cell="{ row }">
-          {{ roleLabels[row.original.role] }}
+        <template #roleName-cell="{ row }">
+          {{ row.original.roleName }}
         </template>
         <template #createdAt-cell="{ row }">
           {{ formatDate(row.original.createdAt) }}
@@ -187,10 +195,11 @@ async function resendInvite(u: User) {
         <UFormField label="E-mail" name="email" required :help="editing ? 'O e-mail não pode ser alterado.' : undefined">
           <UInput v-model="form.email" type="email" class="w-full" :disabled="!!editing" />
         </UFormField>
-        <UFormField label="Papel" name="role" required>
-          <USelect v-model="form.role" :items="roleItems" class="w-full" />
+        <UFormField label="Papel" name="roleId" required>
+          <USelect v-model="form.roleId" :items="roleItems" placeholder="Escolha o papel" class="w-full" />
           <template #help>
-            {{ roleDescriptions[form.role] }}
+            {{ roleDescription(form.roleId) }}
+            <ULink to="/app/settings/roles" class="text-primary">Ver papéis e permissões</ULink>
           </template>
         </UFormField>
         <UFormField v-if="editing" name="active">

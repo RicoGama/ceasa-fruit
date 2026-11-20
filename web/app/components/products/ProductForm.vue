@@ -11,8 +11,8 @@ const toast = useToast()
 const auth = useAuthStore()
 const form = useTemplateRef('form')
 const saving = ref(false)
-// Só gerente e administrador alteram o catálogo; os outros só consultam.
-const canEdit = computed(() => auth.hasRole('manager'))
+// Quem não tem products.edit só consulta.
+const canEdit = computed(() => auth.can('products.edit'))
 
 type StockUnit = ProductFields['stockUnit']
 type Category = ProductFields['category']

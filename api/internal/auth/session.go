@@ -5,8 +5,8 @@
 //     cookie HttpOnly e o hash do token vai para a tabela sessions.
 //  2. Em toda requisição, o middleware LoadSession lê o cookie, busca a sessão
 //     (com o papel do usuário) e coloca um *Session no context.Context.
-//  3. Os middlewares do Huma (RequireUser, RequireRole) barram quem não pode
-//     acessar cada grupo de rotas.
+//  3. Os middlewares do Huma (RequireUser, RequirePermission) barram quem não
+//     pode acessar cada rota.
 package auth
 
 import (
@@ -32,15 +32,51 @@ const (
 
 // Session é o usuário autenticado da requisição atual.
 type Session struct {
-	TokenHash []byte
-	UserID    int64
-	UserName  string
-	UserEmail string
-	Role      string // ver roles.go
+	TokenHash   []byte
+	UserID      int64
+	UserName    string
+	UserEmail   string
+	RoleID      int64
+	RoleKey     *string // "admin" no papel de sistema; nil nos criados pela tela
+	RoleName    string
+	Permissions []Permission // as do papel (vazia no admin: ele pode tudo)
 }
 
-// IsAdmin diz se o usuário tem o papel de administrador.
-func (s *Session) IsAdmin() bool { return s.Role == RoleAdmin }
+// IsAdmin diz se o usuário tem o papel de sistema "Administrador".
+func (s *Session) IsAdmin() bool { return s.RoleKey != nil && *s.RoleKey == RoleKeyAdmin }
+
+// Can diz se o usuário tem a permissão. O administrador pode tudo.
+func (s *Session) Can(p Permission) bool {
+	if s.IsAdmin() {
+		return true
+	}
+	for _, have := range s.Permissions {
+		if have == p {
+			return true
+		}
+	}
+	return false
+}
+
+// EffectivePermissions é a lista que o front recebe: no admin, o catálogo todo.
+func (s *Session) EffectivePermissions() []Permission {
+	if s.IsAdmin() {
+		return All
+	}
+	return s.Permissions
+}
+
+// SessionFromRow monta a Session a partir da consulta GetSession.
+func SessionFromRow(tokenHash []byte, row db.GetSessionRow) *Session {
+	perms := make([]Permission, 0, len(row.Permissions))
+	for _, p := range row.Permissions {
+		perms = append(perms, Permission(p))
+	}
+	return &Session{
+		TokenHash: tokenHash, UserID: row.UserID, UserName: row.UserName, UserEmail: row.UserEmail,
+		RoleID: row.RoleID, RoleKey: row.RoleKey, RoleName: row.RoleName, Permissions: perms,
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Session no context.Context
@@ -144,15 +180,10 @@ func LoadSession(loader SessionLoader, logger *slog.Logger) func(http.Handler) h
 				return
 			}
 
-			// O papel vem do banco a cada requisição: se o admin mudar o papel
-			// de alguém, vale na hora, sem precisar sair e entrar de novo.
-			s := &Session{
-				TokenHash: hash,
-				UserID:    row.UserID,
-				UserName:  row.UserName,
-				UserEmail: row.UserEmail,
-				Role:      row.Role,
-			}
+			// Papel e permissões vêm do banco a cada requisição: se o admin
+			// mudar o papel de alguém (ou as permissões do papel), vale na
+			// hora, sem precisar sair e entrar de novo.
+			s := SessionFromRow(hash, row)
 			next.ServeHTTP(w, r.WithContext(WithSession(r.Context(), s)))
 		})
 	}

@@ -65,16 +65,16 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 
 const createUser = `-- name: CreateUser :one
 
-INSERT INTO users (name, email, password_hash, role)
+INSERT INTO users (name, email, password_hash, role_id)
 VALUES ($1, $2, $3, $4)
-RETURNING id, name, email, password_hash, role, active, created_at, updated_at, version
+RETURNING id, name, email, password_hash, active, created_at, updated_at, version, role_id
 `
 
 type CreateUserParams struct {
 	Name         string
 	Email        string
 	PasswordHash string
-	Role         string
+	RoleID       int64
 }
 
 // Queries de autenticação e senha.
@@ -83,7 +83,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.Name,
 		arg.Email,
 		arg.PasswordHash,
-		arg.Role,
+		arg.RoleID,
 	)
 	var i User
 	err := row.Scan(
@@ -91,11 +91,11 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Name,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.RoleID,
 	)
 	return i, err
 }
@@ -122,22 +122,30 @@ func (q *Queries) DeleteUserSessions(ctx context.Context, userID int64) error {
 }
 
 const getSession = `-- name: GetSession :one
-SELECT u.id AS user_id, u.name AS user_name, u.email AS user_email, u.role
+SELECT u.id AS user_id, u.name AS user_name, u.email AS user_email,
+       r.id AS role_id, r.key AS role_key, r.name AS role_name,
+       ARRAY(SELECT rp.permission FROM role_permissions rp
+             WHERE rp.role_id = r.id ORDER BY rp.permission)::text[] AS permissions
 FROM sessions s
 JOIN users u ON u.id = s.user_id
+JOIN roles r ON r.id = u.role_id
 WHERE s.token_hash = $1
   AND s.expires_at > now()
   AND u.active
 `
 
 type GetSessionRow struct {
-	UserID    int64
-	UserName  string
-	UserEmail string
-	Role      string
+	UserID      int64
+	UserName    string
+	UserEmail   string
+	RoleID      int64
+	RoleKey     *string
+	RoleName    string
+	Permissions []string
 }
 
-// Carrega o que uma requisição autenticada precisa numa consulta só.
+// Carrega o que uma requisição autenticada precisa numa consulta só,
+// inclusive as permissões do papel: mudar um papel vale na próxima requisição.
 func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error) {
 	row := q.db.QueryRow(ctx, getSession, tokenHash)
 	var i GetSessionRow
@@ -145,13 +153,16 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (GetSessionR
 		&i.UserID,
 		&i.UserName,
 		&i.UserEmail,
-		&i.Role,
+		&i.RoleID,
+		&i.RoleKey,
+		&i.RoleName,
+		&i.Permissions,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, name, email, password_hash, role, active, created_at, updated_at, version FROM users
+SELECT id, name, email, password_hash, active, created_at, updated_at, version, role_id FROM users
 WHERE email = $1
 `
 
@@ -163,11 +174,11 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Name,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Version,
+		&i.RoleID,
 	)
 	return i, err
 }

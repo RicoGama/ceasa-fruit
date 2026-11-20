@@ -9,7 +9,7 @@
 //   - embalagens: pilha, pallet, caixa de 30... com quantas unidades de estoque
 //     cabem; sem quantidade = varia, informada na hora da venda.
 //
-// Leitura: qualquer usuário logado. Gravação: administrador e gerente.
+// Ver: permissão products.view. Cadastrar e editar: products.edit.
 package product
 
 import (
@@ -25,6 +25,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/quantity"
@@ -244,39 +245,39 @@ func DisplayName(name string, variety, grade *string) string {
 
 type handler struct{ db postgres.DB }
 
-// Register adiciona as rotas: leitura em authed (qualquer usuário logado),
-// gravação em editors (administrador e gerente).
-func Register(authed, editors huma.API, database postgres.DB) {
+// Register adiciona as rotas: ver exige products.view; cadastrar, editar e
+// inativar exigem products.edit.
+func Register(api huma.API, database postgres.DB) {
 	h := &handler{db: database}
 	tags := []string{"Products"}
 
-	huma.Register(authed, huma.Operation{
+	huma.Register(api, auth.Protect(api, huma.Operation{
 		OperationID: "list-products", Method: http.MethodGet, Path: "/products",
 		Summary: "List products", Tags: tags,
-	}, h.list)
+	}, auth.ProductsView), h.list)
 
-	huma.Register(authed, huma.Operation{
+	huma.Register(api, auth.Protect(api, huma.Operation{
 		OperationID: "get-product", Method: http.MethodGet, Path: "/products/{id}",
 		Summary: "Get a product with its packagings", Tags: tags,
-	}, h.get)
+	}, auth.ProductsView), h.get)
 
-	huma.Register(editors, huma.Operation{
+	huma.Register(api, auth.Protect(api, huma.Operation{
 		OperationID: "create-product", Method: http.MethodPost, Path: "/products",
 		Summary: "Create a product", Tags: tags, DefaultStatus: http.StatusCreated,
-	}, h.create)
+	}, auth.ProductsEdit), h.create)
 
-	huma.Register(editors, huma.Operation{
+	huma.Register(api, auth.Protect(api, huma.Operation{
 		OperationID: "update-product", Method: http.MethodPut, Path: "/products/{id}",
 		Summary:     "Update a product",
 		Description: "Packagings: items with id are updated, items without id are created, missing ones are removed.",
 		Tags:        tags,
-	}, h.update)
+	}, auth.ProductsEdit), h.update)
 
-	huma.Register(editors, huma.Operation{
+	huma.Register(api, auth.Protect(api, huma.Operation{
 		OperationID: "deactivate-product", Method: http.MethodDelete, Path: "/products/{id}",
 		Summary: "Deactivate a product (it is never deleted)", Tags: tags,
 		DefaultStatus: http.StatusNoContent,
-	}, h.deactivate)
+	}, auth.ProductsEdit), h.deactivate)
 }
 
 func (h *handler) list(ctx context.Context, in *listInput) (*listOutput, error) {

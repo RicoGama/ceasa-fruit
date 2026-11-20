@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'dashboard' })
+definePageMeta({ layout: 'dashboard', permission: 'products.view' })
 
 const route = useRoute()
 const id = Number(route.params.id)

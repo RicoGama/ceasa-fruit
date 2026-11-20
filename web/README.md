@@ -88,6 +88,17 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
   começarem a se cruzar (vendas), a ideia é adotar o Pinia Colada (cache com
   invalidação automática).
 
+## Permissões no front
+
+- `auth.can('products.edit')` mostra ou esconde botões, menus e telas; quem
+  barra de verdade é a API.
+- Página que exige permissão: `definePageMeta({ layout: 'dashboard', permission: 'users.manage' })`
+  (o middleware manda para o início quem não tem).
+- Sem a permissão de editar, o formulário abre como **Somente consulta**.
+- Ao receber 403, o front relê as permissões: se o admin mudou o papel da
+  pessoa, menus e botões se ajustam sem recarregar a página.
+- Textos das permissões e a arrumação da tela de papéis: `app/utils/permissions.ts`.
+
 ## Responsivo e breadcrumb
 
 O sistema é usado no celular dentro do box, então toda tela precisa funcionar

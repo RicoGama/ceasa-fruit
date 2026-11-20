@@ -1,6 +1,6 @@
-import type { Me, Role } from '~/types'
+import type { Me, Permission } from '~/types'
 
-// Store da sessão: quem está logado, com qual papel, e qual é a empresa.
+// Store da sessão: quem está logado, com qual papel e permissões, e qual é a empresa.
 // Qualquer componente que use useAuthStore() enxerga o mesmo estado e se
 // atualiza sozinho quando ele muda.
 //
@@ -19,12 +19,14 @@ export const useAuthStore = defineStore('auth', () => {
   const user = computed(() => me.value?.user ?? null)
   const company = computed(() => me.value?.company ?? null)
   const isLoggedIn = computed(() => me.value !== null)
-  const isAdmin = computed(() => me.value?.user.role === 'admin')
+  const isAdmin = computed(() => me.value?.user.role.isAdmin ?? false)
+  const permissions = computed(() => new Set(me.value?.user.permissions ?? []))
 
-  // hasRole('finance', 'manager'): o admin sempre pode (igual à API).
-  function hasRole(...roles: Role[]) {
-    const role = me.value?.user.role
-    return role === 'admin' || (role !== undefined && roles.includes(role))
+  // can('products.edit'): mostra ou esconde botões, menus e telas.
+  // Quem barra de verdade é a API; aqui é só para não mostrar o que a pessoa
+  // não pode usar. (No administrador a API já manda o catálogo inteiro.)
+  function can(...perms: Permission[]) {
+    return perms.some(p => permissions.value.has(p))
   }
 
   // --- Actions -----------------------------------------------------------------
@@ -62,7 +64,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     me, loaded,
-    user, company, isLoggedIn, isAdmin, hasRole,
+    user, company, isLoggedIn, isAdmin, can,
     fetchMe, login, logout, reset,
   }
 })

@@ -128,7 +128,7 @@ func TestIntegrationProducts(t *testing.T) {
 	// --- Papéis -------------------------------------------------------------------
 	hash, _ := auth.HashPassword("senha-do-vendedor")
 	if _, err := db.New(env.pool).CreateUser(context.Background(), db.CreateUserParams{
-		Name: "Vendedor", Email: "v@test.com", PasswordHash: hash, Role: auth.RoleSeller,
+		Name: "Vendedor", Email: "v@test.com", PasswordHash: hash, RoleID: roleID(t, env.pool, "seller"),
 	}); err != nil {
 		t.Fatal(err)
 	}

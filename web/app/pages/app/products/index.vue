@@ -2,14 +2,14 @@
 import type { DropdownMenuItem, TableColumn } from '@nuxt/ui'
 import type { ProductSummary } from '~/types'
 
-definePageMeta({ layout: 'dashboard' })
+definePageMeta({ layout: 'dashboard', permission: 'products.view' })
 useHead({ title: 'Produtos · CEASA Fruit' })
 
 const api = useApi()
 const toast = useToast()
 const auth = useAuthStore()
-// Todos consultam; só gerente e administrador alteram o catálogo.
-const canEdit = computed(() => auth.hasRole('manager'))
+// Ver exige products.view (página); cadastrar e editar, products.edit.
+const canEdit = computed(() => auth.can('products.edit'))
 
 // --- Filtros e paginação ------------------------------------------------------
 const limit = 20

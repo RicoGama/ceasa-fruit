@@ -115,6 +115,21 @@ type ProductPackaging struct {
 	Position  int16
 }
 
+type Role struct {
+	ID          int64
+	Key         *string
+	Name        string
+	Description *string
+	Version     int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type RolePermission struct {
+	RoleID     int64
+	Permission string
+}
+
 type Session struct {
 	TokenHash []byte
 	UserID    int64
@@ -147,9 +162,9 @@ type User struct {
 	Name         string
 	Email        string
 	PasswordHash string
-	Role         string
 	Active       bool
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	Version      int32
+	RoleID       int64
 }

@@ -350,22 +350,16 @@
             "minLength": 8,
             "type": "string"
           },
-          "role": {
-            "enum": [
-              "admin",
-              "manager",
-              "seller",
-              "checker",
-              "finance",
-              "driver"
-            ],
-            "type": "string"
+          "roleId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
           }
         },
         "required": [
           "name",
           "email",
-          "role"
+          "roleId"
         ],
         "type": "object"
       },
@@ -382,23 +376,31 @@
           "name": {
             "type": "string"
           },
+          "permissions": {
+            "items": {
+              "enum": [
+                "suppliers.view",
+                "suppliers.edit",
+                "products.view",
+                "products.edit",
+                "users.manage",
+                "company.edit",
+                "queues.view"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
           "role": {
-            "enum": [
-              "admin",
-              "manager",
-              "seller",
-              "checker",
-              "finance",
-              "driver"
-            ],
-            "type": "string"
+            "$ref": "#/components/schemas/RoleName"
           }
         },
         "required": [
           "id",
           "name",
           "email",
-          "role"
+          "role",
+          "permissions"
         ],
         "type": "object"
       },
@@ -533,6 +535,30 @@
             "description": "A URL to the JSON Schema for this object.",
             "examples": [
               "https://example.com/schemas/ListOutputBody1.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "ListOutputBody2": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/ListOutputBody2.json"
             ],
             "format": "uri",
             "readOnly": true,
@@ -1281,6 +1307,198 @@
         ],
         "type": "object"
       },
+      "Role": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/Role.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "activeUsers": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "isAdmin": {
+            "description": "System role: every permission, cannot be changed or deleted",
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "permissions": {
+            "description": "For the admin role, the whole catalog",
+            "items": {
+              "enum": [
+                "suppliers.view",
+                "suppliers.edit",
+                "products.view",
+                "products.edit",
+                "users.manage",
+                "company.edit",
+                "queues.view"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "isAdmin",
+          "permissions",
+          "activeUsers",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "RoleFields": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/RoleFields.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 2,
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "enum": [
+                "suppliers.view",
+                "suppliers.edit",
+                "products.view",
+                "products.edit",
+                "users.manage",
+                "company.edit",
+                "queues.view"
+              ],
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "permissions"
+        ],
+        "type": "object"
+      },
+      "RoleName": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "isAdmin": {
+            "description": "System role with every permission",
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "isAdmin"
+        ],
+        "type": "object"
+      },
+      "RoleUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/RoleUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 2,
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "enum": [
+                "suppliers.view",
+                "suppliers.edit",
+                "products.view",
+                "products.edit",
+                "users.manage",
+                "company.edit",
+                "queues.view"
+              ],
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "version": {
+            "description": "The version read; 409 if someone saved in between",
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "name",
+          "permissions"
+        ],
+        "type": "object"
+      },
       "Supplier": {
         "additionalProperties": false,
         "properties": {
@@ -1951,16 +2169,10 @@
             "minLength": 2,
             "type": "string"
           },
-          "role": {
-            "enum": [
-              "admin",
-              "manager",
-              "seller",
-              "checker",
-              "finance",
-              "driver"
-            ],
-            "type": "string"
+          "roleId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
           },
           "version": {
             "format": "int32",
@@ -1970,7 +2182,7 @@
         },
         "required": [
           "name",
-          "role",
+          "roleId",
           "active",
           "version"
         ],
@@ -2005,15 +2217,11 @@
           "name": {
             "type": "string"
           },
-          "role": {
-            "enum": [
-              "admin",
-              "manager",
-              "seller",
-              "checker",
-              "finance",
-              "driver"
-            ],
+          "roleId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "roleName": {
             "type": "string"
           },
           "updatedAt": {
@@ -2030,7 +2238,8 @@
           "id",
           "name",
           "email",
-          "role",
+          "roleId",
+          "roleName",
           "active",
           "version",
           "createdAt",
@@ -2392,6 +2601,9 @@
         "summary": "Update the company profile",
         "tags": [
           "Company"
+        ],
+        "x-permissions": [
+          "company.edit"
         ]
       }
     },
@@ -2468,7 +2680,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListOutputBody1"
+                  "$ref": "#/components/schemas/ListOutputBody2"
                 }
               }
             },
@@ -2493,6 +2705,9 @@
         "summary": "List products",
         "tags": [
           "Products"
+        ],
+        "x-permissions": [
+          "products.view"
         ]
       },
       "post": {
@@ -2537,6 +2752,9 @@
         "summary": "Create a product",
         "tags": [
           "Products"
+        ],
+        "x-permissions": [
+          "products.edit"
         ]
       }
     },
@@ -2578,6 +2796,9 @@
         "summary": "Deactivate a product (it is never deleted)",
         "tags": [
           "Products"
+        ],
+        "x-permissions": [
+          "products.edit"
         ]
       },
       "get": {
@@ -2624,6 +2845,9 @@
         "summary": "Get a product with its packagings",
         "tags": [
           "Products"
+        ],
+        "x-permissions": [
+          "products.view"
         ]
       },
       "put": {
@@ -2681,6 +2905,248 @@
         "summary": "Update a product",
         "tags": [
           "Products"
+        ],
+        "x-permissions": [
+          "products.edit"
+        ]
+      }
+    },
+    "/roles": {
+      "get": {
+        "operationId": "list-roles",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListOutputBody1"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "List roles with their permissions",
+        "tags": [
+          "Roles"
+        ],
+        "x-permissions": [
+          "users.manage"
+        ]
+      },
+      "post": {
+        "operationId": "create-role",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleFields"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Create a role",
+        "tags": [
+          "Roles"
+        ],
+        "x-permissions": [
+          "users.manage"
+        ]
+      }
+    },
+    "/roles/{id}": {
+      "delete": {
+        "operationId": "delete-role",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Delete a role that has no users",
+        "tags": [
+          "Roles"
+        ],
+        "x-permissions": [
+          "users.manage"
+        ]
+      },
+      "get": {
+        "operationId": "get-role",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Get a role",
+        "tags": [
+          "Roles"
+        ],
+        "x-permissions": [
+          "users.manage"
+        ]
+      },
+      "put": {
+        "description": "Takes effect immediately for every user with this role.",
+        "operationId": "update-role",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Update a role's name, description and permissions",
+        "tags": [
+          "Roles"
+        ],
+        "x-permissions": [
+          "users.manage"
         ]
       }
     },
@@ -2768,6 +3234,9 @@
         "summary": "List suppliers",
         "tags": [
           "Suppliers"
+        ],
+        "x-permissions": [
+          "suppliers.view"
         ]
       },
       "post": {
@@ -2812,6 +3281,9 @@
         "summary": "Create a supplier",
         "tags": [
           "Suppliers"
+        ],
+        "x-permissions": [
+          "suppliers.edit"
         ]
       }
     },
@@ -2854,6 +3326,9 @@
         "summary": "Deactivate a supplier",
         "tags": [
           "Suppliers"
+        ],
+        "x-permissions": [
+          "suppliers.edit"
         ]
       },
       "get": {
@@ -2900,6 +3375,9 @@
         "summary": "Get a supplier",
         "tags": [
           "Suppliers"
+        ],
+        "x-permissions": [
+          "suppliers.view"
         ]
       },
       "put": {
@@ -2956,6 +3434,9 @@
         "summary": "Update a supplier",
         "tags": [
           "Suppliers"
+        ],
+        "x-permissions": [
+          "suppliers.edit"
         ]
       }
     },
@@ -2992,6 +3473,9 @@
         "summary": "List users",
         "tags": [
           "Users"
+        ],
+        "x-permissions": [
+          "users.manage"
         ]
       },
       "post": {
@@ -3037,6 +3521,9 @@
         "summary": "Create a user",
         "tags": [
           "Users"
+        ],
+        "x-permissions": [
+          "users.manage"
         ]
       }
     },
@@ -3095,6 +3582,9 @@
         "summary": "Update a user's name, role or status",
         "tags": [
           "Users"
+        ],
+        "x-permissions": [
+          "users.manage"
         ]
       }
     },
@@ -3136,6 +3626,9 @@
         "summary": "Send a new invitation (link to set the password)",
         "tags": [
           "Users"
+        ],
+        "x-permissions": [
+          "users.manage"
         ]
       }
     }

@@ -78,10 +78,15 @@ func run(email, name, companyName, password string) error {
 			return err
 		}
 
+		adminKey := auth.RoleKeyAdmin
+		adminRole, err := q.GetRoleIDByKey(ctx, &adminKey)
+		if err != nil {
+			return fmt.Errorf("admin role not found (migration 00006): %w", err)
+		}
 		user, err := q.GetUserByEmail(ctx, email)
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
-			_, err = q.CreateUser(ctx, db.CreateUserParams{Name: name, Email: email, PasswordHash: hash, Role: auth.RoleAdmin})
+			_, err = q.CreateUser(ctx, db.CreateUserParams{Name: name, Email: email, PasswordHash: hash, RoleID: adminRole})
 			created = true
 			return err
 		case err != nil:
@@ -90,7 +95,7 @@ func run(email, name, companyName, password string) error {
 		if err := q.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{ID: user.ID, PasswordHash: hash}); err != nil {
 			return err
 		}
-		_, err = q.UpdateUser(ctx, db.UpdateUserParams{ID: user.ID, Name: user.Name, Role: auth.RoleAdmin, Active: true})
+		_, err = q.UpdateUser(ctx, db.UpdateUserParams{ID: user.ID, Name: user.Name, RoleID: adminRole, Active: true, Version: user.Version})
 		return err
 	})
 	if err != nil {

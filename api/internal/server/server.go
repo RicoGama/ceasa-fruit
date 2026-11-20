@@ -23,6 +23,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/product"
 	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
+	"github.com/RicoGama/ceasa-fruit/api/internal/role"
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
 	"github.com/RicoGama/ceasa-fruit/api/internal/user"
 )
@@ -121,7 +122,7 @@ func build(d Deps) (http.Handler, huma.API) {
 	// Painel das filas. É um http.Handler pronto (do River UI); só colocamos
 	// a proteção na frente: apenas o administrador entra.
 	if d.QueueUI != nil {
-		ui := auth.RequireAdminHTTP(d.QueueUI)
+		ui := auth.RequirePermissionHTTP(auth.QueuesView, d.QueueUI)
 		r.Handle("/admin/queues", ui)
 		r.Handle("/admin/queues/*", ui)
 	}
@@ -144,13 +145,9 @@ func build(d Deps) (http.Handler, huma.API) {
 	authed.UseMiddleware(auth.RequireUser(api))
 	authed.UseSimpleModifier(auth.RequireSecurity)
 
-	adminOnly := huma.NewGroup(api) // exige o papel de administrador
-	adminOnly.UseMiddleware(auth.RequireRole(api, auth.RoleAdmin))
-	adminOnly.UseSimpleModifier(auth.RequireSecurity)
-
-	managers := huma.NewGroup(api) // gerente (e administrador, que sempre passa)
-	managers.UseMiddleware(auth.RequireRole(api, auth.RoleManager))
-	managers.UseSimpleModifier(auth.RequireSecurity)
+	// As permissões de cada rota (papéis configuráveis) ficam junto da rota,
+	// com auth.Protect, dentro de cada pacote. O teste TestEveryRouteHasPermission
+	// confere que nenhuma rota de negócio ficou sem.
 
 	// Cuidado com uma pegadinha do Go: um *queue.Queue nil guardado numa
 	// interface NÃO é uma interface nil. Por isso só atribuímos se existir.
@@ -161,14 +158,12 @@ func build(d Deps) (http.Handler, huma.API) {
 	auth.Register(public, authed, auth.Options{
 		DB: database, Cookies: auth.Cookies{Secure: d.CookieSecure}, Emails: emails, AppURL: d.AppURL,
 	})
-	user.Register(adminOnly, user.Options{DB: database, Emails: emails, AppURL: d.AppURL})
-	company.Register(authed, adminOnly, database)
+	user.Register(authed, user.Options{DB: database, Emails: emails, AppURL: d.AppURL})
+	role.Register(authed, database)
+	company.Register(authed, database)
 	city.Register(authed, database)
-	// Produtos: todos consultam; só gerente e administrador alteram o catálogo.
-	product.Register(authed, managers, database)
+	product.Register(authed, database)
 
-	// Fornecedores: por enquanto qualquer papel; as permissões por papel
-	// (ex.: motorista só consulta) entram quando forem definidas.
 	// O pacote supplier recebe o Store (uma interface) para os testes usarem
 	// um banco falso; aqui ligamos esse Store às transações de verdade.
 	inTx := func(ctx context.Context, fn func(supplier.Store) error) error {

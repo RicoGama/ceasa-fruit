@@ -8,7 +8,7 @@ confiável): um servidor e um banco por cliente, sem multi-tenant.
 
 ## Escopo
 
-0. Login, papéis (admin, gerente, vendedor, conferente, financeiro, motorista), usuários com convite por e-mail, dados da empresa ✅ (API + telas)
+0. Login, papéis configuráveis com permissões (o admin cria papéis e marca o que cada um acessa), usuários com convite por e-mail, dados da empresa ✅ (API + telas)
 1. Controle de vendas de LFV
 2. Cadastro de fornecedores ✅ (API + tela)
 2b. Cadastro de produtos com embalagens ✅ (API + tela; gerente e admin editam)

@@ -9,6 +9,9 @@ const props = defineProps<{ supplier: Supplier | null }>()
 
 const api = useApi()
 const toast = useToast()
+const auth = useAuthStore()
+// Sem suppliers.edit, a tela é só para consulta.
+const canEdit = computed(() => auth.can('suppliers.edit'))
 const form = useTemplateRef('form')
 const saving = ref(false)
 
@@ -328,9 +331,12 @@ const bankAccountTypeOptions = toOptions(bankAccountTypeLabels)
     <template #header>
       <AppNavbar :title="props.supplier ? title : undefined">
         <template #right>
-          <UBadge v-if="dirty" label="Não salvo" color="warning" variant="subtle" class="hidden sm:inline-flex" />
-          <UButton label="Cancelar" color="neutral" variant="ghost" to="/app/suppliers" class="hidden sm:inline-flex" />
-          <UButton type="submit" form="supplier-form" label="Salvar" icon="i-lucide-check" :loading="saving" />
+          <template v-if="canEdit">
+            <UBadge v-if="dirty" label="Não salvo" color="warning" variant="subtle" class="hidden sm:inline-flex" />
+            <UButton label="Cancelar" color="neutral" variant="ghost" to="/app/suppliers" class="hidden sm:inline-flex" />
+            <UButton type="submit" form="supplier-form" label="Salvar" icon="i-lucide-check" :loading="saving" />
+          </template>
+          <UBadge v-else label="Somente consulta" color="neutral" variant="subtle" />
         </template>
       </AppNavbar>
     </template>
@@ -341,6 +347,7 @@ const bankAccountTypeOptions = toOptions(bankAccountTypeLabels)
         ref="form"
         :schema="schema"
         :state="state"
+        :disabled="!canEdit"
         class="flex flex-col gap-6 w-full lg:max-w-4xl mx-auto"
         @submit="onSubmit"
       >
@@ -527,7 +534,7 @@ const bankAccountTypeOptions = toOptions(bankAccountTypeLabels)
           </UFormField>
         </UPageCard>
 
-        <div class="flex justify-end gap-2 pb-6">
+        <div v-if="canEdit" class="flex justify-end gap-2 pb-6">
           <UButton label="Cancelar" color="neutral" variant="ghost" to="/app/suppliers" />
           <UButton type="submit" label="Salvar fornecedor" icon="i-lucide-check" :loading="saving" />
         </div>

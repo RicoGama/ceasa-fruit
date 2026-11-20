@@ -2,11 +2,13 @@
 import type { DropdownMenuItem, TableColumn } from '@nuxt/ui'
 import type { SupplierSummary } from '~/types'
 
-definePageMeta({ layout: 'dashboard' })
+definePageMeta({ layout: 'dashboard', permission: 'suppliers.view' })
 useHead({ title: 'Fornecedores · CEASA Fruit' })
 
 const api = useApi()
 const toast = useToast()
+const auth = useAuthStore()
+const canEdit = computed(() => auth.can('suppliers.edit'))
 
 // --- Filtros e paginação ------------------------------------------------------
 const limit = 20
@@ -65,8 +67,8 @@ const columns: TableColumn<SupplierSummary>[] = [
 
 function rowActions(s: SupplierSummary): DropdownMenuItem[] {
   return [
-    { label: 'Abrir cadastro', icon: 'i-lucide-pencil', to: `/app/suppliers/${s.id}` },
-    ...(s.status === 'active'
+    { label: canEdit.value ? 'Abrir cadastro' : 'Ver cadastro', icon: 'i-lucide-pencil', to: `/app/suppliers/${s.id}` },
+    ...(canEdit.value && s.status === 'active'
       ? [{ label: 'Inativar', icon: 'i-lucide-archive', color: 'error' as const, onSelect: () => { toDeactivate.value = s } }]
       : []),
   ]
@@ -100,7 +102,7 @@ async function deactivate() {
     <template #header>
       <AppNavbar>
         <template #right>
-          <UButton icon="i-lucide-plus" to="/app/suppliers/new" aria-label="Novo fornecedor">
+          <UButton v-if="canEdit" icon="i-lucide-plus" to="/app/suppliers/new" aria-label="Novo fornecedor">
             <span class="hidden sm:inline">Novo fornecedor</span>
           </UButton>
         </template>
@@ -178,7 +180,7 @@ async function deactivate() {
             icon="i-lucide-truck"
             :title="debouncedSearch ? 'Nenhum fornecedor encontrado' : 'Nenhum fornecedor ainda'"
             :description="debouncedSearch ? 'Tente outra busca.' : 'Cadastre os produtores e atacadistas de quem você compra.'"
-            :actions="debouncedSearch ? [] : [{ label: 'Cadastrar fornecedor', icon: 'i-lucide-plus', to: '/app/suppliers/new' }]"
+            :actions="debouncedSearch || !canEdit ? [] : [{ label: 'Cadastrar fornecedor', icon: 'i-lucide-plus', to: '/app/suppliers/new' }]"
           />
         </template>
       </UTable>
