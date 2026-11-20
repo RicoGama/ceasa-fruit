@@ -43,7 +43,8 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
 
 | # | Arquivo | O que você aprende |
 |---|---|---|
-| 1 | `nuxt.config.ts` | módulos, renderização por rota (SSR, SPA, pré-render), proxy |
+| 1 | `nuxt.config.ts` | módulos, renderização por rota (SSR, SPA, redirecionamento) |
+| 1b | `server/utils/api-proxy.ts`, `server/routes/` | o servidor do Nuxt repassando `/api/*` para a API em Go, com o IP real do cliente no `X-Forwarded-For` |
 | 2 | `app/app.vue`, `app/app.config.ts` | raiz do app, tema e idioma do Nuxt UI |
 | 3 | `app/plugins/api.ts` | cliente HTTP tipado (openapi-fetch) e interceptação de 401 |
 | 4 | `app/stores/auth.ts` | store do Pinia (estado, getters, actions): sessão, papel do usuário, empresa, login/logout |

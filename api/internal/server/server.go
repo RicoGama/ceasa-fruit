@@ -43,11 +43,14 @@ type Pinger interface {
 // Deps agrupa o que o servidor precisa. Passar dependências explicitamente
 // (em vez de variáveis globais) deixa o código mais fácil de seguir e testar.
 type Deps struct {
-	Logger       *slog.Logger
-	Pool         *pgxpool.Pool
-	CORSOrigins  []string
-	CookieSecure bool // true em produção (HTTPS)
-	AppURL       string
+	Logger      *slog.Logger
+	Pool        *pgxpool.Pool
+	CORSOrigins []string
+	// TrustedProxies: CIDRs dos proxies confiáveis (ver config). Vazio =
+	// só a própria máquina.
+	TrustedProxies []string
+	CookieSecure   bool // true em produção (HTTPS)
+	AppURL         string
 	// Queue é a fila de jobs (e-mails etc.).
 	Queue *queue.Queue
 	// QueueUI é o painel do River (como o Horizon do Laravel), servido em
@@ -76,7 +79,17 @@ func build(d Deps) (http.Handler, huma.API) {
 
 	// Middlewares envolvem cada requisição, na ordem em que são adicionados.
 	r.Use(middleware.RequestID) // adiciona um X-Request-Id em cada requisição
-	r.Use(middleware.RealIP)    // usa o X-Forwarded-For quando atrás de um proxy
+	// IP real do cliente (para log e auditoria), lido com GetClientIP.
+	// O X-Forwarded-For só vale quando a conexão vem de um proxy confiável
+	// (o Nuxt, na mesma máquina); vindo de qualquer outro lugar, o cabeçalho
+	// é ignorado e vale o IP da conexão. Assim ninguém na rede do box
+	// consegue se passar por outro IP mandando o cabeçalho na mão.
+	// (Substitui o middleware.RealIP, que confiava no cabeçalho de qualquer um.)
+	trusted := d.TrustedProxies
+	if len(trusted) == 0 {
+		trusted = []string{"127.0.0.1/32", "::1/128"}
+	}
+	r.Use(middleware.ClientIPFromXFF(trusted...))
 	r.Use(requestLogger(d.Logger))
 	r.Use(middleware.Recoverer) // transforma um panic em 500 em vez de derrubar o servidor
 	r.Use(cors.Handler(cors.Options{
@@ -204,6 +217,7 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 				"bytes", ww.BytesWritten(),
 				"duration", time.Since(start),
 				"request_id", middleware.GetReqID(r.Context()),
+				"client_ip", middleware.GetClientIP(r.Context()),
 			)
 		})
 	}

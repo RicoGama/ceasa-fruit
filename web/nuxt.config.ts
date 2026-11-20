@@ -40,6 +40,8 @@ export default defineNuxtConfig({
   // Marca do cliente desta instalação (logo, nome). Pode ser trocada sem
   // rebuild com as variáveis NUXT_PUBLIC_BRAND_NAME e NUXT_PUBLIC_BRAND_LOGO.
   runtimeConfig: {
+    // Endereço da API em Go, visto pelo servidor do Nuxt (NUXT_API_URL).
+    apiUrl: 'http://localhost:8080',
     public: {
       brand: {
         name: 'Irmãos Faisão Frutícola',
@@ -58,13 +60,9 @@ export default defineNuxtConfig({
     '/forgot-password': { ssr: false },
     '/reset-password': { ssr: false },
     '/app/**': { ssr: false },
-    // Tudo que começa com /api vai para a API em Go. Como o navegador fala só
-    // com o Nuxt (mesma origem), o cookie de sessão funciona sem CORS.
-    '/api/**': { proxy: `${process.env.NUXT_API_URL ?? 'http://localhost:8080'}/**` },
-    // Painel das filas (River UI), servido pela API em Go. Passa pelo mesmo
-    // proxy para usar o cookie de sessão (só o admin da plataforma entra).
-    '/admin/queues': { proxy: `${process.env.NUXT_API_URL ?? 'http://localhost:8080'}/admin/queues` },
-    '/admin/queues/**': { proxy: `${process.env.NUXT_API_URL ?? 'http://localhost:8080'}/admin/queues/**` },
+    // /api/** e /admin/queues/** vão para a API em Go, por rotas do servidor do
+    // Nuxt (server/routes), e não por "proxy" aqui: assim conseguimos corrigir
+    // o cabeçalho X-Forwarded-For antes de repassar (ver server/utils/api-proxy.ts).
   },
 
   devServer: {

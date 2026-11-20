@@ -149,6 +149,20 @@ Testes que provam cada caso: `internal/user/concurrency_test.go` (corrida do
 Ao criar uma tela de edição nova: devolva `version` no GET, exija no PUT e use
 `ClaimPartyVersion` (pessoas) ou `WHERE version = @version` na query.
 
+## IP do cliente
+
+O IP de quem usa o sistema vai para o log (`client_ip`) e servirá para
+auditoria. Ele vem do cabeçalho `X-Forwarded-For`, que **só é aceito quando a
+conexão chega de um proxy confiável** (`TRUSTED_PROXIES`, padrão: a própria
+máquina, onde roda o Nuxt). Vindo de qualquer outro lugar, o cabeçalho é
+ignorado e vale o IP da conexão (`middleware.ClientIPFromXFF` do chi; o antigo
+`middleware.RealIP` confiava em qualquer um e foi descontinuado por isso).
+
+Do outro lado, o Nuxt nunca repassa o cabeçalho que o navegador mandou: ele o
+troca pelo IP real da conexão (`web/server/utils/api-proxy.ts`). No
+`npm run dev` isso não é garantido (o servidor de desenvolvimento tem um
+salto interno); em produção é.
+
 ## Dinheiro, quantidade e percentual
 
 **Nunca `float64` para valores.** Em float, `0.1 + 0.2` dá `0.30000000000000004`;

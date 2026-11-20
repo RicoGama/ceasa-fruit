@@ -25,6 +25,10 @@ type Config struct {
 	// WorkersEnabled liga os workers da fila neste processo. Em produção dá
 	// para rodar a API com false e os workers em outro processo (cmd/worker).
 	WorkersEnabled bool
+	// TrustedProxies: endereços (CIDR) dos proxies na frente da API. Só deles
+	// aceitamos o cabeçalho X-Forwarded-For para saber o IP real do cliente.
+	// Padrão: a própria máquina (o Nuxt repassa /api/* para cá).
+	TrustedProxies []string
 	SMTP           SMTP
 }
 
@@ -49,6 +53,7 @@ func Load() Config {
 		CookieSecure:   getEnv("COOKIE_SECURE", "false") == "true",
 		AppURL:         strings.TrimSuffix(getEnv("APP_URL", "http://localhost:3000"), "/"),
 		WorkersEnabled: getEnv("WORKERS_ENABLED", "true") == "true",
+		TrustedProxies: strings.Split(getEnv("TRUSTED_PROXIES", "127.0.0.1/32,::1/128"), ","),
 		// Os padrões apontam para o Mailpit, o SMTP de desenvolvimento.
 		SMTP: SMTP{
 			Host:     getEnv("SMTP_HOST", "localhost"),

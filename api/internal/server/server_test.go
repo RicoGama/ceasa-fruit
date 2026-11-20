@@ -78,3 +78,34 @@ func TestProtectedRoutesRequireLogin(t *testing.T) {
 		}
 	}
 }
+
+// O IP do cliente que vai para o log não pode ser forjado: o cabeçalho
+// X-Forwarded-For só vale quando a conexão vem de um proxy confiável.
+func TestClientIPCannotBeSpoofed(t *testing.T) {
+	cases := []struct {
+		name       string
+		remoteAddr string // quem abriu a conexão TCP
+		xff        string // o que veio no cabeçalho
+		want       string
+	}{
+		{"direct client faking the header", "192.168.0.50:51000", "10.9.9.9", "client_ip=192.168.0.50"},
+		{"through the local proxy (Nuxt)", "127.0.0.1:40000", "192.168.0.77", "client_ip=192.168.0.77"},
+		{"proxy chain: only the last untrusted hop counts", "127.0.0.1:40000", "6.6.6.6, 192.168.0.77", "client_ip=192.168.0.77"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var logs strings.Builder
+			logger := slog.New(slog.NewTextHandler(&logs, nil))
+			h := New(Deps{Logger: logger})
+
+			req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+			req.RemoteAddr = c.remoteAddr
+			req.Header.Set("X-Forwarded-For", c.xff)
+			h.ServeHTTP(httptest.NewRecorder(), req)
+
+			if !strings.Contains(logs.String(), c.want) {
+				t.Errorf("log = %s, want it to contain %s", logs.String(), c.want)
+			}
+		})
+	}
+}
