@@ -26,12 +26,13 @@ run: ## Roda a API (aplica as migrations ao subir)
 build: ## Compila o binário em bin/api
 	go build -o bin/api ./cmd/api
 
-test: ## Roda os testes unitários (não precisam de banco)
-	go test ./...
+test: ## Roda os testes unitários (não precisam de banco), com o detector de corridas
+	go test -race ./...
 
 TEST_DATABASE_URL ?= postgres://ceasa:ceasa@localhost:5432/ceasa_test?sslmode=disable
 test-integration: ## Roda todos os testes, inclusive os de integração com o Postgres
-	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -count=1 ./...
+	# -p 1: um pacote por vez, porque todos usam o mesmo banco de teste.
+	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -race -count=1 -p 1 ./...
 
 sqlc: ## Regenera o código Go a partir de internal/db/queries/*.sql
 	sqlc generate

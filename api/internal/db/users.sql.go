@@ -23,7 +23,7 @@ func (q *Queries) CountActiveAdmins(ctx context.Context) (int64, error) {
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, name, email, password_hash, role, active, created_at, updated_at FROM users
+SELECT id, name, email, password_hash, role, active, created_at, updated_at, version FROM users
 WHERE id = $1
 `
 
@@ -39,13 +39,14 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
 
-SELECT id, name, email, password_hash, role, active, created_at, updated_at FROM users
+SELECT id, name, email, password_hash, role, active, created_at, updated_at, version FROM users
 ORDER BY active DESC, lower(name), id
 `
 
@@ -68,6 +69,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.Active,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -79,26 +81,60 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 	return items, nil
 }
 
+const lockActiveAdmins = `-- name: LockActiveAdmins :many
+SELECT id FROM users
+WHERE role = 'admin' AND active
+ORDER BY id
+FOR UPDATE
+`
+
+// Trava as linhas dos administradores ativos até o fim da transação.
+// Quem chegar depois ESPERA, e só então enxerga o que mudou. Ordenado por id
+// para todas as transações travarem na mesma ordem (evita deadlock).
+func (q *Queries) LockActiveAdmins(ctx context.Context) ([]int64, error) {
+	rows, err := q.db.Query(ctx, lockActiveAdmins)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
-SET name = $1, role = $2, active = $3, updated_at = now()
-WHERE id = $4
-RETURNING id, name, email, password_hash, role, active, created_at, updated_at
+SET name = $1, role = $2, active = $3,
+    version = version + 1, updated_at = now()
+WHERE id = $4 AND version = $5
+RETURNING id, name, email, password_hash, role, active, created_at, updated_at, version
 `
 
 type UpdateUserParams struct {
-	Name   string
-	Role   string
-	Active bool
-	ID     int64
+	Name    string
+	Role    string
+	Active  bool
+	ID      int64
+	Version int32
 }
 
+// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, updateUser,
 		arg.Name,
 		arg.Role,
 		arg.Active,
 		arg.ID,
+		arg.Version,
 	)
 	var i User
 	err := row.Scan(
@@ -110,6 +146,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Version,
 	)
 	return i, err
 }

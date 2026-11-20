@@ -11,6 +11,41 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/money"
 )
 
+const bumpPartyVersion = `-- name: BumpPartyVersion :exec
+UPDATE parties
+SET version = version + 1, updated_at = now()
+WHERE id = $1
+`
+
+// Soma 1 na versão sem conferir (ações que não vêm de um formulário, como
+// inativar): quem estiver com a tela aberta recebe 409 ao salvar.
+func (q *Queries) BumpPartyVersion(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, bumpPartyVersion, id)
+	return err
+}
+
+const claimPartyVersion = `-- name: ClaimPartyVersion :execrows
+UPDATE parties
+SET version = version + 1, updated_at = now()
+WHERE id = $1 AND version = $2
+`
+
+type ClaimPartyVersionParams struct {
+	ID      int64
+	Version int32
+}
+
+// "Reserva" a edição da pessoa: só passa se ninguém salvou depois que a tela
+// leu (version igual) e já soma 1. 0 linhas = alterada por outra pessoa (ou
+// inexistente). Toda gravação de fornecedor/cliente começa por aqui.
+func (q *Queries) ClaimPartyVersion(ctx context.Context, arg ClaimPartyVersionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, claimPartyVersion, arg.ID, arg.Version)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const countSuppliers = `-- name: CountSuppliers :one
 SELECT count(*)
 FROM suppliers s
@@ -204,7 +239,7 @@ func (q *Queries) DeletePartyContacts(ctx context.Context, partyID int64) error 
 }
 
 const getSupplier = `-- name: GetSupplier :one
-SELECT p.id, p.person_type, p.document, p.legal_name, p.trade_name, p.state_registration, p.taxpayer_type, p.email, p.phone, p.whatsapp, p.postal_code, p.street, p.number, p.complement, p.district, p.city_id, p.pix_key_type, p.pix_key, p.bank, p.bank_branch, p.bank_account, p.bank_account_type, p.bank_account_holder, p.bank_account_holder_document, p.notes, p.created_at, p.updated_at, s.party_id, s.supplier_type, s.default_purchase_mode, s.consignment_commission, s.payment_term_days, s.ceasa_pavilion, s.ceasa_box, s.status, s.blocked_reason, s.created_at, s.updated_at,
+SELECT p.id, p.person_type, p.document, p.legal_name, p.trade_name, p.state_registration, p.taxpayer_type, p.email, p.phone, p.whatsapp, p.postal_code, p.street, p.number, p.complement, p.district, p.city_id, p.pix_key_type, p.pix_key, p.bank, p.bank_branch, p.bank_account, p.bank_account_type, p.bank_account_holder, p.bank_account_holder_document, p.notes, p.created_at, p.updated_at, p.version, s.party_id, s.supplier_type, s.default_purchase_mode, s.consignment_commission, s.payment_term_days, s.ceasa_pavilion, s.ceasa_box, s.status, s.blocked_reason, s.created_at, s.updated_at,
        c.name       AS city_name,
        c.state_code AS city_state
 FROM suppliers s
@@ -252,6 +287,7 @@ func (q *Queries) GetSupplier(ctx context.Context, id int64) (GetSupplierRow, er
 		&i.Party.Notes,
 		&i.Party.CreatedAt,
 		&i.Party.UpdatedAt,
+		&i.Party.Version,
 		&i.Supplier.PartyID,
 		&i.Supplier.SupplierType,
 		&i.Supplier.DefaultPurchaseMode,

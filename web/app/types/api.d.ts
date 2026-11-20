@@ -285,6 +285,11 @@ export interface components {
             tradeName: string | null;
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * Format: int32
+             * @description Send it back on update (optimistic locking)
+             */
+            version: number;
         };
         CompanyName: {
             name: string;
@@ -508,6 +513,8 @@ export interface components {
             tradeName: string | null;
             /** Format: date-time */
             updatedAt: string;
+            /** Format: int32 */
+            version: number;
             whatsapp: string | null;
         };
         SupplierFields: {
@@ -591,6 +598,74 @@ export interface components {
             tradeName: string | null;
             whatsapp: string | null;
         };
+        SupplierUpdate: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SupplierUpdate.json
+             */
+            readonly $schema?: string;
+            address?: components["schemas"]["AddressInput"];
+            blockedReason?: string;
+            ceasaBox?: string;
+            ceasaPavilion?: string;
+            /**
+             * @description Commission in % kept on consignment sales ("12.5" = 12.5%)
+             * @example 12.5
+             */
+            consignmentCommission?: string;
+            contacts?: components["schemas"]["ContactInput"][];
+            /**
+             * @description direct = buys the goods; consignment = sells first and pays later minus commission
+             * @default direct
+             * @enum {string}
+             */
+            defaultPurchaseMode: "direct" | "consignment";
+            /** @description CPF or CNPJ, with or without mask */
+            document?: string;
+            /** Format: email */
+            email?: string;
+            /** @description Company name (razão social) or full name */
+            legalName: string;
+            notes?: string;
+            payment?: components["schemas"]["PaymentInput"];
+            /**
+             * Format: int32
+             * @description Default payment term in days (0 = cash)
+             * @default 0
+             */
+            paymentTermDays: number;
+            /**
+             * @description individual = CPF, company = CNPJ
+             * @enum {string}
+             */
+            personType: "individual" | "company";
+            phone?: string;
+            stateRegistration?: string;
+            /**
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "inactive" | "blocked";
+            /**
+             * @default producer
+             * @enum {string}
+             */
+            supplierType: "producer" | "wholesaler" | "cooperative" | "importer" | "other";
+            /**
+             * @default non_taxpayer
+             * @enum {string}
+             */
+            taxpayerType: "taxpayer" | "exempt" | "non_taxpayer";
+            /** @description Trade name or nickname */
+            tradeName?: string;
+            /**
+             * Format: int32
+             * @description The version read; 409 if someone saved in between
+             */
+            version: number;
+            whatsapp?: string;
+        };
         UpdateCompanyInputBody: {
             /**
              * Format: uri
@@ -616,6 +691,11 @@ export interface components {
             /** @enum {string} */
             taxRegime?: "simples" | "presumido" | "real";
             tradeName?: string;
+            /**
+             * Format: int32
+             * @description The version read; 409 if someone saved in between
+             */
+            version: number;
         };
         UpdateUserInputBody: {
             /**
@@ -628,6 +708,8 @@ export interface components {
             name: string;
             /** @enum {string} */
             role: "admin" | "manager" | "seller" | "checker" | "finance" | "driver";
+            /** Format: int32 */
+            version: number;
         };
         User: {
             /**
@@ -647,6 +729,11 @@ export interface components {
             role: "admin" | "manager" | "seller" | "checker" | "finance" | "driver";
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * Format: int32
+             * @description Send it back on update (optimistic locking)
+             */
+            version: number;
         };
     };
     responses: never;
@@ -1017,7 +1104,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SupplierFields"];
+                "application/json": components["schemas"]["SupplierUpdate"];
             };
         };
         responses: {

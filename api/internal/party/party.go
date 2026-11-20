@@ -93,6 +93,8 @@ type Party struct {
 	Address           Address   `json:"address"`
 	Payment           Payment   `json:"payment"`
 	Contacts          []Contact `json:"contacts"`
+	// Versão do cadastro (concorrência otimista): a tela devolve ao salvar.
+	Version int32 `json:"version"`
 	Notes             *string   `json:"notes"`
 }
 
@@ -353,6 +355,7 @@ func (f *Fields) UpdateParams(id int64) db.UpdatePartyParams {
 // FromDB converte a linha do banco (com a cidade e os contatos) para a API.
 func FromDB(p db.Party, cityName, cityState *string, contacts []db.PartyContact) Party {
 	out := Party{
+		Version:    p.Version,
 		PersonType: p.PersonType, Document: p.Document, LegalName: p.LegalName,
 		TradeName: p.TradeName, StateRegistration: p.StateRegistration,
 		TaxpayerType: p.TaxpayerType, Email: p.Email, Phone: p.Phone, Whatsapp: p.Whatsapp,

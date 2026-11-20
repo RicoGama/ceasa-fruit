@@ -29,6 +29,7 @@ type User struct {
 	Email     string    `json:"email"`
 	Role      string    `json:"role" enum:"admin,manager,seller,checker,finance,driver"`
 	Active    bool      `json:"active"`
+	Version   int32     `json:"version" doc:"Send it back on update (optimistic locking)"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -65,6 +66,8 @@ type updateUserInput struct {
 		Name   string `json:"name" minLength:"2" maxLength:"120"`
 		Role   string `json:"role" enum:"admin,manager,seller,checker,finance,driver"`
 		Active bool   `json:"active"`
+		// Versão que a tela leu; se outra pessoa salvou depois, a API responde 409.
+		Version int32 `json:"version" minimum:"1"`
 	}
 }
 
@@ -179,32 +182,10 @@ func (h *handler) update(ctx context.Context, in *updateUserInput) (*userOutput,
 	}
 
 	var updated db.User
-	err := h.db.InTx(ctx, func(q postgres.Tx) error {
-		current, err := q.GetUser(ctx, in.ID)
-		if err != nil {
-			return err
-		}
-		updated, err = q.UpdateUser(ctx, db.UpdateUserParams{ID: in.ID, Name: b.Name, Role: b.Role, Active: b.Active})
-		if err != nil {
-			return err
-		}
-		// Se era um admin ativo e deixou de ser, confere que sobrou pelo menos um.
-		wasAdmin := current.Role == auth.RoleAdmin && current.Active
-		isAdmin := updated.Role == auth.RoleAdmin && updated.Active
-		if wasAdmin && !isAdmin {
-			n, err := q.CountActiveAdmins(ctx)
-			if err != nil {
-				return err
-			}
-			if n == 0 {
-				return errLastAdmin // desfaz a transação inteira
-			}
-		}
-		// Desativado: encerra as sessões abertas na hora.
-		if !updated.Active {
-			return q.DeleteUserSessions(ctx, in.ID)
-		}
-		return nil
+	err := h.db.InTx(ctx, func(tx postgres.Tx) error {
+		var err error
+		updated, err = applyUpdate(ctx, tx, in.ID, b.Version, b.Name, b.Role, b.Active)
+		return err
 	})
 	switch {
 	case errors.Is(err, errLastAdmin):
@@ -237,6 +218,61 @@ func (h *handler) resendInvite(ctx context.Context, in *idInput) (*struct{}, err
 	return nil, err
 }
 
+// applyUpdate altera o usuário dentro da transação tx. Fica separada do
+// handler para o teste de concorrência controlar quando cada transação grava.
+//
+// Concorrência:
+//   - version: a tela manda a versão que leu; se outra pessoa salvou no
+//     meio, a versão não bate e devolvemos StaleError (409);
+//   - último admin: dois admins rebaixando um ao outro AO MESMO TEMPO veriam,
+//     cada um, "ainda existe outro admin" e o sistema ficaria sem nenhum.
+//     Por isso travamos as linhas dos admins ativos ANTES de checar: a segunda
+//     transação espera a primeira terminar e só então conta.
+func applyUpdate(ctx context.Context, q postgres.Tx, id int64, version int32, name, role string, active bool) (db.User, error) {
+	admins, err := q.LockActiveAdmins(ctx)
+	if err != nil {
+		return db.User{}, err
+	}
+	current, err := q.GetUser(ctx, id)
+	if err != nil {
+		return db.User{}, err
+	}
+	if current.Version != version {
+		return db.User{}, postgres.StaleError()
+	}
+	updated, err := q.UpdateUser(ctx, db.UpdateUserParams{ID: id, Version: version, Name: name, Role: role, Active: active})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return db.User{}, postgres.StaleError() // existia, mas a versão mudou no meio
+	}
+	if err != nil {
+		return db.User{}, err
+	}
+
+	// Se era um admin ativo e deixou de ser, confere que sobrou pelo menos um.
+	// (admins = os ativos no momento da trava, já com as alterações de quem
+	// gravou antes de nós.)
+	wasAdmin := current.Role == auth.RoleAdmin && current.Active
+	isAdmin := updated.Role == auth.RoleAdmin && updated.Active
+	if wasAdmin && !isAdmin {
+		remaining := 0
+		for _, adminID := range admins {
+			if adminID != id {
+				remaining++
+			}
+		}
+		if remaining == 0 {
+			return db.User{}, errLastAdmin // desfaz a transação inteira
+		}
+	}
+	// Desativado: encerra as sessões abertas na hora.
+	if !updated.Active {
+		if err := q.DeleteUserSessions(ctx, id); err != nil {
+			return db.User{}, err
+		}
+	}
+	return updated, nil
+}
+
 var (
 	errLastAdmin = errors.New("last admin")
 	errInactive  = errors.New("inactive user")
@@ -244,7 +280,7 @@ var (
 
 func toAPI(u db.User) User {
 	return User{
-		ID: u.ID, Name: u.Name, Email: u.Email, Role: u.Role, Active: u.Active,
+		ID: u.ID, Name: u.Name, Email: u.Email, Role: u.Role, Active: u.Active, Version: u.Version,
 		CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt,
 	}
 }

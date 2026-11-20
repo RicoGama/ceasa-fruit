@@ -67,7 +67,7 @@ const createUser = `-- name: CreateUser :one
 
 INSERT INTO users (name, email, password_hash, role)
 VALUES ($1, $2, $3, $4)
-RETURNING id, name, email, password_hash, role, active, created_at, updated_at
+RETURNING id, name, email, password_hash, role, active, created_at, updated_at, version
 `
 
 type CreateUserParams struct {
@@ -95,6 +95,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Version,
 	)
 	return i, err
 }
@@ -150,7 +151,7 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (GetSessionR
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, name, email, password_hash, role, active, created_at, updated_at FROM users
+SELECT id, name, email, password_hash, role, active, created_at, updated_at, version FROM users
 WHERE email = $1
 `
 
@@ -166,6 +167,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Version,
 	)
 	return i, err
 }

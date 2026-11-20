@@ -127,6 +127,28 @@ err := h.db.InReadTx(ctx, func(tx postgres.Tx) error { ... })
   transação por conta própria (`pgx.BeginFunc`, `.Begin`), criar queries
   soltas (`db.New`) ou receber o `pgxpool` num pacote de negócio.
 
+## Concorrência
+
+Muita gente mexendo ao mesmo tempo (vendedores, conferentes, financeiro). As
+ferramentas, de acordo com o problema:
+
+| Problema | Ferramenta | Onde já está |
+|---|---|---|
+| Duas pessoas editam o mesmo cadastro; a segunda apaga a alteração da primeira | **Versão da linha** (concorrência otimista): a tela manda a `version` que leu; o `UPDATE ... WHERE version = @version` só passa se ninguém salvou no meio. Senão, **409** e o front oferece recarregar | fornecedor, empresa, usuários |
+| Duas transações disputam a mesma linha (estoque, próximo número da nota, último admin) | **`SELECT ... FOR UPDATE`**: a segunda espera a primeira terminar e enxerga o valor novo. Travar sempre na mesma ordem (por id) | último admin (`LockActiveAdmins`) |
+| Deadlock / falha de serialização | `InTx` **repete a transação sozinho** (até 3 vezes). Por isso a função dentro do `InTx` só mexe no banco: SEFAZ, banco e e-mail vão pela fila | todas as transações |
+| Trava presa por muito tempo | `lock_timeout` 5s → **503** "tente de novo"; `statement_timeout` 30s; transação esquecida aberta cai em 60s | conexão (`postgres.Connect`) |
+| Mesmo documento cadastrado duas vezes ao mesmo tempo | **índice único** no banco: a segunda recebe 409 | CPF/CNPJ, e-mail |
+| Disputa de memória dentro do Go | testes com **`-race`** (`make test`, `make test-integration`) | sempre |
+
+Testes que provam cada caso: `internal/user/concurrency_test.go` (corrida do
+último admin, forçada de forma determinística), `internal/server/concurrency_test.go`
+(10 pessoas salvando o mesmo fornecedor: exatamente 1 vence) e
+`internal/postgres/tx_test.go` (deadlock repetido sozinho, trava demorada vira 503).
+
+Ao criar uma tela de edição nova: devolva `version` no GET, exija no PUT e use
+`ClaimPartyVersion` (pessoas) ou `WHERE version = @version` na query.
+
 ## Dinheiro, quantidade e percentual
 
 **Nunca `float64` para valores.** Em float, `0.1 + 0.2` dá `0.30000000000000004`;
@@ -201,8 +223,8 @@ make help
 | Comando | O que faz |
 |---|---|
 | `make run` | sobe a API (migrations aplicadas no start) |
-| `make test` | testes unitários (não precisam de banco) |
-| `make test-integration` | todos os testes, incluindo os de integração no banco `ceasa_test` |
+| `make test` | testes unitários (não precisam de banco), com detector de corridas |
+| `make test-integration` | todos os testes, incluindo integração e concorrência no banco `ceasa_test` |
 | `make sqlc` | regenera `internal/db` depois de mexer em `queries/*.sql` ou migrations |
 | `make migration name=create_customers` | cria um novo arquivo de migration |
 | `make seed [email=...] [password=...]` | cria a empresa e cria/atualiza um admin (senha aleatória se não informar) |

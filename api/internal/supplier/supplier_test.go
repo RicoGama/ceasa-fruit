@@ -64,9 +64,27 @@ func (f *fakeStore) CreateParty(_ context.Context, a db.CreatePartyParams) (int6
 		ID: id, PersonType: a.PersonType, Document: a.Document,
 		LegalName: a.LegalName, TradeName: a.TradeName, TaxpayerType: a.TaxpayerType,
 		Phone: a.Phone, PostalCode: a.PostalCode, CityID: a.CityID,
-		PixKeyType: a.PixKeyType, PixKey: a.PixKey,
+		PixKeyType: a.PixKeyType, PixKey: a.PixKey, Version: 1,
 	}
 	return id, nil
+}
+
+// ClaimPartyVersion imita o UPDATE ... WHERE version = @version do banco.
+func (f *fakeStore) ClaimPartyVersion(_ context.Context, a db.ClaimPartyVersionParams) (int64, error) {
+	p, ok := f.parties[a.ID]
+	if !ok || p.Version != a.Version {
+		return 0, nil
+	}
+	p.Version++
+	f.parties[a.ID] = p
+	return 1, nil
+}
+
+func (f *fakeStore) BumpPartyVersion(_ context.Context, id int64) error {
+	p := f.parties[id]
+	p.Version++
+	f.parties[id] = p
+	return nil
 }
 
 func (f *fakeStore) UpdateParty(_ context.Context, a db.UpdatePartyParams) (int64, error) {
@@ -310,6 +328,7 @@ func TestUpdateReplacesContacts(t *testing.T) {
 	body := fullBody()
 	body["tradeName"] = "Zé Tomateiro"
 	body["contacts"] = []map[string]any{{"name": "Carlos", "role": "motorista"}}
+	body["version"] = 1
 	resp := env.api.Put("/suppliers/1", body)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body.String())
@@ -318,6 +337,47 @@ func TestUpdateReplacesContacts(t *testing.T) {
 	if *got.TradeName != "Zé Tomateiro" || len(got.Contacts) != 1 || got.Contacts[0].Name != "Carlos" {
 		t.Errorf("update not applied: trade=%v contacts=%+v", *got.TradeName, got.Contacts)
 	}
+	if got.Version != 2 {
+		t.Errorf("version = %d, want 2", got.Version)
+	}
+}
+
+// Duas pessoas abrem o cadastro na versão 1. A primeira salva (vira 2); a
+// segunda, ainda com a versão 1, recebe 409 em vez de apagar a alteração.
+func TestStaleUpdateIsRejected(t *testing.T) {
+	env := newTestEnv(t)
+	env.api.Post("/suppliers", fullBody())
+
+	first := fullBody()
+	first["tradeName"] = "Primeira pessoa"
+	first["version"] = 1
+	if resp := env.api.Put("/suppliers/1", first); resp.Code != http.StatusOK {
+		t.Fatalf("first save: %d %s", resp.Code, resp.Body.String())
+	}
+
+	second := fullBody()
+	second["tradeName"] = "Segunda pessoa"
+	second["version"] = 1
+	resp := env.api.Put("/suppliers/1", second)
+	if resp.Code != http.StatusConflict {
+		t.Fatalf("stale save: status = %d, want 409", resp.Code)
+	}
+	if got := decode[Supplier](t, env.api.Get("/suppliers/1").Body.Bytes()); *got.TradeName != "Primeira pessoa" {
+		t.Errorf("first change was lost: %s", *got.TradeName)
+	}
+
+	// Inativar também muda a versão: a tela aberta não reativa sem querer.
+	env.api.Delete("/suppliers/1")
+	third := fullBody()
+	third["version"] = 2
+	if resp := env.api.Put("/suppliers/1", third); resp.Code != http.StatusConflict {
+		t.Errorf("save after deactivate: status = %d, want 409", resp.Code)
+	}
+}
+
+func withVersion(b map[string]any, v int) map[string]any {
+	b["version"] = v
+	return b
 }
 
 func TestUnknownSupplierIs404(t *testing.T) {
@@ -325,7 +385,7 @@ func TestUnknownSupplierIs404(t *testing.T) {
 	if resp := env.api.Get("/suppliers/99"); resp.Code != http.StatusNotFound {
 		t.Errorf("get: status = %d, want 404", resp.Code)
 	}
-	if resp := env.api.Put("/suppliers/99", fullBody()); resp.Code != http.StatusNotFound {
+	if resp := env.api.Put("/suppliers/99", withVersion(fullBody(), 1)); resp.Code != http.StatusNotFound {
 		t.Errorf("update: status = %d, want 404", resp.Code)
 	}
 	if resp := env.api.Delete("/suppliers/99"); resp.Code != http.StatusNotFound {

@@ -16,7 +16,8 @@ useHead({ title: () => `${supplier.value ? displayName(supplier.value) : 'Fornec
 </script>
 
 <template>
-  <SuppliersSupplierForm v-if="supplier" :key="supplier.id" :supplier="supplier" />
+  <!-- A chave inclui a versão: ao recarregar depois de um conflito, o formulário é recriado com os dados novos. -->
+  <SuppliersSupplierForm v-if="supplier" :key="`${supplier.id}-${supplier.version}`" :supplier="supplier" />
 
   <UDashboardPanel v-else id="supplier-not-found">
     <template #header>

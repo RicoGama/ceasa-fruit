@@ -74,11 +74,18 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   saving.value = true
   const { name, email, role, active } = event.data
   const { error } = editing.value
-    ? await api.PUT('/users/{id}', { params: { path: { id: editing.value.id } }, body: { name, role, active } })
+    ? await api.PUT('/users/{id}', { params: { path: { id: editing.value.id } }, body: { name, role, active, version: editing.value.version } })
     : await api.POST('/users', { body: { name, email, role } })
   saving.value = false
 
   if (error) {
+    if (isStaleError(error)) {
+      // Outra pessoa alterou este usuário: fecha o modal e mostra a lista atual.
+      modalOpen.value = false
+      toast.add({ title: apiErrorMessage(error), description: 'A lista foi atualizada; abra o usuário de novo.', color: 'warning' })
+      await refresh()
+      return
+    }
     const fieldErrors = apiFieldErrors(error)
     if (fieldErrors.length) formRef.value?.setErrors(fieldErrors)
     else toast.add({ title: apiErrorMessage(error), color: 'error' })

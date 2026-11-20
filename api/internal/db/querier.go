@@ -9,6 +9,13 @@ import (
 )
 
 type Querier interface {
+	// Soma 1 na versão sem conferir (ações que não vêm de um formulário, como
+	// inativar): quem estiver com a tela aberta recebe 409 ao salvar.
+	BumpPartyVersion(ctx context.Context, id int64) error
+	// "Reserva" a edição da pessoa: só passa se ninguém salvou depois que a tela
+	// leu (version igual) e já soma 1. 0 linhas = alterada por outra pessoa (ou
+	// inexistente). Toda gravação de fornecedor/cliente começa por aqui.
+	ClaimPartyVersion(ctx context.Context, arg ClaimPartyVersionParams) (int64, error)
 	// Marca o token como usado e devolve o usuário, numa operação só: dois
 	// pedidos simultâneos com o mesmo link não conseguem usá-lo duas vezes.
 	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) (int64, error)
@@ -44,14 +51,20 @@ type Querier interface {
 	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]ListSuppliersRow, error)
 	// Gestão de usuários (tela do administrador).
 	ListUsers(ctx context.Context) ([]User, error)
+	// Trava as linhas dos administradores ativos até o fim da transação.
+	// Quem chegar depois ESPERA, e só então enxerga o que mudou. Ordenado por id
+	// para todas as transações travarem na mesma ordem (evita deadlock).
+	LockActiveAdmins(ctx context.Context) ([]int64, error)
 	// Municípios do IBGE (tabela de referência, sem organização).
 	// Busca sem acento; quem começa com o texto aparece primeiro.
 	SearchCities(ctx context.Context, arg SearchCitiesParams) ([]City, error)
+	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
+	UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (int64, error)
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (int64, error)
 	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (int64, error)
+	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
-	UpsertCompany(ctx context.Context, arg UpsertCompanyParams) error
 }
 
 var _ Querier = (*Queries)(nil)

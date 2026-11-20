@@ -100,6 +100,9 @@ function fromSupplier(s: Supplier): State {
 }
 
 const state = reactive<State>(props.supplier ? fromSupplier(props.supplier) : emptyState())
+// Versão do cadastro que esta tela leu (concorrência otimista): vai junto ao
+// salvar; se outra pessoa salvou no meio, a API responde 409.
+const version = ref(props.supplier?.version ?? 0)
 
 // "Alterações não salvas": compara o estado atual com o último salvo.
 const savedSnapshot = ref(JSON.stringify(state))
@@ -259,11 +262,21 @@ async function onSubmit(_event: FormSubmitEvent<z.output<typeof schema>>) {
   saving.value = true
   const body = toBody(state)
   const result = props.supplier
-    ? await api.PUT('/suppliers/{id}', { params: { path: { id: props.supplier.id } }, body })
+    ? await api.PUT('/suppliers/{id}', { params: { path: { id: props.supplier.id } }, body: { ...body, version: version.value } })
     : await api.POST('/suppliers', { body })
   saving.value = false
 
   if (result.error) {
+    if (isStaleError(result.error)) {
+      toast.add({
+        title: apiErrorMessage(result.error),
+        description: 'Recarregue para ver a versão atual. O que você mudou nesta tela será descartado.',
+        color: 'warning',
+        duration: 0,
+        actions: [{ label: 'Recarregar', color: 'warning', variant: 'outline', onClick: reload }],
+      })
+      return
+    }
     if (result.response.status === 409) {
       form.value?.setErrors([{ name: 'document', message: apiErrorMessage(result.error) }])
     }
@@ -275,10 +288,18 @@ async function onSubmit(_event: FormSubmitEvent<z.output<typeof schema>>) {
   }
 
   const saved = result.data
+  version.value = saved.version
   Object.assign(state, fromSupplier(saved))
   savedSnapshot.value = JSON.stringify(state)
   toast.add({ title: props.supplier ? 'Fornecedor atualizado' : 'Fornecedor cadastrado', color: 'success' })
   if (!props.supplier) await navigateTo(`/app/suppliers/${saved.id}`)
+}
+
+// Busca de novo o cadastro (a página recria o formulário com a versão nova).
+async function reload() {
+  if (!props.supplier) return
+  savedSnapshot.value = JSON.stringify(state) // descarta: não pergunta de novo
+  await refreshNuxtData(`supplier-${props.supplier.id}`)
 }
 
 // Avisa antes de sair da tela com alterações não salvas.

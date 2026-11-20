@@ -33,6 +33,8 @@ function toState(c?: Company | null) {
     complement: c?.complement ?? '',
     district: c?.district ?? '',
     city: (c?.city ?? null) as City | null,
+    // Versão lida (concorrência otimista): vai junto ao salvar.
+    version: c?.version ?? 0,
   }
 }
 type State = ReturnType<typeof toState>
@@ -91,10 +93,21 @@ async function onSubmit(_: FormSubmitEvent<unknown>) {
       complement: t(state.complement),
       district: t(state.district),
       cityId: state.city?.id,
+      version: state.version,
     },
   })
   saving.value = false
   if (error) {
+    if (isStaleError(error)) {
+      toast.add({
+        title: apiErrorMessage(error),
+        description: 'Recarregue para ver os dados atuais. O que você mudou nesta tela será descartado.',
+        color: 'warning',
+        duration: 0,
+        actions: [{ label: 'Recarregar', color: 'warning', variant: 'outline', onClick: () => { refresh() } }],
+      })
+      return
+    }
     const fieldErrors = apiFieldErrors(error)
     if (fieldErrors.length) formRef.value?.setErrors(fieldErrors)
     toast.add({ title: apiErrorMessage(error), color: 'error' })

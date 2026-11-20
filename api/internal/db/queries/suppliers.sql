@@ -30,6 +30,21 @@ SET person_type = @person_type, document = @document, legal_name = @legal_name,
     updated_at = now()
 WHERE id = @id;
 
+-- "Reserva" a edição da pessoa: só passa se ninguém salvou depois que a tela
+-- leu (version igual) e já soma 1. 0 linhas = alterada por outra pessoa (ou
+-- inexistente). Toda gravação de fornecedor/cliente começa por aqui.
+-- name: ClaimPartyVersion :execrows
+UPDATE parties
+SET version = version + 1, updated_at = now()
+WHERE id = @id AND version = @version;
+
+-- Soma 1 na versão sem conferir (ações que não vêm de um formulário, como
+-- inativar): quem estiver com a tela aberta recebe 409 ao salvar.
+-- name: BumpPartyVersion :exec
+UPDATE parties
+SET version = version + 1, updated_at = now()
+WHERE id = @id;
+
 -- name: CreateSupplier :exec
 INSERT INTO suppliers (
     party_id, supplier_type, default_purchase_mode,

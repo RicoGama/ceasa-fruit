@@ -25,6 +25,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/money"
 	"github.com/RicoGama/ceasa-fruit/api/internal/party"
+	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 )
 
 // Store é o que os handlers precisam do banco de dados.
@@ -35,6 +36,8 @@ type Store interface {
 	party.ContactStore
 	CreateParty(ctx context.Context, arg db.CreatePartyParams) (int64, error)
 	UpdateParty(ctx context.Context, arg db.UpdatePartyParams) (int64, error)
+	ClaimPartyVersion(ctx context.Context, arg db.ClaimPartyVersionParams) (int64, error)
+	BumpPartyVersion(ctx context.Context, id int64) error
 	CreateSupplier(ctx context.Context, arg db.CreateSupplierParams) error
 	UpdateSupplier(ctx context.Context, arg db.UpdateSupplierParams) (int64, error)
 	GetSupplier(ctx context.Context, id int64) (db.GetSupplierRow, error)
@@ -168,9 +171,15 @@ func (in *createInput) Resolve(huma.Context) []error {
 	return in.Body.normalize()
 }
 
+// SupplierUpdate são os campos editáveis + a versão que a tela leu.
+type SupplierUpdate struct {
+	SupplierFields
+	Version int32 `json:"version" minimum:"1" doc:"The version read; 409 if someone saved in between"`
+}
+
 type updateInput struct {
 	ID   int64 `path:"id" minimum:"1"`
-	Body SupplierFields
+	Body SupplierUpdate
 }
 
 func (in *updateInput) Resolve(huma.Context) []error {
@@ -317,9 +326,22 @@ func (h *handler) update(ctx context.Context, in *updateInput) (*supplierOutput,
 	f := &in.Body
 	var out Supplier
 	err := h.tx(ctx, func(s Store) error {
-		// Primeiro o fornecedor: se ele não existir, nenhuma linha é alterada e
-		// respondemos 404 sem mexer na pessoa.
-		n, err := s.UpdateSupplier(ctx, db.UpdateSupplierParams{
+		// 1. "Reserva" a edição: só passa se ninguém salvou depois que a tela
+		//    leu (versão igual). Assim a alteração de outra pessoa nunca some.
+		n, err := s.ClaimPartyVersion(ctx, db.ClaimPartyVersionParams{ID: in.ID, Version: f.Version})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			// Não existe (404) ou a versão mudou (409)?
+			if _, err := s.GetSupplier(ctx, in.ID); err != nil {
+				return err
+			}
+			return postgres.StaleError()
+		}
+
+		// 2. Fornecedor: se a pessoa existe mas não é fornecedor, 404.
+		n, err = s.UpdateSupplier(ctx, db.UpdateSupplierParams{
 			PartyID: in.ID, SupplierType: f.SupplierType,
 			DefaultPurchaseMode: f.DefaultPurchaseMode, ConsignmentCommission: f.ConsignmentCommission,
 			PaymentTermDays: f.PaymentTermDays, CeasaPavilion: f.CeasaPavilion, CeasaBox: f.CeasaBox,
@@ -352,7 +374,12 @@ func (h *handler) deactivate(ctx context.Context, in *idInput) (*struct{}, error
 	err := h.tx(ctx, func(s Store) error {
 		var err error
 		n, err = s.DeactivateSupplier(ctx, in.ID)
-		return err
+		if err != nil || n == 0 {
+			return err
+		}
+		// Quem estiver com o cadastro aberto recebe 409 ao salvar, em vez de
+		// reativar o fornecedor sem perceber.
+		return s.BumpPartyVersion(ctx, in.ID)
 	})
 	if err != nil {
 		return nil, err

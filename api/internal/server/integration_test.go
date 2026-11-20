@@ -241,10 +241,11 @@ func TestIntegrationUsersAndRoles(t *testing.T) {
 	// --- Empresa ------------------------------------------------------------------
 	admin.expect(http.StatusOK, "GET", "/company", nil, nil)
 	admin.expect(http.StatusUnprocessableEntity, "PUT", "/company",
-		map[string]any{"name": "Irmãos Faisão", "document": "11.111.111/1111-11"}, nil)
+		map[string]any{"name": "Irmãos Faisão", "document": "11.111.111/1111-11", "version": 1}, nil)
 	admin.expect(http.StatusUnprocessableEntity, "PUT", "/company",
-		map[string]any{"name": "Irmãos Faisão", "cityId": 9999999}, nil)
+		map[string]any{"name": "Irmãos Faisão", "cityId": 9999999, "version": 1}, nil)
 	var company struct {
+		Version   int32   `json:"version"`
 		TradeName *string `json:"tradeName"`
 		City      *struct {
 			Name string `json:"name"`
@@ -253,10 +254,13 @@ func TestIntegrationUsersAndRoles(t *testing.T) {
 	admin.expect(http.StatusOK, "PUT", "/company", map[string]any{
 		"name": "Irmãos Faisão Frutícola Ltda", "tradeName": "Irmãos Faisão",
 		"document": "11.222.333/0001-81", "taxRegime": "simples", "cityId": 3304557, // Rio de Janeiro
+		"version": 1,
 	}, &company)
-	if company.City == nil || company.City.Name != "Rio de Janeiro" || company.TradeName == nil {
+	if company.City == nil || company.City.Name != "Rio de Janeiro" || company.TradeName == nil || company.Version != 2 {
 		t.Fatalf("company: %+v", company)
 	}
+	// Outra tela ainda com a versão 1: 409 em vez de apagar o que foi salvo.
+	admin.expect(http.StatusConflict, "PUT", "/company", map[string]any{"name": "Tela antiga", "version": 1}, nil)
 
 	// --- Criar vendedor sem senha: vai convite por e-mail -----------------------
 	var seller idResp
@@ -283,21 +287,21 @@ func TestIntegrationUsersAndRoles(t *testing.T) {
 
 	// --- Papéis: vendedor não mexe em usuários nem na empresa ------------------
 	sellerClient.expect(http.StatusForbidden, "GET", "/users", nil, nil)
-	sellerClient.expect(http.StatusForbidden, "PUT", "/company", map[string]any{"name": "Hack"}, nil)
+	sellerClient.expect(http.StatusForbidden, "PUT", "/company", map[string]any{"name": "Hack", "version": 2}, nil)
 	sellerClient.expect(http.StatusOK, "GET", "/company", nil, nil)
 	sellerClient.expect(http.StatusOK, "GET", "/suppliers", nil, nil)
 
 	// --- Proteções do admin ------------------------------------------------------
 	admin.expect(http.StatusConflict, "PUT", fmt.Sprintf("/users/%d", adminMe.User.ID),
-		map[string]any{"name": "Admin", "role": "admin", "active": false}, nil)
+		map[string]any{"name": "Admin", "role": "admin", "active": false, "version": 1}, nil)
 	admin.expect(http.StatusConflict, "PUT", fmt.Sprintf("/users/%d", adminMe.User.ID),
-		map[string]any{"name": "Admin", "role": "manager", "active": true}, nil)
+		map[string]any{"name": "Admin", "role": "manager", "active": true, "version": 1}, nil)
 	admin.expect(http.StatusNotFound, "PUT", "/users/9999",
-		map[string]any{"name": "Ninguém", "role": "seller", "active": true}, nil)
+		map[string]any{"name": "Ninguém", "role": "seller", "active": true, "version": 1}, nil)
 
 	// --- Desativar o vendedor derruba a sessão dele -----------------------------
 	admin.expect(http.StatusOK, "PUT", fmt.Sprintf("/users/%d", seller.ID),
-		map[string]any{"name": "Vendedor", "role": "seller", "active": false}, nil)
+		map[string]any{"name": "Vendedor", "role": "seller", "active": false, "version": 1}, nil)
 	sellerClient.expect(http.StatusUnauthorized, "GET", "/auth/me", nil, nil)
 	anon.expect(http.StatusUnauthorized, "POST", "/auth/login",
 		map[string]any{"email": "vendedor@test.com", "password": "senha-do-vendedor"}, nil)

@@ -20,7 +20,28 @@ var migrationsFS embed.FS
 
 // Connect abre um pool de conexões (as conexões são reaproveitadas entre requisições).
 func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
-	pool, err := pgxpool.New(ctx, databaseURL)
+	cfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parsing database url: %w", err)
+	}
+	// Limites para nenhuma requisição ficar presa para sempre:
+	//   - lock_timeout: esperar no máximo 5s por uma trava (FOR UPDATE);
+	//     depois disso, a API responde "tente de novo" (503);
+	//   - statement_timeout: nenhuma consulta passa de 30s;
+	//   - idle_in_transaction_session_timeout: uma transação esquecida aberta
+	//     é encerrada em 60s, soltando as travas que segurava.
+	// (Dá para mudar por transação com SET LOCAL, ex.: um relatório pesado.)
+	for name, value := range map[string]string{
+		"lock_timeout":                        "5s",
+		"statement_timeout":                   "30s",
+		"idle_in_transaction_session_timeout": "60s",
+	} {
+		if _, ok := cfg.ConnConfig.RuntimeParams[name]; !ok {
+			cfg.ConnConfig.RuntimeParams[name] = value
+		}
+	}
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		// %w "embrulha" o erro original: quem chamar pode inspecioná-lo com errors.Is/As.
 		return nil, fmt.Errorf("creating pool: %w", err)

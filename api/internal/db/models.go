@@ -34,6 +34,7 @@ type Company struct {
 	CityID            *int32
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	Version           int32
 }
 
 type Party struct {
@@ -64,6 +65,7 @@ type Party struct {
 	Notes                     *string
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
+	Version                   int32
 }
 
 type PartyContact struct {
@@ -121,4 +123,5 @@ type User struct {
 	Active       bool
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	Version      int32
 }

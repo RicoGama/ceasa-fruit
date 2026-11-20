@@ -35,6 +35,7 @@ type Company struct {
 	Complement        *string     `json:"complement"`
 	District          *string     `json:"district"`
 	City              *party.City `json:"city"`
+	Version           int32       `json:"version" doc:"Send it back on update (optimistic locking)"`
 	UpdatedAt         time.Time   `json:"updatedAt"`
 }
 
@@ -44,6 +45,7 @@ type companyOutput struct {
 
 type updateCompanyInput struct {
 	Body struct {
+		Version           int32   `json:"version" minimum:"1" doc:"The version read; 409 if someone saved in between"`
 		Name              string  `json:"name" minLength:"2" maxLength:"150" doc:"Legal name (razão social)"`
 		TradeName         *string `json:"tradeName,omitempty" maxLength:"150"`
 		Document          *string `json:"document,omitempty" maxLength:"18" doc:"CNPJ, with or without mask"`
@@ -131,13 +133,20 @@ func (h *handler) update(ctx context.Context, in *updateCompanyInput) (*companyO
 	b := in.Body
 	var out Company
 	err := h.db.InTx(ctx, func(tx postgres.Tx) error {
-		err := tx.UpsertCompany(ctx, db.UpsertCompanyParams{
-			Name: b.Name, TradeName: b.TradeName, Document: b.Document, StateRegistration: b.StateRegistration,
+		n, err := tx.UpdateCompany(ctx, db.UpdateCompanyParams{
+			Version: b.Version, Name: b.Name, TradeName: b.TradeName, Document: b.Document, StateRegistration: b.StateRegistration,
 			TaxRegime: b.TaxRegime, Phone: b.Phone, Email: b.Email, PostalCode: b.PostalCode,
 			Street: b.Street, Number: b.Number, Complement: b.Complement, District: b.District, CityID: b.CityID,
 		})
 		if err != nil {
 			return err
+		}
+		if n == 0 {
+			// Ou a empresa não existe (404), ou outra pessoa salvou no meio (409).
+			if _, err := load(ctx, tx); err != nil {
+				return err
+			}
+			return postgres.StaleError()
 		}
 		out, err = load(ctx, tx)
 		return err
@@ -166,7 +175,7 @@ func load(ctx context.Context, tx postgres.Tx) (Company, error) {
 		Name: c.Name, TradeName: c.TradeName, Document: c.Document, StateRegistration: c.StateRegistration,
 		TaxRegime: c.TaxRegime, Phone: c.Phone, Email: c.Email, PostalCode: c.PostalCode,
 		Street: c.Street, Number: c.Number, Complement: c.Complement, District: c.District,
-		UpdatedAt: c.UpdatedAt,
+		Version: c.Version, UpdatedAt: c.UpdatedAt,
 	}
 	if c.CityID != nil && c.CityName != nil && c.CityState != nil {
 		out.City = &party.City{ID: *c.CityID, Name: *c.CityName, State: *c.CityState}

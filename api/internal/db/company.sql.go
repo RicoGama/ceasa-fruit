@@ -24,7 +24,7 @@ func (q *Queries) EnsureCompany(ctx context.Context, name string) error {
 
 const getCompany = `-- name: GetCompany :one
 
-SELECT c.id, c.name, c.trade_name, c.document, c.state_registration, c.tax_regime, c.phone, c.email, c.postal_code, c.street, c.number, c.complement, c.district, c.city_id, c.created_at, c.updated_at, ci.name AS city_name, ci.state_code AS city_state
+SELECT c.id, c.name, c.trade_name, c.document, c.state_registration, c.tax_regime, c.phone, c.email, c.postal_code, c.street, c.number, c.complement, c.district, c.city_id, c.created_at, c.updated_at, c.version, ci.name AS city_name, ci.state_code AS city_state
 FROM company c
 LEFT JOIN cities ci ON ci.id = c.city_id
 WHERE c.id = 1
@@ -47,6 +47,7 @@ type GetCompanyRow struct {
 	CityID            *int32
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	Version           int32
 	CityName          *string
 	CityState         *string
 }
@@ -72,29 +73,25 @@ func (q *Queries) GetCompany(ctx context.Context) (GetCompanyRow, error) {
 		&i.CityID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Version,
 		&i.CityName,
 		&i.CityState,
 	)
 	return i, err
 }
 
-const upsertCompany = `-- name: UpsertCompany :exec
-INSERT INTO company (
-    id, name, trade_name, document, state_registration, tax_regime, phone, email,
-    postal_code, street, number, complement, district, city_id
-) VALUES (
-    1, $1, $2, $3, $4, $5, $6, $7,
-    $8, $9, $10, $11, $12, $13
-)
-ON CONFLICT (id) DO UPDATE
-SET name = EXCLUDED.name, trade_name = EXCLUDED.trade_name, document = EXCLUDED.document,
-    state_registration = EXCLUDED.state_registration, tax_regime = EXCLUDED.tax_regime,
-    phone = EXCLUDED.phone, email = EXCLUDED.email, postal_code = EXCLUDED.postal_code,
-    street = EXCLUDED.street, number = EXCLUDED.number, complement = EXCLUDED.complement,
-    district = EXCLUDED.district, city_id = EXCLUDED.city_id, updated_at = now()
+const updateCompany = `-- name: UpdateCompany :execrows
+UPDATE company
+SET name = $1, trade_name = $2, document = $3,
+    state_registration = $4, tax_regime = $5,
+    phone = $6, email = $7, postal_code = $8,
+    street = $9, number = $10, complement = $11,
+    district = $12, city_id = $13,
+    version = version + 1, updated_at = now()
+WHERE id = 1 AND version = $14
 `
 
-type UpsertCompanyParams struct {
+type UpdateCompanyParams struct {
 	Name              string
 	TradeName         *string
 	Document          *string
@@ -108,10 +105,12 @@ type UpsertCompanyParams struct {
 	Complement        *string
 	District          *string
 	CityID            *int32
+	Version           int32
 }
 
-func (q *Queries) UpsertCompany(ctx context.Context, arg UpsertCompanyParams) error {
-	_, err := q.db.Exec(ctx, upsertCompany,
+// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
+func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateCompany,
 		arg.Name,
 		arg.TradeName,
 		arg.Document,
@@ -125,6 +124,10 @@ func (q *Queries) UpsertCompany(ctx context.Context, arg UpsertCompanyParams) er
 		arg.Complement,
 		arg.District,
 		arg.CityID,
+		arg.Version,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

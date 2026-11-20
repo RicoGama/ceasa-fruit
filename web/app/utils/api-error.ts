@@ -3,6 +3,15 @@ import type { ApiErrorModel } from '~/types'
 
 // A API responde mensagens em inglês (código em inglês); aqui traduzimos as
 // conhecidas para mostrar ao usuário. Mensagem desconhecida aparece como veio.
+// Concorrência: a API recusa salvar por cima do que outra pessoa gravou
+// (409, versão diferente) ou quando o registro está travado há tempo demais (503).
+const STALE = 'this record was changed by someone else'
+const BUSY = 'the record is busy, try again'
+
+export function isStaleError(error: unknown): boolean {
+  return (error as Partial<ApiErrorModel> | undefined)?.detail === STALE
+}
+
 const translations: Record<string, string> = {
   'invalid CPF or CNPJ': 'CPF ou CNPJ inválido',
   'a supplier with this document already exists': 'Já existe um fornecedor com este documento',
@@ -29,6 +38,8 @@ const translations: Record<string, string> = {
   'company not configured': 'Os dados da empresa ainda não foram cadastrados',
   'invalid CNPJ': 'CNPJ inválido',
   'validation failed': 'Verifique os campos destacados',
+  [STALE]: 'Outra pessoa salvou este registro enquanto você editava',
+  [BUSY]: 'Outra pessoa está gravando este registro agora. Tente de novo em instantes.',
   'authentication required': 'Sua sessão expirou. Entre de novo.',
   'invalid CPF': 'CPF inválido',
   'invalid document': 'Documento inválido',
