@@ -94,8 +94,8 @@ type Party struct {
 	Payment           Payment   `json:"payment"`
 	Contacts          []Contact `json:"contacts"`
 	// Versão do cadastro (concorrência otimista): a tela devolve ao salvar.
-	Version int32 `json:"version"`
-	Notes             *string   `json:"notes"`
+	Version int32   `json:"version"`
+	Notes   *string `json:"notes"`
 }
 
 type Address struct {
