@@ -106,14 +106,13 @@ async function deactivate() {
 <template>
   <UDashboardPanel id="products">
     <template #header>
-      <UDashboardNavbar title="Produtos">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
+      <AppNavbar>
         <template #right>
-          <UButton v-if="canEdit" label="Novo produto" icon="i-lucide-plus" to="/app/products/new" />
+          <UButton v-if="canEdit" icon="i-lucide-plus" to="/app/products/new" aria-label="Novo produto">
+            <span class="hidden sm:inline">Novo produto</span>
+          </UButton>
         </template>
-      </UDashboardNavbar>
+      </AppNavbar>
     </template>
 
     <template #body>

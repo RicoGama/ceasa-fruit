@@ -20,11 +20,7 @@ useHead({ title: () => `${product.value?.displayName ?? 'Produto'} · CEASA Frui
 
   <UDashboardPanel v-else id="product-not-found">
     <template #header>
-      <UDashboardNavbar title="Produto">
-        <template #leading>
-          <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/app/products" aria-label="Voltar" />
-        </template>
-      </UDashboardNavbar>
+      <AppNavbar />
     </template>
     <template #body>
       <UEmpty

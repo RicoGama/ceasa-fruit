@@ -111,14 +111,13 @@ async function resendInvite(u: User) {
 <template>
   <UDashboardPanel id="users">
     <template #header>
-      <UDashboardNavbar title="Usuários">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
+      <AppNavbar>
         <template #right>
-          <UButton label="Novo usuário" icon="i-lucide-plus" @click="openCreate" />
+          <UButton icon="i-lucide-plus" aria-label="Novo usuário" @click="openCreate">
+            <span class="hidden sm:inline">Novo usuário</span>
+          </UButton>
         </template>
-      </UDashboardNavbar>
+      </AppNavbar>
     </template>
 
     <template #body>

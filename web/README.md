@@ -50,6 +50,7 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
 | 4 | `app/stores/auth.ts` | store do Pinia (estado, getters, actions): sessão, papel do usuário, empresa, login/logout |
 | 5 | `app/middleware/auth.global.ts` | proteção de rotas antes de cada navegação |
 | 6 | `app/layouts/dashboard.vue` | layout com barra lateral (`UDashboard*`) |
+| 6b | `app/components/AppNavbar.vue`, `app/utils/breadcrumbs.ts` | cabeçalho padrão com breadcrumb: trilha completa no computador, "voltar + título" no celular |
 | 7 | `app/pages/login.vue`, `reset-password.vue` | formulários com validação (Zod + `UAuthForm`); a mesma tela serve para convite (`?invite=1`) |
 | 8 | `app/pages/app/suppliers/index.vue` | listagem com busca, filtro, paginação e `useAsyncData` |
 | 9 | `app/pages/app/suppliers/[id].vue` | rota com parâmetro, carregar um registro |
@@ -86,6 +87,23 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
   página, para não virar cópia desatualizada num store. Quando as telas
   começarem a se cruzar (vendas), a ideia é adotar o Pinia Colada (cache com
   invalidação automática).
+
+## Responsivo e breadcrumb
+
+O sistema é usado no celular dentro do box, então toda tela precisa funcionar
+a partir de 375px de largura, sem rolagem horizontal.
+
+- **Cabeçalho**: toda tela usa `<AppNavbar>` (nunca `UDashboardNavbar` direto).
+  - celular (< 640px): botão voltar para o nível de cima + nome dele pequeno +
+    título da tela (cortado com "…" se não couber);
+  - tablet e computador: trilha completa (Início › Cadastros › Fornecedores ›
+    nome), com os níveis de cima sempre inteiros e só o último cortado.
+- **Tela nova**: acrescente a regra da rota em `app/utils/breadcrumbs.ts`. Se o
+  último nível é um registro, passe o nome: `<AppNavbar :title="produto.displayName">`.
+- **Botões no cabeçalho**: no celular só o ícone (texto com `hidden sm:inline`
+  e `aria-label` no botão).
+- Tabelas escondem colunas secundárias no celular (`hidden md:table-cell`) e
+  mostram o essencial embaixo do nome.
 
 ## Convenções
 

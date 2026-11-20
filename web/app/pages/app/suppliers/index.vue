@@ -98,14 +98,13 @@ async function deactivate() {
 <template>
   <UDashboardPanel id="suppliers">
     <template #header>
-      <UDashboardNavbar title="Fornecedores">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
+      <AppNavbar>
         <template #right>
-          <UButton label="Novo fornecedor" icon="i-lucide-plus" to="/app/suppliers/new" />
+          <UButton icon="i-lucide-plus" to="/app/suppliers/new" aria-label="Novo fornecedor">
+            <span class="hidden sm:inline">Novo fornecedor</span>
+          </UButton>
         </template>
-      </UDashboardNavbar>
+      </AppNavbar>
     </template>
 
     <template #body>

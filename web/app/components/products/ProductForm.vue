@@ -192,10 +192,7 @@ const originOptions = Object.entries(productOriginLabels).map(([value, label]) =
 <template>
   <UDashboardPanel id="product-form">
     <template #header>
-      <UDashboardNavbar :title="title">
-        <template #leading>
-          <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/app/products" aria-label="Voltar" />
-        </template>
+      <AppNavbar :title="props.product ? title : undefined">
         <template #right>
           <template v-if="canEdit">
             <UBadge v-if="dirty" label="Não salvo" color="warning" variant="subtle" class="hidden sm:inline-flex" />
@@ -204,7 +201,7 @@ const originOptions = Object.entries(productOriginLabels).map(([value, label]) =
           </template>
           <UBadge v-else label="Somente consulta" color="neutral" variant="subtle" />
         </template>
-      </UDashboardNavbar>
+      </AppNavbar>
     </template>
 
     <template #body>

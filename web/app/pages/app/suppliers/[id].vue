@@ -21,11 +21,7 @@ useHead({ title: () => `${supplier.value ? displayName(supplier.value) : 'Fornec
 
   <UDashboardPanel v-else id="supplier-not-found">
     <template #header>
-      <UDashboardNavbar title="Fornecedor">
-        <template #leading>
-          <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/app/suppliers" aria-label="Voltar" />
-        </template>
-      </UDashboardNavbar>
+      <AppNavbar />
     </template>
     <template #body>
       <UEmpty

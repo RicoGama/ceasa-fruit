@@ -40,17 +40,7 @@ const toneClasses = {
 <template>
   <UDashboardPanel id="home" :ui="{ body: 'bg-canvas gap-6 lg:p-8' }">
     <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #title>
-          <nav class="flex items-center gap-2 text-sm" aria-label="Você está em">
-            <span class="text-muted">Comercial</span>
-            <UIcon name="i-lucide-chevron-right" class="size-4 text-dimmed" />
-            <span class="font-bold text-highlighted">Visão geral</span>
-          </nav>
-        </template>
+      <AppNavbar>
         <template #right>
           <UPopover>
             <UButton icon="i-lucide-bell" color="neutral" variant="outline" aria-label="Notificações" class="rounded-xl" />
@@ -61,7 +51,7 @@ const toneClasses = {
             </template>
           </UPopover>
         </template>
-      </UDashboardNavbar>
+      </AppNavbar>
     </template>
 
     <template #body>

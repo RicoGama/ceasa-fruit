@@ -121,14 +121,11 @@ async function onSubmit(_: FormSubmitEvent<unknown>) {
 <template>
   <UDashboardPanel id="company">
     <template #header>
-      <UDashboardNavbar title="Dados da empresa">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
+      <AppNavbar>
         <template #right>
           <UButton type="submit" form="company-form" label="Salvar" icon="i-lucide-check" :loading="saving" />
         </template>
-      </UDashboardNavbar>
+      </AppNavbar>
     </template>
 
     <template #body>

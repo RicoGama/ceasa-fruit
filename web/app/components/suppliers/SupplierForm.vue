@@ -326,16 +326,13 @@ const bankAccountTypeOptions = toOptions(bankAccountTypeLabels)
 <template>
   <UDashboardPanel id="supplier-form">
     <template #header>
-      <UDashboardNavbar :title="title">
-        <template #leading>
-          <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/app/suppliers" aria-label="Voltar" />
-        </template>
+      <AppNavbar :title="props.supplier ? title : undefined">
         <template #right>
           <UBadge v-if="dirty" label="Não salvo" color="warning" variant="subtle" class="hidden sm:inline-flex" />
           <UButton label="Cancelar" color="neutral" variant="ghost" to="/app/suppliers" class="hidden sm:inline-flex" />
           <UButton type="submit" form="supplier-form" label="Salvar" icon="i-lucide-check" :loading="saving" />
         </template>
-      </UDashboardNavbar>
+      </AppNavbar>
     </template>
 
     <template #body>
