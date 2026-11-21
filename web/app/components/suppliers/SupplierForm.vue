@@ -305,6 +305,20 @@ async function reload() {
   await refreshNuxtData(`supplier-${props.supplier.id}`)
 }
 
+// Tempo real: outra pessoa alterou ou excluiu este cadastro.
+const { remoteChange } = useLiveRecord({
+  topic: 'suppliers',
+  id: () => props.supplier?.id,
+  version: () => version.value,
+  dirty: () => dirty.value,
+  fetchVersion: async () => {
+    if (!props.supplier) return undefined
+    const { data, response } = await api.GET('/suppliers/{id}', { params: { path: { id: props.supplier.id } } })
+    return response.status === 404 ? undefined : data?.version
+  },
+  reload,
+})
+
 // Avisa antes de sair da tela com alterações não salvas.
 onBeforeRouteLeave(() => {
   if (dirty.value && !saving.value && !window.confirm('Descartar as alterações não salvas?')) return false
@@ -351,6 +365,7 @@ const bankAccountTypeOptions = toOptions(bankAccountTypeLabels)
         class="flex flex-col gap-6 w-full lg:max-w-4xl mx-auto"
         @submit="onSubmit"
       >
+        <RemoteChangeAlert :kind="remoteChange" back-to="/app/suppliers" @reload="reload" />
         <!-- Identificação -->
         <UPageCard title="Identificação" description="Quem é o fornecedor. Só o nome é obrigatório." variant="subtle">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

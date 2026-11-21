@@ -88,6 +88,20 @@ TypeScript aponta cada lugar do front que precisa de ajuste.
   começarem a se cruzar (vendas), a ideia é adotar o Pinia Colada (cache com
   invalidação automática).
 
+## Tempo real
+
+Uma conexão só para o app inteiro (`plugins/realtime.client.ts`, `stores/realtime.ts`):
+
+- **Lista**: `useLiveRefresh('suppliers', refresh)`: recarrega quando qualquer
+  fornecedor muda (vários avisos seguidos viram uma recarga só).
+- **Cadastro aberto**: `useLiveRecord({ topic, id, version, dirty, fetchVersion, reload })`
+  - sem alterações na tela: atualiza sozinho;
+  - com alterações não salvas: não mexe no que a pessoa digitou e mostra
+    `<RemoteChangeAlert>` com o botão **Recarregar** (ou "foi excluído").
+- **Sem conexão** por mais de 4s: faixa amarela no rodapé; a reconexão é
+  automática (inclusive quando a API estava fora do ar) e, ao voltar, todas as
+  telas recarregam o que podem ter perdido.
+
 ## Permissões no front
 
 - `auth.can('products.edit')` mostra ou esconde botões, menus e telas; quem

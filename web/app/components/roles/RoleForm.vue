@@ -112,6 +112,20 @@ async function remove() {
   await navigateTo('/app/settings/roles')
 }
 
+// Tempo real: outra pessoa alterou ou excluiu este cadastro.
+const { remoteChange } = useLiveRecord({
+  topic: 'roles',
+  id: () => props.role?.id,
+  version: () => version.value,
+  dirty: () => dirty.value,
+  fetchVersion: async () => {
+    if (!props.role) return undefined
+    const { data, response } = await api.GET('/roles/{id}', { params: { path: { id: props.role.id } } })
+    return response.status === 404 ? undefined : data?.version
+  },
+  reload,
+})
+
 onBeforeRouteLeave(() => {
   if (dirty.value && !saving.value && !window.confirm('Descartar as alterações não salvas?')) return false
 })
@@ -141,6 +155,7 @@ onBeforeRouteLeave(() => {
         class="mx-auto w-full max-w-4xl space-y-6"
         @submit="onSubmit"
       >
+        <RemoteChangeAlert :kind="remoteChange" back-to="/app/settings/roles" @reload="reload" />
         <UAlert
           v-if="isSystem"
           icon="i-lucide-shield-check"

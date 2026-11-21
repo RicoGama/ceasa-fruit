@@ -40,7 +40,26 @@ function toState(c?: Company | null) {
 type State = ReturnType<typeof toState>
 
 const state = reactive<State>(toState(data.value))
-watch(data, c => Object.assign(state, toState(c)))
+const savedSnapshot = ref(JSON.stringify(state))
+const dirty = computed(() => JSON.stringify(state) !== savedSnapshot.value)
+watch(data, (c) => {
+  Object.assign(state, toState(c))
+  savedSnapshot.value = JSON.stringify(state)
+})
+
+// Tempo real: outra pessoa salvou os dados da empresa.
+async function reloadCompany() {
+  await refresh()
+}
+const { remoteChange } = useLiveRecord({
+  topic: 'company',
+  id: () => 1, // a empresa é um registro só
+  version: () => state.version,
+  dirty: () => dirty.value,
+  fetchVersion: async () => (await api.GET('/company')).data?.version,
+  reload: reloadCompany,
+})
+watch(data, () => { remoteChange.value = null })
 
 const schema = z.object({
   name: z.string().trim().min(2, 'Informe a razão social'),
@@ -147,6 +166,7 @@ async function onSubmit(_: FormSubmitEvent<unknown>) {
         class="mx-auto w-full max-w-4xl space-y-6"
         @submit="onSubmit"
       >
+        <RemoteChangeAlert :kind="remoteChange" @reload="reloadCompany" />
         <UPageCard title="Identificação" description="Aparece nas notas fiscais, boletos e documentos impressos.">
           <div class="grid gap-4 sm:grid-cols-6">
             <UFormField label="Razão social" name="name" required class="sm:col-span-4">

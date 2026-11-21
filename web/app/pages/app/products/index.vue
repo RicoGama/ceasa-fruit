@@ -54,6 +54,9 @@ const { data, status: loadStatus, error, refresh } = await useAsyncData('product
   return data
 }, { watch: [debouncedSearch, status, category, page] })
 
+// Tempo real: alguém cadastrou ou alterou -> a lista recarrega sozinha.
+useLiveRefresh('products', refresh)
+
 // --- Tabela -------------------------------------------------------------------
 const desktopOnly = { class: { th: 'hidden md:table-cell', td: 'hidden md:table-cell' } }
 

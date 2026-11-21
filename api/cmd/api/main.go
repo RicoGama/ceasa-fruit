@@ -20,6 +20,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/mail"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
+	"github.com/RicoGama/ceasa-fruit/api/internal/realtime"
 	"github.com/RicoGama/ceasa-fruit/api/internal/server"
 )
 
@@ -89,6 +90,10 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
+	// Tempo real: escuta as mudanças do banco e repassa às telas abertas.
+	hub := realtime.New(pool.Config().ConnConfig, logger)
+	go hub.Run(ctx)
+
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
 		Handler: server.New(server.Deps{
@@ -100,6 +105,7 @@ func run(logger *slog.Logger) error {
 			AppURL:         cfg.AppURL,
 			Queue:          q,
 			QueueUI:        queueUI,
+			Realtime:       hub,
 		}),
 		// Timeouts protegem o servidor de clientes lentos ou travados.
 		ReadHeaderTimeout: 5 * time.Second,
@@ -107,6 +113,10 @@ func run(logger *slog.Logger) error {
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
+
+	// As conexões de tempo real nunca terminam sozinhas: no desligamento o Hub
+	// as encerra, senão o Shutdown esperaria por elas até o limite.
+	srv.RegisterOnShutdown(hub.Close)
 
 	// ListenAndServe bloqueia, então roda numa goroutine (uma "thread" leve).
 	// Os erros voltam por um channel.

@@ -18,7 +18,7 @@ const { data, status, error, refresh } = await useAsyncData('users', async () =>
 })
 
 // Papéis para o campo "Papel" (os criados na tela de papéis aparecem aqui).
-const { data: roles } = await useAsyncData('roles-for-users', async () => {
+const { data: roles, refresh: refreshRoles } = await useAsyncData('roles-for-users', async () => {
   const { data } = await api.GET('/roles')
   return data?.items ?? []
 })
@@ -28,6 +28,10 @@ const roleItems = computed(() => (roles.value ?? []).map(r => ({
   description: r.description ?? undefined,
 })))
 const roleDescription = (id: number) => roles.value?.find(r => r.id === id)?.description
+
+// Tempo real: usuários e papéis criados ou alterados por outra pessoa aparecem na hora.
+useLiveRefresh('users', refresh)
+useLiveRefresh('roles', refreshRoles)
 
 const showInactive = ref(false)
 const users = computed(() => (data.value ?? []).filter(u => showInactive.value || u.active))

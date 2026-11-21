@@ -58,6 +58,8 @@ type Deps struct {
 	// QueueUI é o painel do River (como o Horizon do Laravel), servido em
 	// /admin/queues só para o administrador da plataforma. Opcional.
 	QueueUI http.Handler
+	// Realtime entrega as mudanças do banco às telas (GET /events). Opcional.
+	Realtime http.Handler
 }
 
 // New devolve o http.Handler raiz da aplicação.
@@ -115,6 +117,12 @@ func build(d Deps) (http.Handler, huma.API) {
 		return row, err
 	}
 	r.Use(auth.LoadSession(loadSession, d.Logger))
+
+	// Tempo real (Server-Sent Events). Exige login; cada pessoa só recebe os
+	// avisos dos assuntos que pode ver (ver internal/realtime).
+	if d.Realtime != nil {
+		r.Get("/events", d.Realtime.ServeHTTP)
+	}
 
 	// Rota com chi + net/http puro, escrita à mão de propósito (ver healthHandler).
 	r.Get("/health", healthHandler(d.Pool))

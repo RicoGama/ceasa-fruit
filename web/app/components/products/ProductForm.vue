@@ -173,6 +173,20 @@ async function reload() {
   await refreshNuxtData(`product-${props.product.id}`)
 }
 
+// Tempo real: outra pessoa alterou ou excluiu este cadastro.
+const { remoteChange } = useLiveRecord({
+  topic: 'products',
+  id: () => props.product?.id,
+  version: () => version.value,
+  dirty: () => dirty.value,
+  fetchVersion: async () => {
+    if (!props.product) return undefined
+    const { data, response } = await api.GET('/products/{id}', { params: { path: { id: props.product.id } } })
+    return response.status === 404 ? undefined : data?.version
+  },
+  reload,
+})
+
 // Avisa antes de sair da tela com alterações não salvas.
 onBeforeRouteLeave(() => {
   if (dirty.value && !saving.value && !window.confirm('Descartar as alterações não salvas?')) return false
@@ -214,6 +228,7 @@ const originOptions = Object.entries(productOriginLabels).map(([value, label]) =
         class="mx-auto w-full max-w-4xl space-y-6"
         @submit="onSubmit"
       >
+        <RemoteChangeAlert :kind="remoteChange" back-to="/app/products" @reload="reload" />
         <!-- Identificação -->
         <UPageCard title="Identificação" description="Cada combinação de nome, variedade e classificação é um produto: o preço muda entre elas." variant="subtle">
           <div class="grid grid-cols-1 sm:grid-cols-6 gap-4">

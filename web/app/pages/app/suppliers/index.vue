@@ -51,6 +51,9 @@ const { data, status: loadStatus, error, refresh } = await useAsyncData('supplie
   return data
 }, { watch: [debouncedSearch, status, page] })
 
+// Tempo real: alguém cadastrou ou alterou -> a lista recarrega sozinha.
+useLiveRefresh('suppliers', refresh)
+
 // --- Tabela -----------------------------------------------------------------
 // No celular, documento, cidade e modalidade saem da tabela (classes
 // "hidden md:table-cell"); o documento passa a aparecer embaixo do nome.

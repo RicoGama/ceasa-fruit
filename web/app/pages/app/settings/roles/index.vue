@@ -12,6 +12,9 @@ const { data, error, refresh } = await useAsyncData('roles', async () => {
   return data.items
 })
 
+// Tempo real: alguém cadastrou ou alterou -> a lista recarrega sozinha.
+useLiveRefresh('roles', refresh)
+
 // Total de permissões do catálogo (para "5 de 7").
 const catalogSize = permissionResources.reduce((n, r) => n + r.actions.length, 0)
 

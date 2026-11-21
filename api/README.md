@@ -167,6 +167,32 @@ Testes que provam cada caso: `internal/user/concurrency_test.go` (corrida do
 Ao criar uma tela de edição nova: devolva `version` no GET, exija no PUT e use
 `ClaimPartyVersion` (pessoas) ou `WHERE version = @version` na query.
 
+## Tempo real
+
+Tudo o que alguém grava aparece na hora para quem está com a tela aberta.
+
+```
+gravação -> gatilho no Postgres -> NOTIFY app_events (só depois do COMMIT)
+  -> internal/realtime (uma conexão com LISTEN) -> GET /events (Server-Sent Events)
+  -> o front recarrega a lista ou o cadastro aberto
+```
+
+- **Os avisos vêm de gatilhos no banco** (migration `00007`), não do código Go:
+  nenhuma gravação escapa (tela, seed, script), um ROLLBACK não avisa nada, e
+  avisos iguais na mesma transação viram um só.
+- O aviso é só `{"topic": "suppliers", "id": 42}`; os dados o front busca pela
+  API, com as permissões de sempre. Mesmo assim, cada pessoa só recebe os
+  assuntos que pode ver (`topicPermission` em `realtime.go`).
+- Mudança no próprio usuário ou no papel dele chega como `"me"`: o front relê
+  as permissões (menus e botões mudam na hora).
+- Se a API perder a conexão com o banco, ao voltar manda `"resync"` e as telas
+  recarregam tudo.
+
+**Tabela nova que deve aparecer em tempo real:** um `CREATE TRIGGER ... EXECUTE
+FUNCTION notify_change('<assunto>', '<coluna do id>')` numa migration (tabela
+filha avisa com o id do pai), a permissão do assunto em `topicPermission`, e
+`useLiveRefresh` / `useLiveRecord` na tela.
+
 ## IP do cliente
 
 O IP de quem usa o sistema vai para o log (`client_ip`) e servirá para

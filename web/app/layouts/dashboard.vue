@@ -43,6 +43,18 @@ const adminLinks = computed<NavigationMenuItem[]>(() => {
   return items.length ? [{ label: 'Administração', type: 'label' }, ...items] : []
 })
 
+// Aviso de conexão: se o tempo real cair por mais de 4s (Wi-Fi do box,
+// servidor reiniciando), mostra uma faixa; some sozinha quando voltar, e as
+// telas recarregam o que perderam.
+const realtime = useRealtimeStore()
+const showOffline = ref(false)
+let offlineTimer: ReturnType<typeof setTimeout> | undefined
+watch(() => realtime.status, (status) => {
+  clearTimeout(offlineTimer)
+  if (status === 'live') showOffline.value = false
+  else offlineTimer = setTimeout(() => { showOffline.value = realtime.status !== 'live' }, 4000)
+})
+
 // Estilo dos itens do menu: o item ativo ganha fundo suave na cor do tema.
 const menuUi = {
   label: 'text-[11px] font-bold uppercase tracking-[0.12em] text-dimmed px-2.5 pt-4',
@@ -102,5 +114,22 @@ const menuUi = {
     </UDashboardSidebar>
 
     <slot />
+
+    <!-- Faixa de "sem conexão", flutuando acima do conteúdo -->
+    <Transition
+      enter-from-class="opacity-0 translate-y-2"
+      leave-to-class="opacity-0 translate-y-2"
+      enter-active-class="transition"
+      leave-active-class="transition"
+    >
+      <div
+        v-if="showOffline"
+        role="status"
+        class="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md items-center gap-3 rounded-xl bg-warning px-4 py-3 text-sm font-medium text-inverted shadow-lg"
+      >
+        <UIcon name="i-lucide-wifi-off" class="size-5 shrink-0" />
+        <span>Sem conexão com o servidor. Tentando de novo… As telas podem estar desatualizadas.</span>
+      </div>
+    </Transition>
   </UDashboardGroup>
 </template>
