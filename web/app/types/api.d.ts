@@ -170,6 +170,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/{id}/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suppliers of a product (preferred first) */
+        get: operations["list-product-suppliers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/roles": {
         parameters: {
             query?: never;
@@ -245,6 +262,42 @@ export interface paths {
          * @description Soft delete: the supplier is marked inactive, never removed, to preserve history.
          */
         delete: operations["deactivate-supplier"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/suppliers/{id}/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Products a supplier supplies */
+        get: operations["list-supplier-products"];
+        put?: never;
+        /** Link a product to a supplier */
+        post: operations["add-supplier-product"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/suppliers/{id}/products/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update a supplier-product link */
+        put: operations["update-supplier-product"];
+        post?: never;
+        /** Unlink a product from a supplier */
+        delete: operations["remove-supplier-product"];
         options?: never;
         head?: never;
         patch?: never;
@@ -393,6 +446,33 @@ export interface components {
             /** @description e.g. owner, manager, driver */
             role?: string;
         };
+        CreateInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateInputBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * @description Required when purchaseMode is consignment
+             * @example 12.5
+             */
+            consignmentCommission?: string;
+            /** @description Months the supplier has it (1-12); empty = all year */
+            months?: number[];
+            notes?: string;
+            /** @description Preferred supplier for this product */
+            preferred?: boolean;
+            /** Format: int64 */
+            productId: number;
+            /**
+             * @description Overrides the supplier default for this product
+             * @enum {string}
+             */
+            purchaseMode?: "direct" | "consignment";
+            /** @description How the supplier calls the product (on their invoice) */
+            supplierProductName?: string;
+        };
         CreateUserInputBody: {
             /**
              * Format: uri
@@ -503,6 +583,15 @@ export interface components {
             offset: number;
             /** Format: int64 */
             total: number;
+        };
+        ListOutputBody3: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListOutputBody3.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["SupplierProduct"][];
         };
         ListSuppliersOutputBody: {
             /**
@@ -682,6 +771,38 @@ export interface components {
             sellsByWeight: boolean;
             /** @enum {string} */
             stockUnit: "box" | "kg" | "unit" | "dozen" | "bag" | "bunch" | "tray" | "pack";
+        };
+        ProductSupplier: {
+            /**
+             * @description Percentage (12.5 = 12.5%), dot as decimal separator, up to 4 places
+             * @example 12.5
+             */
+            consignmentCommission: string;
+            legalName: string;
+            months: number[];
+            phone: string | null;
+            preferred: boolean;
+            /**
+             * @description Effective mode (own or the supplier default)
+             * @enum {string}
+             */
+            purchaseMode: "direct" | "consignment";
+            /** @enum {string} */
+            status: "active" | "inactive" | "blocked";
+            /** Format: int64 */
+            supplierId: number;
+            supplierProductName: string | null;
+            tradeName: string | null;
+            whatsapp: string | null;
+        };
+        ProductSuppliersOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProductSuppliersOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ProductSupplier"][];
         };
         ProductUpdate: {
             /**
@@ -907,6 +1028,44 @@ export interface components {
             tradeName?: string;
             whatsapp?: string;
         };
+        SupplierProduct: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SupplierProduct.json
+             */
+            readonly $schema?: string;
+            /**
+             * @description Percentage (12.5 = 12.5%), dot as decimal separator, up to 4 places
+             * @example 12.5
+             */
+            consignmentCommission: string;
+            /** @description Empty = all year */
+            months: number[];
+            notes: string | null;
+            preferred: boolean;
+            product: components["schemas"]["SupplierProductProductStruct"];
+            /** Format: int64 */
+            productId: number;
+            /**
+             * @description null = the supplier default
+             * @enum {string|null}
+             */
+            purchaseMode: "direct" | "consignment" | null;
+            supplierProductName: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: int32 */
+            version: number;
+        };
+        SupplierProductProductStruct: {
+            active: boolean;
+            /** @enum {string} */
+            category: "fruit" | "vegetable" | "leafy" | "egg" | "other";
+            displayName: string;
+            /** @enum {string} */
+            stockUnit: "box" | "kg" | "unit" | "dozen" | "bag" | "bunch" | "tray" | "pack";
+        };
         SupplierSummary: {
             city: components["schemas"]["City"];
             /** @enum {string} */
@@ -1018,6 +1177,36 @@ export interface components {
             /** @enum {string} */
             taxRegime?: "simples" | "presumido" | "real";
             tradeName?: string;
+            /**
+             * Format: int32
+             * @description The version read; 409 if someone saved in between
+             */
+            version: number;
+        };
+        UpdateInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateInputBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * @description Required when purchaseMode is consignment
+             * @example 12.5
+             */
+            consignmentCommission?: string;
+            /** @description Months the supplier has it (1-12); empty = all year */
+            months?: number[];
+            notes?: string;
+            /** @description Preferred supplier for this product */
+            preferred?: boolean;
+            /**
+             * @description Overrides the supplier default for this product
+             * @enum {string}
+             */
+            purchaseMode?: "direct" | "consignment";
+            /** @description How the supplier calls the product (on their invoice) */
+            supplierProductName?: string;
             /**
              * Format: int32
              * @description The version read; 409 if someone saved in between
@@ -1486,6 +1675,37 @@ export interface operations {
             };
         };
     };
+    "list-product-suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductSuppliersOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-roles": {
         parameters: {
             query?: never;
@@ -1649,6 +1869,8 @@ export interface operations {
                 /** @description Name or nickname (contains, accent-insensitive) or document (prefix) */
                 search?: string;
                 status?: "active" | "inactive" | "blocked" | "all";
+                /** @description Only suppliers that supply this product */
+                productId?: number;
                 limit?: number;
                 offset?: number;
             };
@@ -1783,6 +2005,138 @@ export interface operations {
             header?: never;
             path: {
                 id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-supplier-products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOutputBody3"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "add-supplier-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInputBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierProduct"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "update-supplier-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                productId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierProduct"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "remove-supplier-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                productId: number;
             };
             cookie?: never;
         };

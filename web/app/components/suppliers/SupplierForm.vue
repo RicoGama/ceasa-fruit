@@ -12,6 +12,20 @@ const toast = useToast()
 const auth = useAuthStore()
 // Sem suppliers.edit, a tela é só para consulta.
 const canEdit = computed(() => auth.can('suppliers.edit'))
+
+// Abas (só no fornecedor já cadastrado). A aba fica na URL (?aba=produtos):
+// o botão voltar e um link copiado abrem na aba certa.
+const route = useRoute()
+const router = useRouter()
+const tab = computed({
+  get: () => (props.supplier && route.query.aba === 'produtos' ? 'produtos' : 'cadastro'),
+  set: v => router.replace({ query: { ...route.query, aba: v === 'produtos' ? 'produtos' : undefined } }),
+})
+const productCount = ref<number>()
+const tabs = computed(() => [
+  { label: 'Cadastro', value: 'cadastro', icon: 'i-lucide-id-card' },
+  { label: 'Produtos', value: 'produtos', icon: 'i-lucide-apple', badge: productCount.value },
+])
 const form = useTemplateRef('form')
 const saving = ref(false)
 
@@ -345,18 +359,28 @@ const bankAccountTypeOptions = toOptions(bankAccountTypeLabels)
     <template #header>
       <AppNavbar :title="props.supplier ? title : undefined">
         <template #right>
-          <template v-if="canEdit">
+          <template v-if="canEdit && tab === 'cadastro'">
             <UBadge v-if="dirty" label="Não salvo" color="warning" variant="subtle" class="hidden sm:inline-flex" />
             <UButton label="Cancelar" color="neutral" variant="ghost" to="/app/suppliers" class="hidden sm:inline-flex" />
             <UButton type="submit" form="supplier-form" label="Salvar" icon="i-lucide-check" :loading="saving" />
           </template>
-          <UBadge v-else label="Somente consulta" color="neutral" variant="subtle" />
+          <UBadge v-else-if="!canEdit" label="Somente consulta" color="neutral" variant="subtle" />
         </template>
       </AppNavbar>
     </template>
 
     <template #body>
+      <UTabs
+        v-if="props.supplier"
+        v-model="tab"
+        :items="tabs"
+        :content="false"
+        variant="link"
+        class="mx-auto w-full lg:max-w-4xl"
+      />
+
       <UForm
+        v-show="tab === 'cadastro'"
         id="supplier-form"
         ref="form"
         :schema="schema"
@@ -554,6 +578,14 @@ const bankAccountTypeOptions = toOptions(bankAccountTypeLabels)
           <UButton type="submit" label="Salvar fornecedor" icon="i-lucide-check" :loading="saving" />
         </div>
       </UForm>
+
+      <!-- v-show (e não v-if): carrega junto, para a aba já mostrar a quantidade -->
+      <SuppliersSupplierProducts
+        v-if="props.supplier"
+        v-show="tab === 'produtos'"
+        :supplier="props.supplier"
+        @count="productCount = $event"
+      />
     </template>
   </UDashboardPanel>
 </template>

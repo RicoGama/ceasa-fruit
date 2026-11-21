@@ -323,6 +323,67 @@
         ],
         "type": "object"
       },
+      "CreateInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/CreateInputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "consignmentCommission": {
+            "description": "Required when purchaseMode is consignment",
+            "examples": [
+              "12.5"
+            ],
+            "pattern": "^-?\\d{1,3}(\\.\\d{1,4})?$",
+            "type": "string"
+          },
+          "months": {
+            "description": "Months the supplier has it (1-12); empty = all year",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "maxItems": 12,
+            "type": "array"
+          },
+          "notes": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "preferred": {
+            "description": "Preferred supplier for this product",
+            "type": "boolean"
+          },
+          "productId": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "purchaseMode": {
+            "description": "Overrides the supplier default for this product",
+            "enum": [
+              "direct",
+              "consignment"
+            ],
+            "type": "string"
+          },
+          "supplierProductName": {
+            "description": "How the supplier calls the product (on their invoice)",
+            "maxLength": 80,
+            "type": "string"
+          }
+        },
+        "required": [
+          "productId"
+        ],
+        "type": "object"
+      },
       "CreateUserInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -588,6 +649,30 @@
           "total",
           "limit",
           "offset"
+        ],
+        "type": "object"
+      },
+      "ListOutputBody3": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/ListOutputBody3.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SupplierProduct"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
         ],
         "type": "object"
       },
@@ -1164,6 +1249,114 @@
           "nominalWeightKg",
           "sellsByWeight",
           "active"
+        ],
+        "type": "object"
+      },
+      "ProductSupplier": {
+        "additionalProperties": false,
+        "properties": {
+          "consignmentCommission": {
+            "description": "Percentage (12.5 = 12.5%), dot as decimal separator, up to 4 places",
+            "examples": [
+              "12.5"
+            ],
+            "pattern": "^-?\\d{1,3}(\\.\\d{1,4})?$",
+            "type": "string"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "months": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preferred": {
+            "type": "boolean"
+          },
+          "purchaseMode": {
+            "description": "Effective mode (own or the supplier default)",
+            "enum": [
+              "direct",
+              "consignment"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "inactive",
+              "blocked"
+            ],
+            "type": "string"
+          },
+          "supplierId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "supplierProductName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tradeName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "whatsapp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "supplierId",
+          "legalName",
+          "tradeName",
+          "phone",
+          "whatsapp",
+          "status",
+          "supplierProductName",
+          "months",
+          "purchaseMode",
+          "consignmentCommission",
+          "preferred"
+        ],
+        "type": "object"
+      },
+      "ProductSuppliersOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/ProductSuppliersOutputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProductSupplier"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
         ],
         "type": "object"
       },
@@ -1827,6 +2020,131 @@
         ],
         "type": "object"
       },
+      "SupplierProduct": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/SupplierProduct.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "consignmentCommission": {
+            "description": "Percentage (12.5 = 12.5%), dot as decimal separator, up to 4 places",
+            "examples": [
+              "12.5"
+            ],
+            "pattern": "^-?\\d{1,3}(\\.\\d{1,4})?$",
+            "type": "string"
+          },
+          "months": {
+            "description": "Empty = all year",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preferred": {
+            "type": "boolean"
+          },
+          "product": {
+            "$ref": "#/components/schemas/SupplierProductProductStruct"
+          },
+          "productId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "purchaseMode": {
+            "description": "null = the supplier default",
+            "enum": [
+              "direct",
+              "consignment"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "supplierProductName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "productId",
+          "product",
+          "supplierProductName",
+          "months",
+          "purchaseMode",
+          "consignmentCommission",
+          "preferred",
+          "notes",
+          "version",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "SupplierProductProductStruct": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "category": {
+            "enum": [
+              "fruit",
+              "vegetable",
+              "leafy",
+              "egg",
+              "other"
+            ],
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "stockUnit": {
+            "enum": [
+              "box",
+              "kg",
+              "unit",
+              "dozen",
+              "bag",
+              "bunch",
+              "tray",
+              "pack"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "displayName",
+          "category",
+          "stockUnit",
+          "active"
+        ],
+        "type": "object"
+      },
       "SupplierSummary": {
         "additionalProperties": false,
         "properties": {
@@ -2146,6 +2464,68 @@
         "required": [
           "version",
           "name"
+        ],
+        "type": "object"
+      },
+      "UpdateInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/UpdateInputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "consignmentCommission": {
+            "description": "Required when purchaseMode is consignment",
+            "examples": [
+              "12.5"
+            ],
+            "pattern": "^-?\\d{1,3}(\\.\\d{1,4})?$",
+            "type": "string"
+          },
+          "months": {
+            "description": "Months the supplier has it (1-12); empty = all year",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "maxItems": 12,
+            "type": "array"
+          },
+          "notes": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "preferred": {
+            "description": "Preferred supplier for this product",
+            "type": "boolean"
+          },
+          "purchaseMode": {
+            "description": "Overrides the supplier default for this product",
+            "enum": [
+              "direct",
+              "consignment"
+            ],
+            "type": "string"
+          },
+          "supplierProductName": {
+            "description": "How the supplier calls the product (on their invoice)",
+            "maxLength": 80,
+            "type": "string"
+          },
+          "version": {
+            "description": "The version read; 409 if someone saved in between",
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
         ],
         "type": "object"
       },
@@ -2911,6 +3291,58 @@
         ]
       }
     },
+    "/products/{id}/suppliers": {
+      "get": {
+        "operationId": "list-product-suppliers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductSuppliersOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Suppliers of a product (preferred first)",
+        "tags": [
+          "Products"
+        ],
+        "x-permissions": [
+          "products.view",
+          "suppliers.view"
+        ]
+      }
+    },
     "/roles": {
       "get": {
         "operationId": "list-roles",
@@ -3181,6 +3613,18 @@
             }
           },
           {
+            "description": "Only suppliers that supply this product",
+            "explode": false,
+            "in": "query",
+            "name": "productId",
+            "schema": {
+              "description": "Only suppliers that supply this product",
+              "format": "int64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
             "explode": false,
             "in": "query",
             "name": "limit",
@@ -3432,6 +3876,239 @@
           }
         ],
         "summary": "Update a supplier",
+        "tags": [
+          "Suppliers"
+        ],
+        "x-permissions": [
+          "suppliers.edit"
+        ]
+      }
+    },
+    "/suppliers/{id}/products": {
+      "get": {
+        "operationId": "list-supplier-products",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListOutputBody3"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Products a supplier supplies",
+        "tags": [
+          "Suppliers"
+        ],
+        "x-permissions": [
+          "suppliers.view"
+        ]
+      },
+      "post": {
+        "operationId": "add-supplier-product",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierProduct"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Link a product to a supplier",
+        "tags": [
+          "Suppliers"
+        ],
+        "x-permissions": [
+          "suppliers.edit"
+        ]
+      }
+    },
+    "/suppliers/{id}/products/{productId}": {
+      "delete": {
+        "operationId": "remove-supplier-product",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Unlink a product from a supplier",
+        "tags": [
+          "Suppliers"
+        ],
+        "x-permissions": [
+          "suppliers.edit"
+        ]
+      },
+      "put": {
+        "operationId": "update-supplier-product",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierProduct"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Update a supplier-product link",
         "tags": [
           "Suppliers"
         ],

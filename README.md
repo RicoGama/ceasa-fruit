@@ -12,6 +12,7 @@ confiável): um servidor e um banco por cliente, sem multi-tenant.
 1. Controle de vendas de LFV
 2. Cadastro de fornecedores ✅ (API + tela)
 2b. Cadastro de produtos com embalagens ✅ (API + tela; gerente e admin editam)
+2d. Produtos de cada fornecedor (safra, nome na nota dele, modalidade, preferencial), "quem fornece" no produto e filtro por produto na lista ✅
 2c. Tempo real em todas as telas: cadastros e alterações aparecem na hora para todo mundo ✅
 3. Cadastro de clientes
 4. Controle de estoque com aviso de perda

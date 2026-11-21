@@ -86,6 +86,9 @@ WHERE (sqlc.narg('search')::text IS NULL
        OR unaccent(p.trade_name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
        OR p.document LIKE upper(sqlc.narg('search')) || '%')
   AND (sqlc.narg('status')::text IS NULL OR s.status = sqlc.narg('status'))
+  AND (sqlc.narg('product_id')::bigint IS NULL OR EXISTS (
+        SELECT 1 FROM supplier_products sp
+        WHERE sp.supplier_id = s.party_id AND sp.product_id = sqlc.narg('product_id')))
 ORDER BY lower(coalesce(p.trade_name, p.legal_name)), s.party_id
 LIMIT @limit_rows OFFSET @offset_rows;
 
@@ -97,7 +100,10 @@ WHERE (sqlc.narg('search')::text IS NULL
        OR unaccent(p.legal_name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
        OR unaccent(p.trade_name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
        OR p.document LIKE upper(sqlc.narg('search')) || '%')
-  AND (sqlc.narg('status')::text IS NULL OR s.status = sqlc.narg('status'));
+  AND (sqlc.narg('status')::text IS NULL OR s.status = sqlc.narg('status'))
+  AND (sqlc.narg('product_id')::bigint IS NULL OR EXISTS (
+        SELECT 1 FROM supplier_products sp
+        WHERE sp.supplier_id = s.party_id AND sp.product_id = sqlc.narg('product_id')));
 
 -- name: DeactivateSupplier :execrows
 UPDATE suppliers

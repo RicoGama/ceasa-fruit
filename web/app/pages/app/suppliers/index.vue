@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DropdownMenuItem, TableColumn } from '@nuxt/ui'
 import type { SupplierSummary } from '~/types'
+import type { PickedProduct } from '~/components/ProductPicker.vue'
 
 definePageMeta({ layout: 'dashboard', permission: 'suppliers.view' })
 useHead({ title: 'Fornecedores · CEASA Fruit' })
@@ -32,7 +33,9 @@ watch(search, (value) => {
     page.value = 1
   }, 300)
 })
-watch(status, () => { page.value = 1 })
+// "Quem tem chuchu?": filtra os fornecedores que trazem um produto.
+const product = ref<PickedProduct | null>(null)
+watch([status, product], () => { page.value = 1 })
 
 // --- Dados ----------------------------------------------------------------------
 // useAsyncData refaz a chamada sozinho quando algo em `watch` muda.
@@ -42,6 +45,7 @@ const { data, status: loadStatus, error, refresh } = await useAsyncData('supplie
       query: {
         search: debouncedSearch.value || undefined,
         status: status.value,
+        productId: product.value?.id,
         limit,
         offset: (page.value - 1) * limit,
       },
@@ -49,7 +53,7 @@ const { data, status: loadStatus, error, refresh } = await useAsyncData('supplie
   })
   if (error) throw createError({ statusCode: error.status, message: apiErrorMessage(error) })
   return data
-}, { watch: [debouncedSearch, status, page] })
+}, { watch: [debouncedSearch, status, product, page] })
 
 // Tempo real: alguém cadastrou ou alterou -> a lista recarrega sozinha.
 useLiveRefresh('suppliers', refresh)
@@ -120,6 +124,10 @@ async function deactivate() {
           placeholder="Buscar por nome, apelido ou documento"
           class="w-full sm:max-w-sm"
         />
+        <div class="flex w-full items-center gap-2 sm:w-64">
+          <ProductPicker v-model="product" placeholder="Quem fornece o produto…" />
+          <UButton v-if="product" icon="i-lucide-x" color="neutral" variant="ghost" aria-label="Limpar filtro de produto" @click="product = null" />
+        </div>
         <USelect v-model="status" :items="statusOptions" class="w-36" />
       </div>
 

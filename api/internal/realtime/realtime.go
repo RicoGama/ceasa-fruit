@@ -165,6 +165,9 @@ var topicPermission = map[string]auth.Permission{
 	"products":  auth.ProductsView,
 	"users":     auth.UsersManage,
 	"roles":     auth.UsersManage,
+	// fornecedor × produto: a aba do fornecedor e a lista no produto
+	"supplier_products": auth.SuppliersView,
+	"product_suppliers": auth.SuppliersView,
 }
 
 // route decide o que esta sessão recebe de um aviso (pode ser nada, o próprio

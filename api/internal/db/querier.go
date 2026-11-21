@@ -34,6 +34,7 @@ type Querier interface {
 	CreateRole(ctx context.Context, arg CreateRoleParams) (int64, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	CreateSupplier(ctx context.Context, arg CreateSupplierParams) error
+	CreateSupplierProduct(ctx context.Context, arg CreateSupplierProductParams) error
 	// Queries de autenticação e senha.
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// Inativa (não apaga: estoque e vendas vão apontar para o produto) e muda a
@@ -47,6 +48,7 @@ type Querier interface {
 	DeleteRole(ctx context.Context, id int64) (int64, error)
 	DeleteRolePermissions(ctx context.Context, roleID int64) error
 	DeleteSession(ctx context.Context, tokenHash []byte) error
+	DeleteSupplierProduct(ctx context.Context, arg DeleteSupplierProductParams) (int64, error)
 	// Encerra todas as sessões do usuário (ex.: troca de senha, usuário desativado).
 	DeleteUserSessions(ctx context.Context, userID int64) error
 	// Cria a empresa só com o nome, se ainda não existir (usado pelo make seed).
@@ -61,6 +63,7 @@ type Querier interface {
 	GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error)
 	// sqlc.embed devolve as colunas de cada tabela agrupadas (row.Party, row.Supplier).
 	GetSupplier(ctx context.Context, id int64) (GetSupplierRow, error)
+	GetSupplierProduct(ctx context.Context, arg GetSupplierProductParams) (GetSupplierProductRow, error)
 	GetUser(ctx context.Context, id int64) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserWithRole(ctx context.Context, id int64) (GetUserWithRoleRow, error)
@@ -68,9 +71,13 @@ type Querier interface {
 	InvalidatePasswordResetTokens(ctx context.Context, userID int64) error
 	ListPartyContacts(ctx context.Context, partyID int64) ([]PartyContact, error)
 	ListProductPackagings(ctx context.Context, productID int64) ([]ProductPackaging, error)
+	// Quem fornece este produto (preferidos primeiro).
+	ListProductSuppliers(ctx context.Context, productID int64) ([]ListProductSuppliersRow, error)
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
 	// Papéis de acesso e suas permissões (ver migration 00006).
 	ListRoles(ctx context.Context) ([]ListRolesRow, error)
+	// Fornecedor × produto (ver migration 00008).
+	ListSupplierProducts(ctx context.Context, supplierID int64) ([]ListSupplierProductsRow, error)
 	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]ListSuppliersRow, error)
 	// Gestão de usuários (tela do administrador).
 	ListUsers(ctx context.Context) ([]ListUsersRow, error)
@@ -90,6 +97,8 @@ type Querier interface {
 	// Papel do sistema (key = 'admin') nunca é alterado por aqui.
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (int64, error)
 	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (int64, error)
+	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
+	UpdateSupplierProduct(ctx context.Context, arg UpdateSupplierProductParams) (int64, error)
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error

@@ -157,6 +157,20 @@ type Supplier struct {
 	UpdatedAt             time.Time
 }
 
+type SupplierProduct struct {
+	SupplierID            int64
+	ProductID             int64
+	SupplierProductName   *string
+	Months                []int16
+	PurchaseMode          *string
+	ConsignmentCommission *money.Percent
+	Preferred             bool
+	Notes                 *string
+	Version               int32
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
 type User struct {
 	ID           int64
 	Name         string

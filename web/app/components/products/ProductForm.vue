@@ -333,6 +333,9 @@ const originOptions = Object.entries(productOriginLabels).map(([value, label]) =
           </div>
         </UPageCard>
 
+        <!-- Quem fornece (só no produto já cadastrado, para quem vê fornecedores) -->
+        <ProductsProductSuppliers v-if="props.product && auth.can('suppliers.view')" :product-id="props.product.id" />
+
         <!-- Observações -->
         <UPageCard title="Observações" variant="subtle">
           <UFormField name="notes">

@@ -55,15 +55,19 @@ WHERE ($1::text IS NULL
        OR unaccent(p.trade_name) ILIKE '%' || unaccent($1) || '%'
        OR p.document LIKE upper($1) || '%')
   AND ($2::text IS NULL OR s.status = $2)
+  AND ($3::bigint IS NULL OR EXISTS (
+        SELECT 1 FROM supplier_products sp
+        WHERE sp.supplier_id = s.party_id AND sp.product_id = $3))
 `
 
 type CountSuppliersParams struct {
-	Search *string
-	Status *string
+	Search    *string
+	Status    *string
+	ProductID *int64
 }
 
 func (q *Queries) CountSuppliers(ctx context.Context, arg CountSuppliersParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countSuppliers, arg.Search, arg.Status)
+	row := q.db.QueryRow(ctx, countSuppliers, arg.Search, arg.Status, arg.ProductID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -352,13 +356,17 @@ WHERE ($1::text IS NULL
        OR unaccent(p.trade_name) ILIKE '%' || unaccent($1) || '%'
        OR p.document LIKE upper($1) || '%')
   AND ($2::text IS NULL OR s.status = $2)
+  AND ($3::bigint IS NULL OR EXISTS (
+        SELECT 1 FROM supplier_products sp
+        WHERE sp.supplier_id = s.party_id AND sp.product_id = $3))
 ORDER BY lower(coalesce(p.trade_name, p.legal_name)), s.party_id
-LIMIT $4 OFFSET $3
+LIMIT $5 OFFSET $4
 `
 
 type ListSuppliersParams struct {
 	Search     *string
 	Status     *string
+	ProductID  *int64
 	OffsetRows int32
 	LimitRows  int32
 }
@@ -382,6 +390,7 @@ func (q *Queries) ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([
 	rows, err := q.db.Query(ctx, listSuppliers,
 		arg.Search,
 		arg.Status,
+		arg.ProductID,
 		arg.OffsetRows,
 		arg.LimitRows,
 	)

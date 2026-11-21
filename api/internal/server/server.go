@@ -25,6 +25,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
 	"github.com/RicoGama/ceasa-fruit/api/internal/role"
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
+	"github.com/RicoGama/ceasa-fruit/api/internal/supplierproduct"
 	"github.com/RicoGama/ceasa-fruit/api/internal/user"
 )
 
@@ -178,6 +179,7 @@ func build(d Deps) (http.Handler, huma.API) {
 		return database.InTx(ctx, func(tx postgres.Tx) error { return fn(tx) })
 	}
 	supplier.Register(authed, inTx)
+	supplierproduct.Register(authed, database)
 
 	return r, api
 }

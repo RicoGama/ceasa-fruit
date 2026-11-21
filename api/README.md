@@ -24,6 +24,7 @@ na ordem abaixo; os comentários no código explicam cada conceito.
 | 14 | `internal/party/party.go` | dados comuns de pessoa (endereço, contatos, PIX), normalização, structs aninhadas |
 | 15 | `internal/supplier/supplier.go` | Huma: struct tags, validação, interfaces, embedding, closures, transação com várias tabelas |
 | 15b | `internal/product/product.go` | cadastro com lista filha (embalagens): atualizar, criar e remover numa transação; papéis na rota |
+| 15c | `internal/supplierproduct/supplierproduct.go` | relação muitos-para-muitos com dados na ligação, rotas aninhadas (`/suppliers/{id}/products`), permissão dupla (`Protect` duas vezes = E) |
 | 16 | `internal/city/city.go` | uma rota pequena de consulta (municípios do IBGE) |
 | 17 | `internal/company/company.go` | registro único (singleton), `Resolve()` para validar, erro de chave estrangeira |
 | 18 | `internal/mail/` | e-mail por SMTP, modelos com `html/template` e `text/template`, `//go:embed` |
@@ -56,6 +57,7 @@ não existe "organização" nas tabelas: o banco inteiro é de uma empresa só.
 | Fornecedor | `suppliers` | papel "fornecedor" de uma pessoa (consignação, prazo, box) |
 | Produto | `products` | nome + variedade + classificação, unidade de estoque, peso médio, NCM |
 | Embalagem | `product_packagings` | pilha, pallet, caixa de 30: quantas unidades cabem (vazio = varia) |
+| Fornecedor × produto | `supplier_products` | o que cada fornecedor traz: nome na nota dele, safra (meses), modalidade própria, preferencial |
 | Cliente | `customers` | *(próximo passo: outro papel da mesma pessoa)* |
 | Municípios/UFs | `cities`, `states` | lista oficial do IBGE |
 

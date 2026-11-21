@@ -141,8 +141,10 @@ type SupplierSummary struct {
 type listSuppliersInput struct {
 	Search string `query:"search" maxLength:"100" doc:"Name or nickname (contains, accent-insensitive) or document (prefix)"`
 	Status string `query:"status" enum:"active,inactive,blocked,all" default:"active"`
-	Limit  int32  `query:"limit" minimum:"1" maximum:"100" default:"20"`
-	Offset int32  `query:"offset" minimum:"0" default:"0"`
+	// "Quem tem chuchu?": só fornecedores ligados a este produto.
+	ProductID int64 `query:"productId" minimum:"0" doc:"Only suppliers that supply this product"`
+	Limit     int32 `query:"limit" minimum:"1" maximum:"100" default:"20"`
+	Offset    int32 `query:"offset" minimum:"0" default:"0"`
 }
 
 type listSuppliersOutput struct {
@@ -231,6 +233,10 @@ func Register(api huma.API, tx TxFunc) {
 
 // list é um *método* de handler: (h *handler) é o receiver, parecido com o "this".
 func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppliersOutput, error) {
+	var productID *int64
+	if in.ProductID > 0 {
+		productID = &in.ProductID
+	}
 
 	var search *string
 	if s := strings.TrimSpace(in.Search); s != "" {
@@ -247,13 +253,13 @@ func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppli
 	err := h.tx(ctx, func(s Store) error {
 		var err error
 		rows, err = s.ListSuppliers(ctx, db.ListSuppliersParams{
-			Search: search, Status: status,
+			Search: search, Status: status, ProductID: productID,
 			LimitRows: in.Limit, OffsetRows: in.Offset,
 		})
 		if err != nil {
 			return err
 		}
-		total, err = s.CountSuppliers(ctx, db.CountSuppliersParams{Search: search, Status: status})
+		total, err = s.CountSuppliers(ctx, db.CountSuppliersParams{Search: search, Status: status, ProductID: productID})
 		return err
 	})
 	if err != nil {

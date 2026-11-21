@@ -60,7 +60,10 @@ func Protect(api huma.API, op huma.Operation, perms ...Permission) huma.Operatio
 	if op.Extensions == nil {
 		op.Extensions = map[string]any{}
 	}
-	op.Extensions["x-permissions"] = perms
+	// Chamar Protect de novo acrescenta uma exigência (E): a rota passa a
+	// pedir as duas. Dentro de uma chamada, basta uma das permissões (OU).
+	prev, _ := op.Extensions["x-permissions"].([]Permission)
+	op.Extensions["x-permissions"] = append(prev, perms...)
 	return op
 }
 
