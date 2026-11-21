@@ -74,6 +74,7 @@ const failedReasons: Record<string, string> = {
   wrong_password: 'Senha errada',
   unknown_email: 'E-mail não cadastrado',
   inactive_user: 'Usuário desativado',
+  too_many_attempts: 'Bloqueado: muitas tentativas',
 }
 const endedReasons: Record<string, string> = {
   logout: 'Saiu do sistema',

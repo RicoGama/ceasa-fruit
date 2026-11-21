@@ -39,7 +39,7 @@ type AccessEntry struct {
 	//   ended    saiu (ver endReason)
 	//   failed   tentativa de login que falhou (ver endReason)
 	Status    string  `json:"status" enum:"online,idle,expired,ended,failed"`
-	EndReason *string `json:"endReason" enum:"logout,password_changed,deactivated,wrong_password,unknown_email,inactive_user"`
+	EndReason *string `json:"endReason" enum:"logout,password_changed,deactivated,wrong_password,unknown_email,inactive_user,too_many_attempts"`
 }
 
 type listInput struct {

@@ -6,6 +6,7 @@ package db
 
 import (
 	"context"
+	"time"
 )
 
 type Querier interface {
@@ -96,6 +97,15 @@ type Querier interface {
 	// Quem chegar depois ESPERA, e só então enxerga o que mudou. Ordenado por id
 	// para todas as transações travarem na mesma ordem (evita deadlock).
 	LockActiveAdmins(ctx context.Context) ([]int64, error)
+	// Enfileira as tentativas de login do MESMO e-mail até o fim da transação:
+	// 50 tentativas disparadas juntas são checadas uma de cada vez, e não passam
+	// todas pela contagem antes de alguma falha ser gravada.
+	LockLoginEmail(ctx context.Context, email string) error
+	// Falhas "de verdade" recentes deste e-mail desde o último login certo, da
+	// mais nova para a mais velha (as recusadas por bloqueio não contam).
+	RecentEmailFailures(ctx context.Context, arg RecentEmailFailuresParams) ([]time.Time, error)
+	// Falhas recentes vindas deste IP (com qualquer e-mail).
+	RecentIPFailures(ctx context.Context, arg RecentIPFailuresParams) ([]time.Time, error)
 	// Municípios do IBGE (tabela de referência, sem organização).
 	// Busca sem acento; quem começa com o texto aparece primeiro.
 	SearchCities(ctx context.Context, arg SearchCitiesParams) ([]City, error)

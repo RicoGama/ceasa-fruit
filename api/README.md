@@ -183,8 +183,15 @@ tentativa de login que falhou. Tela: *Administração → Acessos* (permissão
 - **Saiu**: `logout`, `password_changed` ou `deactivated`. As sessões só
   terminam por `EndSession` / `EndUserSessions`, que exigem o motivo: o
   compilador não deixa encerrar sessão sem registrar.
-- **Falhas**: `wrong_password`, `unknown_email`, `inactive_user`, gravadas
-  numa transação separada (a do login é desfeita).
+- **Falhas**: `wrong_password`, `unknown_email`, `inactive_user`
+  (e `too_many_attempts` durante o bloqueio).
+- **Limite de tentativas** (`internal/auth/ratelimit.go`): 5 falhas em 15 min
+  bloqueiam o e-mail (mesmo inexistente; um login certo zera) e 20 falhas em
+  15 min bloqueiam o IP. Resposta 429 com `Retry-After` e os minutos restantes.
+  Tentativas durante o bloqueio são registradas (`too_many_attempts`) mas não
+  renovam o bloqueio. Rajadas não furam o limite: as tentativas do mesmo e-mail
+  passam por uma trava no banco (`pg_advisory_xact_lock`), e a falha é gravada
+  na mesma transação da contagem (teste: 30 tentativas simultâneas, 5 contam).
 - Quem só fecha o navegador não tem hora de saída (não há como saber): a tela
   mostra a última atividade, ou "Sessão expirou" quando a sessão venceu.
 

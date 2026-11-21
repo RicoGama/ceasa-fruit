@@ -98,6 +98,12 @@ export function translateApiMessage(message?: string | null): string {
 // Mensagem principal de um erro da API (formato RFC 9457 do Huma).
 export function apiErrorMessage(error: unknown): string {
   const e = error as Partial<ApiErrorModel> | undefined
+  // Login bloqueado por excesso de tentativas: a API diz em quantos minutos.
+  if (e?.detail === 'too many login attempts') {
+    const minutes = Number(e.errors?.[0]?.value)
+    const wait = minutes > 1 ? `${minutes} minutos` : '1 minuto'
+    return `Muitas tentativas sem sucesso. Por segurança, o acesso foi bloqueado por alguns minutos: tente de novo em ${wait}.`
+  }
   return translateApiMessage(e?.detail)
 }
 

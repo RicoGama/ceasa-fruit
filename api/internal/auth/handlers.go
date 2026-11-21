@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"errors"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -151,9 +153,6 @@ func Register(public, authed huma.API, opts Options) {
 // ---------------------------------------------------------------------------
 
 func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutput, error) {
-	// Mesma mensagem para todo tipo de falha: não revelamos se o e-mail existe.
-	invalid := huma.Error401Unauthorized("invalid email or password")
-
 	email := NormalizeEmail(in.Body.Email)
 	ip, userAgent := clientInfo(ctx, in.UserAgent)
 
@@ -161,16 +160,40 @@ func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutpu
 		token   string
 		expires time.Time
 		me      Me
-		// Por que falhou (vai para o registro de acessos; a resposta é a mesma).
-		failReason string
-		failUserID *int64
+		// Resultado quando não entra: o motivo vai para o registro de acessos;
+		// a resposta é a mesma para qualquer motivo (não revelamos se o e-mail existe).
+		failReason  string
+		lockedUntil time.Time
 	)
 	err := h.db.InTx(ctx, func(tx postgres.Tx) error {
+		// Uma tentativa por vez para este e-mail (ver LockLoginEmail).
+		if err := tx.LockLoginEmail(ctx, email); err != nil {
+			return err
+		}
+		// A falha é gravada NESTA transação, que termina em COMMIT (não
+		// devolvemos erro): assim a próxima tentativa, que estava esperando a
+		// trava, já enxerga esta falha na contagem.
+		fail := func(reason string, userID *int64) error {
+			failReason = reason
+			return tx.CreateFailedLoginLog(ctx, db.CreateFailedLoginLogParams{
+				UserID: userID, Email: email, Ip: ip, UserAgent: userAgent, Reason: &reason,
+			})
+		}
+
+		now := time.Now()
+		until, err := loginLockedUntil(ctx, tx, email, ip, now)
+		if err != nil {
+			return err
+		}
+		if !until.IsZero() {
+			lockedUntil = until
+			return fail("too_many_attempts", nil)
+		}
+
 		user, err := tx.GetUserByEmail(ctx, email)
 		if errors.Is(err, pgx.ErrNoRows) {
 			_, _ = VerifyPassword(dummyHash(), in.Body.Password) // gasta o mesmo tempo
-			failReason = "unknown_email"
-			return invalid
+			return fail("unknown_email", nil)
 		}
 		if err != nil {
 			return err
@@ -182,11 +205,9 @@ func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutpu
 		}
 		switch {
 		case !ok:
-			failReason, failUserID = "wrong_password", &user.ID
-			return invalid
+			return fail("wrong_password", &user.ID)
 		case !user.Active:
-			failReason, failUserID = "inactive_user", &user.ID
-			return invalid
+			return fail("inactive_user", &user.ID)
 		}
 
 		// Abre a linha no registro de acessos e a sessão apontando para ela.
@@ -214,22 +235,28 @@ func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutpu
 		me, err = buildMe(ctx, tx, currentUser(SessionFromRow(tokenHash, row)))
 		return err
 	})
-	if failReason != "" {
-		// A tentativa que falhou é registrada numa transação SEPARADA: a do
-		// login acabou de ser desfeita (ROLLBACK) e levaria o registro junto.
-		logErr := h.db.InTx(ctx, func(tx postgres.Tx) error {
-			return tx.CreateFailedLoginLog(ctx, db.CreateFailedLoginLogParams{
-				UserID: failUserID, Email: email, Ip: ip, UserAgent: userAgent, Reason: &failReason,
-			})
-		})
-		if logErr != nil {
-			return nil, logErr
-		}
-	}
-	if err != nil {
+	switch {
+	case err != nil:
 		return nil, err
+	case !lockedUntil.IsZero():
+		return nil, tooManyAttempts(lockedUntil)
+	case failReason != "":
+		return nil, huma.Error401Unauthorized("invalid email or password")
 	}
 	return &meWithCookieOutput{SetCookie: h.cookies.New(token, expires), Body: me}, nil
+}
+
+// tooManyAttempts é o 429 do bloqueio. Diz em quantos minutos tentar de novo
+// (no cabeçalho Retry-After, em segundos, e no detalhe, em minutos, para a tela).
+func tooManyAttempts(until time.Time) error {
+	wait := time.Until(until)
+	minutes := int(math.Ceil(wait.Minutes()))
+	err := huma.Error429TooManyRequests("too many login attempts", &huma.ErrorDetail{
+		Location: "retryAfterMinutes", Message: "try again later", Value: minutes,
+	})
+	return huma.ErrorWithHeaders(err, http.Header{
+		"Retry-After": []string{strconv.Itoa(int(math.Ceil(wait.Seconds())))},
+	})
 }
 
 // clientInfo devolve o IP real (ver middleware.ClientIPFromXFF no servidor) e

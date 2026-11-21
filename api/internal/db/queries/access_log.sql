@@ -33,3 +33,33 @@ SELECT count(*) FROM access_log a
 WHERE (sqlc.narg('user_id')::bigint IS NULL OR a.user_id = sqlc.narg('user_id'))
   AND (sqlc.narg('kind')::text IS NULL OR a.kind = sqlc.narg('kind'))
   AND a.started_at >= @since;
+
+-- Enfileira as tentativas de login do MESMO e-mail até o fim da transação:
+-- 50 tentativas disparadas juntas são checadas uma de cada vez, e não passam
+-- todas pela contagem antes de alguma falha ser gravada.
+-- name: LockLoginEmail :exec
+SELECT pg_advisory_xact_lock(hashtext('login:' || @email::text));
+
+-- Falhas "de verdade" recentes deste e-mail desde o último login certo, da
+-- mais nova para a mais velha (as recusadas por bloqueio não contam).
+-- name: RecentEmailFailures :many
+SELECT f.started_at FROM access_log f
+WHERE f.email = @email
+  AND f.kind = 'failed_login'
+  AND f.end_reason IN ('wrong_password', 'unknown_email', 'inactive_user')
+  AND f.started_at > @since
+  AND f.started_at > coalesce(
+        (SELECT max(ok.started_at) FROM access_log ok WHERE ok.email = f.email AND ok.kind = 'session'),
+        '-infinity')
+ORDER BY f.started_at DESC
+LIMIT @max_rows;
+
+-- Falhas recentes vindas deste IP (com qualquer e-mail).
+-- name: RecentIPFailures :many
+SELECT started_at FROM access_log
+WHERE ip = @ip
+  AND kind = 'failed_login'
+  AND end_reason IN ('wrong_password', 'unknown_email', 'inactive_user')
+  AND started_at > @since
+ORDER BY started_at DESC
+LIMIT @max_rows;

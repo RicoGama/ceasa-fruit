@@ -158,6 +158,96 @@ func (q *Queries) ListAccessLog(ctx context.Context, arg ListAccessLogParams) ([
 	return items, nil
 }
 
+const lockLoginEmail = `-- name: LockLoginEmail :exec
+SELECT pg_advisory_xact_lock(hashtext('login:' || $1::text))
+`
+
+// Enfileira as tentativas de login do MESMO e-mail até o fim da transação:
+// 50 tentativas disparadas juntas são checadas uma de cada vez, e não passam
+// todas pela contagem antes de alguma falha ser gravada.
+func (q *Queries) LockLoginEmail(ctx context.Context, email string) error {
+	_, err := q.db.Exec(ctx, lockLoginEmail, email)
+	return err
+}
+
+const recentEmailFailures = `-- name: RecentEmailFailures :many
+SELECT f.started_at FROM access_log f
+WHERE f.email = $1
+  AND f.kind = 'failed_login'
+  AND f.end_reason IN ('wrong_password', 'unknown_email', 'inactive_user')
+  AND f.started_at > $2
+  AND f.started_at > coalesce(
+        (SELECT max(ok.started_at) FROM access_log ok WHERE ok.email = f.email AND ok.kind = 'session'),
+        '-infinity')
+ORDER BY f.started_at DESC
+LIMIT $3
+`
+
+type RecentEmailFailuresParams struct {
+	Email   string
+	Since   time.Time
+	MaxRows int32
+}
+
+// Falhas "de verdade" recentes deste e-mail desde o último login certo, da
+// mais nova para a mais velha (as recusadas por bloqueio não contam).
+func (q *Queries) RecentEmailFailures(ctx context.Context, arg RecentEmailFailuresParams) ([]time.Time, error) {
+	rows, err := q.db.Query(ctx, recentEmailFailures, arg.Email, arg.Since, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []time.Time
+	for rows.Next() {
+		var started_at time.Time
+		if err := rows.Scan(&started_at); err != nil {
+			return nil, err
+		}
+		items = append(items, started_at)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const recentIPFailures = `-- name: RecentIPFailures :many
+SELECT started_at FROM access_log
+WHERE ip = $1
+  AND kind = 'failed_login'
+  AND end_reason IN ('wrong_password', 'unknown_email', 'inactive_user')
+  AND started_at > $2
+ORDER BY started_at DESC
+LIMIT $3
+`
+
+type RecentIPFailuresParams struct {
+	Ip      *string
+	Since   time.Time
+	MaxRows int32
+}
+
+// Falhas recentes vindas deste IP (com qualquer e-mail).
+func (q *Queries) RecentIPFailures(ctx context.Context, arg RecentIPFailuresParams) ([]time.Time, error) {
+	rows, err := q.db.Query(ctx, recentIPFailures, arg.Ip, arg.Since, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []time.Time
+	for rows.Next() {
+		var started_at time.Time
+		if err := rows.Scan(&started_at); err != nil {
+			return nil, err
+		}
+		items = append(items, started_at)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const touchSessionLog = `-- name: TouchSessionLog :exec
 UPDATE access_log SET last_seen_at = now()
 WHERE id = $1 AND ended_at IS NULL

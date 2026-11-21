@@ -382,7 +382,7 @@ export interface components {
         AccessEntry: {
             email: string;
             /** @enum {string|null} */
-            endReason: "logout" | "password_changed" | "deactivated" | "wrong_password" | "unknown_email" | "inactive_user" | null;
+            endReason: "logout" | "password_changed" | "deactivated" | "wrong_password" | "unknown_email" | "inactive_user" | "too_many_attempts" | null;
             /** Format: date-time */
             endedAt: string | null;
             /** Format: int64 */

@@ -14,7 +14,8 @@
               "deactivated",
               "wrong_password",
               "unknown_email",
-              "inactive_user"
+              "inactive_user",
+              "too_many_attempts"
             ],
             "type": [
               "string",
