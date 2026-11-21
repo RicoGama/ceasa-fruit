@@ -44,11 +44,17 @@ function toggleGroup(g: PermissionGroup, on: boolean) {
 }
 
 // --- Salvar ----------------------------------------------------------------------
+const confirm = useConfirm()
 async function onSubmit() {
   // Tirar de si mesmo o acesso a esta tela: confirma antes.
   const ownRole = props.role && auth.user?.role.id === props.role.id
-  if (ownRole && !has('users.manage')
-    && !window.confirm('Você está tirando do seu próprio papel o acesso a usuários e papéis. Depois de salvar, não vai conseguir voltar a esta tela. Continuar?')) {
+  if (ownRole && !has('users.manage') && !await confirm({
+    title: 'Perder o acesso a esta tela?',
+    description: 'Você está tirando do seu próprio papel o acesso a usuários e papéis. Depois de salvar, não vai conseguir voltar a esta tela.',
+    confirmLabel: 'Salvar assim mesmo',
+    color: 'warning',
+    icon: 'i-lucide-shield-alert',
+  })) {
     return
   }
 
@@ -126,9 +132,8 @@ const { remoteChange } = useLiveRecord({
   reload,
 })
 
-onBeforeRouteLeave(() => {
-  if (dirty.value && !saving.value && !window.confirm('Descartar as alterações não salvas?')) return false
-})
+// Avisa antes de sair da tela com alterações não salvas.
+useUnsavedChangesGuard(() => dirty.value && !saving.value)
 </script>
 
 <template>

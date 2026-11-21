@@ -334,14 +334,7 @@ const { remoteChange } = useLiveRecord({
 })
 
 // Avisa antes de sair da tela com alterações não salvas.
-onBeforeRouteLeave(() => {
-  if (dirty.value && !saving.value && !window.confirm('Descartar as alterações não salvas?')) return false
-})
-function beforeUnload(e: BeforeUnloadEvent) {
-  if (dirty.value) e.preventDefault()
-}
-onMounted(() => window.addEventListener('beforeunload', beforeUnload))
-onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload))
+useUnsavedChangesGuard(() => dirty.value && !saving.value)
 
 const title = computed(() => props.supplier ? displayName(props.supplier) : 'Novo fornecedor')
 
