@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
@@ -73,7 +74,9 @@ type logoutOutput struct {
 }
 
 type loginInput struct {
-	Body struct {
+	// Navegador e sistema de quem entra, para o registro de acessos.
+	UserAgent string `header:"User-Agent"`
+	Body      struct {
 		Email    string `json:"email" maxLength:"254"`
 		Password string `json:"password" maxLength:"128"`
 	}
@@ -151,15 +154,22 @@ func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutpu
 	// Mesma mensagem para todo tipo de falha: não revelamos se o e-mail existe.
 	invalid := huma.Error401Unauthorized("invalid email or password")
 
+	email := NormalizeEmail(in.Body.Email)
+	ip, userAgent := clientInfo(ctx, in.UserAgent)
+
 	var (
 		token   string
 		expires time.Time
 		me      Me
+		// Por que falhou (vai para o registro de acessos; a resposta é a mesma).
+		failReason string
+		failUserID *int64
 	)
 	err := h.db.InTx(ctx, func(tx postgres.Tx) error {
-		user, err := tx.GetUserByEmail(ctx, NormalizeEmail(in.Body.Email))
+		user, err := tx.GetUserByEmail(ctx, email)
 		if errors.Is(err, pgx.ErrNoRows) {
 			_, _ = VerifyPassword(dummyHash(), in.Body.Password) // gasta o mesmo tempo
+			failReason = "unknown_email"
 			return invalid
 		}
 		if err != nil {
@@ -170,14 +180,29 @@ func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutpu
 		if err != nil {
 			return err
 		}
-		if !ok || !user.Active {
+		switch {
+		case !ok:
+			failReason, failUserID = "wrong_password", &user.ID
 			return invalid
+		case !user.Active:
+			failReason, failUserID = "inactive_user", &user.ID
+			return invalid
+		}
+
+		// Abre a linha no registro de acessos e a sessão apontando para ela.
+		logID, err := tx.CreateSessionLog(ctx, db.CreateSessionLogParams{
+			UserID: &user.ID, Email: email, Ip: ip, UserAgent: userAgent,
+		})
+		if err != nil {
+			return err
 		}
 
 		var tokenHash []byte
 		token, tokenHash = NewToken()
 		expires = time.Now().Add(SessionTTL)
-		err = tx.CreateSession(ctx, db.CreateSessionParams{TokenHash: tokenHash, UserID: user.ID, ExpiresAt: expires})
+		err = tx.CreateSession(ctx, db.CreateSessionParams{
+			TokenHash: tokenHash, UserID: user.ID, ExpiresAt: expires, AccessLogID: &logID,
+		})
 		if err != nil {
 			return err
 		}
@@ -189,17 +214,53 @@ func (h *handler) login(ctx context.Context, in *loginInput) (*meWithCookieOutpu
 		me, err = buildMe(ctx, tx, currentUser(SessionFromRow(tokenHash, row)))
 		return err
 	})
+	if failReason != "" {
+		// A tentativa que falhou é registrada numa transação SEPARADA: a do
+		// login acabou de ser desfeita (ROLLBACK) e levaria o registro junto.
+		logErr := h.db.InTx(ctx, func(tx postgres.Tx) error {
+			return tx.CreateFailedLoginLog(ctx, db.CreateFailedLoginLogParams{
+				UserID: failUserID, Email: email, Ip: ip, UserAgent: userAgent, Reason: &failReason,
+			})
+		})
+		if logErr != nil {
+			return nil, logErr
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
 	return &meWithCookieOutput{SetCookie: h.cookies.New(token, expires), Body: me}, nil
 }
 
+// clientInfo devolve o IP real (ver middleware.ClientIPFromXFF no servidor) e
+// o navegador, limitados em tamanho, para o registro de acessos.
+func clientInfo(ctx context.Context, userAgent string) (ip, ua *string) {
+	if v := middleware.GetClientIP(ctx); v != "" {
+		ip = &v
+	}
+	if userAgent = strings.TrimSpace(userAgent); userAgent != "" {
+		if len(userAgent) > 400 {
+			userAgent = userAgent[:400]
+		}
+		ua = &userAgent
+	}
+	return ip, ua
+}
+
+// Touch marca a "última atividade" da sessão no registro de acessos.
+// Quem chama decide a frequência (no máximo uma vez por minuto por sessão).
+func Touch(ctx context.Context, database postgres.DB, accessLogID int64) error {
+	return database.InTx(ctx, func(tx postgres.Tx) error {
+		return tx.TouchSessionLog(ctx, accessLogID)
+	})
+}
+
 // logout apaga a sessão no banco (se houver) e manda o navegador apagar o cookie.
 func (h *handler) logout(ctx context.Context, _ *struct{}) (*logoutOutput, error) {
 	if s, ok := FromContext(ctx); ok {
 		err := h.db.InTx(ctx, func(tx postgres.Tx) error {
-			return tx.DeleteSession(ctx, s.TokenHash)
+			reason := "logout"
+			return tx.EndSession(ctx, db.EndSessionParams{TokenHash: s.TokenHash, Reason: &reason})
 		})
 		if err != nil {
 			return nil, err
@@ -291,7 +352,8 @@ func (h *handler) resetPassword(ctx context.Context, in *resetPasswordInput) (*s
 		if err := q.InvalidatePasswordResetTokens(ctx, userID); err != nil {
 			return err
 		}
-		return q.DeleteUserSessions(ctx, userID)
+		reason := "password_changed"
+		return q.EndUserSessions(ctx, db.EndUserSessionsParams{UserID: userID, Reason: &reason})
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, huma.Error400BadRequest("invalid or expired token")

@@ -48,18 +48,24 @@ func (q *Queries) CreatePasswordResetToken(ctx context.Context, arg CreatePasswo
 }
 
 const createSession = `-- name: CreateSession :exec
-INSERT INTO sessions (token_hash, user_id, expires_at)
-VALUES ($1, $2, $3)
+INSERT INTO sessions (token_hash, user_id, expires_at, access_log_id)
+VALUES ($1, $2, $3, $4)
 `
 
 type CreateSessionParams struct {
-	TokenHash []byte
-	UserID    int64
-	ExpiresAt time.Time
+	TokenHash   []byte
+	UserID      int64
+	ExpiresAt   time.Time
+	AccessLogID *int64
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
-	_, err := q.db.Exec(ctx, createSession, arg.TokenHash, arg.UserID, arg.ExpiresAt)
+	_, err := q.db.Exec(ctx, createSession,
+		arg.TokenHash,
+		arg.UserID,
+		arg.ExpiresAt,
+		arg.AccessLogID,
+	)
 	return err
 }
 
@@ -100,35 +106,55 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
-const deleteSession = `-- name: DeleteSession :exec
-DELETE FROM sessions
-WHERE token_hash = $1
+const endSession = `-- name: EndSession :exec
+WITH ended AS (
+    DELETE FROM sessions s WHERE s.token_hash = $2 RETURNING s.access_log_id
+)
+UPDATE access_log SET ended_at = now(), end_reason = $1
+WHERE id IN (SELECT access_log_id FROM ended) AND ended_at IS NULL
 `
 
-func (q *Queries) DeleteSession(ctx context.Context, tokenHash []byte) error {
-	_, err := q.db.Exec(ctx, deleteSession, tokenHash)
+type EndSessionParams struct {
+	Reason    *string
+	TokenHash []byte
+}
+
+// Encerra uma sessão: apaga da tabela sessions e fecha a linha no histórico
+// com o motivo, numa operação só.
+func (q *Queries) EndSession(ctx context.Context, arg EndSessionParams) error {
+	_, err := q.db.Exec(ctx, endSession, arg.Reason, arg.TokenHash)
 	return err
 }
 
-const deleteUserSessions = `-- name: DeleteUserSessions :exec
-DELETE FROM sessions
-WHERE user_id = $1
+const endUserSessions = `-- name: EndUserSessions :exec
+WITH ended AS (
+    DELETE FROM sessions s WHERE s.user_id = $2 RETURNING s.access_log_id
+)
+UPDATE access_log SET ended_at = now(), end_reason = $1
+WHERE id IN (SELECT access_log_id FROM ended) AND ended_at IS NULL
 `
 
-// Encerra todas as sessões do usuário (ex.: troca de senha, usuário desativado).
-func (q *Queries) DeleteUserSessions(ctx context.Context, userID int64) error {
-	_, err := q.db.Exec(ctx, deleteUserSessions, userID)
+type EndUserSessionsParams struct {
+	Reason *string
+	UserID int64
+}
+
+// Encerra todas as sessões do usuário (troca de senha, usuário desativado).
+func (q *Queries) EndUserSessions(ctx context.Context, arg EndUserSessionsParams) error {
+	_, err := q.db.Exec(ctx, endUserSessions, arg.Reason, arg.UserID)
 	return err
 }
 
 const getSession = `-- name: GetSession :one
 SELECT u.id AS user_id, u.name AS user_name, u.email AS user_email,
        r.id AS role_id, r.key AS role_key, r.name AS role_name,
+       s.access_log_id, a.last_seen_at,
        ARRAY(SELECT rp.permission FROM role_permissions rp
              WHERE rp.role_id = r.id ORDER BY rp.permission)::text[] AS permissions
 FROM sessions s
 JOIN users u ON u.id = s.user_id
 JOIN roles r ON r.id = u.role_id
+LEFT JOIN access_log a ON a.id = s.access_log_id
 WHERE s.token_hash = $1
   AND s.expires_at > now()
   AND u.active
@@ -141,6 +167,8 @@ type GetSessionRow struct {
 	RoleID      int64
 	RoleKey     *string
 	RoleName    string
+	AccessLogID *int64
+	LastSeenAt  *time.Time
 	Permissions []string
 }
 
@@ -156,6 +184,8 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (GetSessionR
 		&i.RoleID,
 		&i.RoleKey,
 		&i.RoleName,
+		&i.AccessLogID,
+		&i.LastSeenAt,
 		&i.Permissions,
 	)
 	return i, err

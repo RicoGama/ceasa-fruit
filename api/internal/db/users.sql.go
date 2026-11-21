@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 )
 
 const countActiveAdmins = `-- name: CountActiveAdmins :one
@@ -112,6 +113,39 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 			&i.User.RoleID,
 			&i.RoleName,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUsersLastSeen = `-- name: ListUsersLastSeen :many
+SELECT user_id, max(last_seen_at)::timestamptz AS last_seen_at
+FROM access_log
+WHERE kind = 'session' AND user_id IS NOT NULL
+GROUP BY user_id
+`
+
+type ListUsersLastSeenRow struct {
+	UserID     *int64
+	LastSeenAt time.Time
+}
+
+// Último acesso de cada usuário (só aparece quem já entrou alguma vez).
+func (q *Queries) ListUsersLastSeen(ctx context.Context) ([]ListUsersLastSeenRow, error) {
+	rows, err := q.db.Query(ctx, listUsersLastSeen)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUsersLastSeenRow
+	for rows.Next() {
+		var i ListUsersLastSeenRow
+		if err := rows.Scan(&i.UserID, &i.LastSeenAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

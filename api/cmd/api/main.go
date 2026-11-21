@@ -16,6 +16,7 @@ import (
 
 	"riverqueue.com/riverui"
 
+	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/config"
 	"github.com/RicoGama/ceasa-fruit/api/internal/mail"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
@@ -92,6 +93,15 @@ func run(logger *slog.Logger) error {
 
 	// Tempo real: escuta as mudanças do banco e repassa às telas abertas.
 	hub := realtime.New(pool.Config().ConnConfig, logger)
+	database := postgres.NewDB(pool)
+	hub.OnAlive = func(ctx context.Context, s *auth.Session) {
+		if s.AccessLogID == nil {
+			return
+		}
+		if err := auth.Touch(ctx, database, *s.AccessLogID); err != nil && ctx.Err() == nil {
+			logger.Warn("touching session from realtime", "error", err)
+		}
+	}
 	go hub.Run(ctx)
 
 	srv := &http.Server{

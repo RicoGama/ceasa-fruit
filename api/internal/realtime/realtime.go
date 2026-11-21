@@ -51,6 +51,11 @@ type Hub struct {
 	mu     sync.Mutex
 	subs   map[chan Event]struct{}
 	closed bool
+
+	// OnAlive é chamado ao conectar e depois a cada minuto enquanto a tela
+	// estiver aberta (usado para a "última atividade" do registro de acessos:
+	// quem está só olhando a tela também conta como presente). Opcional.
+	OnAlive func(ctx context.Context, s *auth.Session)
 }
 
 // New cria o Hub. connConfig é a configuração de conexão do banco: o Hub abre
@@ -161,10 +166,11 @@ func (h *Hub) Close() {
 // topicPermission: quem precisa de qual permissão para receber cada assunto.
 // Assunto que não está aqui (company, resync) vai para todos os logados.
 var topicPermission = map[string]auth.Permission{
-	"suppliers": auth.SuppliersView,
-	"products":  auth.ProductsView,
-	"users":     auth.UsersManage,
-	"roles":     auth.UsersManage,
+	"suppliers":  auth.SuppliersView,
+	"access_log": auth.AuditView,
+	"products":   auth.ProductsView,
+	"users":      auth.UsersManage,
+	"roles":      auth.UsersManage,
 	// fornecedor × produto: a aba do fornecedor e a lista no produto
 	"supplier_products": auth.SuppliersView,
 	"product_suppliers": auth.SuppliersView,
@@ -217,6 +223,14 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = rc.Flush()
 
+	alive := func() {
+		if h.OnAlive != nil {
+			h.OnAlive(r.Context(), s)
+		}
+	}
+	alive()
+	lastAlive := time.Now()
+
 	tick := time.NewTicker(heartbeat)
 	defer tick.Stop()
 	for {
@@ -226,6 +240,10 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case <-tick.C:
 			if _, err := fmt.Fprint(w, ": ping\n\n"); err != nil {
 				return
+			}
+			if time.Since(lastAlive) >= time.Minute {
+				alive()
+				lastAlive = time.Now()
 			}
 		case ev, open := <-events:
 			if !open {

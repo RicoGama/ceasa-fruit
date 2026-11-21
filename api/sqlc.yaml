@@ -17,6 +17,11 @@ sql:
         overrides:
           - db_type: timestamptz
             go_type: time.Time
+          - db_type: timestamptz
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
           # Tipos decimais (ver migration 00003). Nunca float64 para dinheiro.
           - db_type: money_amount
             go_type: github.com/RicoGama/ceasa-fruit/api/internal/money.Money

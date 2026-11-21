@@ -74,7 +74,8 @@ func run(email, password string) error {
 		if err := q.InvalidatePasswordResetTokens(ctx, user.ID); err != nil {
 			return err
 		}
-		return q.DeleteUserSessions(ctx, user.ID)
+		reason := "password_changed"
+		return q.EndUserSessions(ctx, db.EndUserSessionsParams{UserID: user.ID, Reason: &reason})
 	})
 	if err != nil {
 		return err

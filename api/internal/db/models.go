@@ -9,8 +9,20 @@ import (
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/money"
 	"github.com/RicoGama/ceasa-fruit/api/internal/quantity"
-	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type AccessLog struct {
+	ID         int64
+	Kind       string
+	UserID     *int64
+	Email      string
+	Ip         *string
+	UserAgent  *string
+	StartedAt  time.Time
+	LastSeenAt time.Time
+	EndedAt    *time.Time
+	EndReason  *string
+}
 
 type City struct {
 	ID        int32
@@ -84,7 +96,7 @@ type PasswordResetToken struct {
 	TokenHash []byte
 	UserID    int64
 	ExpiresAt time.Time
-	UsedAt    pgtype.Timestamptz
+	UsedAt    *time.Time
 	CreatedAt time.Time
 }
 
@@ -131,10 +143,11 @@ type RolePermission struct {
 }
 
 type Session struct {
-	TokenHash []byte
-	UserID    int64
-	CreatedAt time.Time
-	ExpiresAt time.Time
+	TokenHash   []byte
+	UserID      int64
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+	AccessLogID *int64
 }
 
 type State struct {

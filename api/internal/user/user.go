@@ -24,15 +24,17 @@ import (
 
 // User é o usuário como a API devolve (nunca com a senha).
 type User struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	RoleID    int64     `json:"roleId"`
-	RoleName  string    `json:"roleName"`
-	Active    bool      `json:"active"`
-	Version   int32     `json:"version" doc:"Send it back on update (optimistic locking)"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	RoleID   int64  `json:"roleId"`
+	RoleName string `json:"roleName"`
+	Active   bool   `json:"active"`
+	// Último acesso (null = nunca entrou).
+	LastSeenAt *time.Time `json:"lastSeenAt"`
+	Version    int32      `json:"version" doc:"Send it back on update (optimistic locking)"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
 }
 
 type listOutput struct {
@@ -121,9 +123,18 @@ func Register(api huma.API, opts Options) {
 
 func (h *handler) list(ctx context.Context, _ *struct{}) (*listOutput, error) {
 	var rows []db.ListUsersRow
+	lastSeen := map[int64]time.Time{}
 	err := h.db.InReadTx(ctx, func(tx postgres.Tx) error {
 		var err error
-		rows, err = tx.ListUsers(ctx)
+		if rows, err = tx.ListUsers(ctx); err != nil {
+			return err
+		}
+		seen, err := tx.ListUsersLastSeen(ctx)
+		for _, s := range seen {
+			if s.UserID != nil {
+				lastSeen[*s.UserID] = s.LastSeenAt
+			}
+		}
 		return err
 	})
 	if err != nil {
@@ -132,7 +143,11 @@ func (h *handler) list(ctx context.Context, _ *struct{}) (*listOutput, error) {
 	out := &listOutput{}
 	out.Body.Items = make([]User, 0, len(rows))
 	for _, r := range rows {
-		out.Body.Items = append(out.Body.Items, toAPI(r.User, r.RoleName))
+		u := toAPI(r.User, r.RoleName)
+		if t, ok := lastSeen[r.User.ID]; ok {
+			u.LastSeenAt = &t
+		}
+		out.Body.Items = append(out.Body.Items, u)
 	}
 	return out, nil
 }
@@ -247,7 +262,8 @@ func applyUpdate(ctx context.Context, q postgres.Tx, id int64, version int32, na
 	}
 	// Desativado: encerra as sessões abertas na hora.
 	if !updated.User.Active {
-		return q.DeleteUserSessions(ctx, id)
+		reason := "deactivated"
+		return q.EndUserSessions(ctx, db.EndUserSessionsParams{UserID: id, Reason: &reason})
 	}
 	return nil
 }

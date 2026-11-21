@@ -6,6 +6,13 @@ FROM users u
 JOIN roles r ON r.id = u.role_id
 ORDER BY u.active DESC, lower(u.name), u.id;
 
+-- Último acesso de cada usuário (só aparece quem já entrou alguma vez).
+-- name: ListUsersLastSeen :many
+SELECT user_id, max(last_seen_at)::timestamptz AS last_seen_at
+FROM access_log
+WHERE kind = 'session' AND user_id IS NOT NULL
+GROUP BY user_id;
+
 -- name: GetUser :one
 SELECT * FROM users
 WHERE id = @id;

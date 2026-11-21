@@ -45,6 +45,11 @@ export const permissionGroups = [
         actions: [{ permission: 'company.edit', label: 'Alterar' }],
       },
       {
+        label: 'Registro de acessos',
+        description: 'Quem entrou, quando, de onde e como saiu',
+        actions: [{ permission: 'audit.view', label: 'Ver' }],
+      },
+      {
         label: 'Fila de tarefas',
         description: 'Painel técnico dos envios em segundo plano',
         actions: [{ permission: 'queues.view', label: 'Ver' }],

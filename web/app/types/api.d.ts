@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/access-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Access log: logins, logouts and failed attempts */
+        get: operations["list-access-log"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -362,6 +379,29 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccessEntry: {
+            email: string;
+            /** @enum {string|null} */
+            endReason: "logout" | "password_changed" | "deactivated" | "wrong_password" | "unknown_email" | "inactive_user" | null;
+            /** Format: date-time */
+            endedAt: string | null;
+            /** Format: int64 */
+            id: number;
+            ip: string | null;
+            /** @enum {string} */
+            kind: "session" | "failed_login";
+            /** Format: date-time */
+            lastSeenAt: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** @enum {string} */
+            status: "online" | "idle" | "expired" | "ended" | "failed";
+            userAgent: string | null;
+            /** Format: int64 */
+            userId: number | null;
+            /** @description null when the email does not belong to any user */
+            userName: string | null;
+        };
         Address: {
             city: components["schemas"]["City"];
             complement: string | null;
@@ -492,7 +532,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
             role: components["schemas"]["RoleName"];
         };
         ErrorDetail: {
@@ -576,7 +616,7 @@ export interface components {
              * @example https://example.com/schemas/ListOutputBody2.json
              */
             readonly $schema?: string;
-            items: components["schemas"]["ProductSummary"][];
+            items: components["schemas"]["AccessEntry"][];
             /** Format: int32 */
             limit: number;
             /** Format: int32 */
@@ -589,6 +629,21 @@ export interface components {
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              * @example https://example.com/schemas/ListOutputBody3.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ProductSummary"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
+        ListOutputBody4: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListOutputBody4.json
              */
             readonly $schema?: string;
             items: components["schemas"]["SupplierProduct"][];
@@ -878,7 +933,7 @@ export interface components {
             isAdmin: boolean;
             name: string;
             /** @description For the admin role, the whole catalog */
-            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
             /** Format: date-time */
             updatedAt: string;
             /** Format: int32 */
@@ -893,7 +948,7 @@ export interface components {
             readonly $schema?: string;
             description?: string;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
         };
         RoleName: {
             /** Format: int64 */
@@ -911,7 +966,7 @@ export interface components {
             readonly $schema?: string;
             description?: string;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
             /**
              * Format: int32
              * @description The version read; 409 if someone saved in between
@@ -1240,6 +1295,8 @@ export interface components {
             email: string;
             /** Format: int64 */
             id: number;
+            /** Format: date-time */
+            lastSeenAt: string | null;
             name: string;
             /** Format: int64 */
             roleId: number;
@@ -1261,10 +1318,50 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    "list-access-log": {
+        parameters: {
+            query?: {
+                /** @description Only this user */
+                userId?: number;
+                /** @description Only sessions or only failed logins */
+                kind?: "session" | "failed_login";
+                /** @description How many days back */
+                days?: number;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOutputBody2"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "User-Agent"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1533,7 +1630,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody2"];
+                    "application/json": components["schemas"]["ListOutputBody3"];
                 };
             };
             /** @description Error */
@@ -2045,7 +2142,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody3"];
+                    "application/json": components["schemas"]["ListOutputBody4"];
                 };
             };
             /** @description Error */

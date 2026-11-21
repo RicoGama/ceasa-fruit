@@ -40,6 +40,9 @@ type Session struct {
 	RoleKey     *string // "admin" no papel de sistema; nil nos criados pela tela
 	RoleName    string
 	Permissions []Permission // as do papel (vazia no admin: ele pode tudo)
+	// AccessLogID é a linha desta sessão no registro de acessos (nil nas
+	// sessões criadas antes do registro existir).
+	AccessLogID *int64
 }
 
 // IsAdmin diz se o usuário tem o papel de sistema "Administrador".
@@ -75,6 +78,7 @@ func SessionFromRow(tokenHash []byte, row db.GetSessionRow) *Session {
 	return &Session{
 		TokenHash: tokenHash, UserID: row.UserID, UserName: row.UserName, UserEmail: row.UserEmail,
 		RoleID: row.RoleID, RoleKey: row.RoleKey, RoleName: row.RoleName, Permissions: perms,
+		AccessLogID: row.AccessLogID,
 	}
 }
 

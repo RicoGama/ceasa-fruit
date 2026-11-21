@@ -26,13 +26,14 @@ const (
 	UsersManage   Permission = "users.manage"   // usuários, papéis e permissões
 	CompanyEdit   Permission = "company.edit"   // alterar os dados da empresa
 	QueuesView    Permission = "queues.view"    // painel da fila de tarefas
+	AuditView     Permission = "audit.view"     // registro de acessos (quem entrou, quando, de onde)
 )
 
 // All é o catálogo completo, na ordem em que aparece na tela.
 var All = []Permission{
 	SuppliersView, SuppliersEdit,
 	ProductsView, ProductsEdit,
-	UsersManage, CompanyEdit, QueuesView,
+	UsersManage, CompanyEdit, QueuesView, AuditView,
 }
 
 // Implies: quem tem a permissão da esquerda também precisa da da direita

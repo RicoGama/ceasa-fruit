@@ -16,6 +16,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/RicoGama/ceasa-fruit/api/internal/access"
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/city"
 	"github.com/RicoGama/ceasa-fruit/api/internal/company"
@@ -115,6 +116,13 @@ func build(d Deps) (http.Handler, huma.API) {
 			row, err = tx.GetSession(ctx, tokenHash)
 			return err
 		})
+		// Última atividade no registro de acessos: no máximo 1x por minuto
+		// por sessão (gravar a cada requisição seria desperdício).
+		if err == nil && row.AccessLogID != nil && (row.LastSeenAt == nil || time.Since(*row.LastSeenAt) > time.Minute) {
+			if err := auth.Touch(ctx, database, *row.AccessLogID); err != nil {
+				d.Logger.Warn("touching session", "error", err)
+			}
+		}
 		return row, err
 	}
 	r.Use(auth.LoadSession(loadSession, d.Logger))
@@ -169,6 +177,7 @@ func build(d Deps) (http.Handler, huma.API) {
 	})
 	user.Register(authed, user.Options{DB: database, Emails: emails, AppURL: d.AppURL})
 	role.Register(authed, database)
+	access.Register(authed, database)
 	company.Register(authed, database)
 	city.Register(authed, database)
 	product.Register(authed, database)

@@ -20,10 +20,13 @@ type Querier interface {
 	// Marca o token como usado e devolve o usuário, numa operação só: dois
 	// pedidos simultâneos com o mesmo link não conseguem usá-lo duas vezes.
 	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) (int64, error)
+	CountAccessLog(ctx context.Context, arg CountAccessLogParams) (int64, error)
 	// Usada para impedir que o sistema fique sem nenhum administrador ativo.
 	CountActiveAdmins(ctx context.Context) (int64, error)
 	CountProducts(ctx context.Context, arg CountProductsParams) (int64, error)
 	CountSuppliers(ctx context.Context, arg CountSuppliersParams) (int64, error)
+	// Tentativa de login que falhou: já nasce encerrada, com o motivo.
+	CreateFailedLoginLog(ctx context.Context, arg CreateFailedLoginLogParams) error
 	// @nome é atalho do sqlc para sqlc.arg('nome'); sqlc.narg = pode ser NULL.
 	CreateParty(ctx context.Context, arg CreatePartyParams) (int64, error)
 	CreatePartyContact(ctx context.Context, arg CreatePartyContactParams) error
@@ -33,6 +36,8 @@ type Querier interface {
 	CreateProductPackaging(ctx context.Context, arg CreateProductPackagingParams) error
 	CreateRole(ctx context.Context, arg CreateRoleParams) (int64, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) error
+	// Registro de acessos (ver migration 00009).
+	CreateSessionLog(ctx context.Context, arg CreateSessionLogParams) (int64, error)
 	CreateSupplier(ctx context.Context, arg CreateSupplierParams) error
 	CreateSupplierProduct(ctx context.Context, arg CreateSupplierProductParams) error
 	// Queries de autenticação e senha.
@@ -47,10 +52,12 @@ type Querier interface {
 	// Só apaga papel sem nenhum usuário (nem desativado) e que não seja o admin.
 	DeleteRole(ctx context.Context, id int64) (int64, error)
 	DeleteRolePermissions(ctx context.Context, roleID int64) error
-	DeleteSession(ctx context.Context, tokenHash []byte) error
 	DeleteSupplierProduct(ctx context.Context, arg DeleteSupplierProductParams) (int64, error)
-	// Encerra todas as sessões do usuário (ex.: troca de senha, usuário desativado).
-	DeleteUserSessions(ctx context.Context, userID int64) error
+	// Encerra uma sessão: apaga da tabela sessions e fecha a linha no histórico
+	// com o motivo, numa operação só.
+	EndSession(ctx context.Context, arg EndSessionParams) error
+	// Encerra todas as sessões do usuário (troca de senha, usuário desativado).
+	EndUserSessions(ctx context.Context, arg EndUserSessionsParams) error
 	// Cria a empresa só com o nome, se ainda não existir (usado pelo make seed).
 	EnsureCompany(ctx context.Context, name string) error
 	// Empresa desta instalação (um registro só, id = 1).
@@ -69,6 +76,8 @@ type Querier interface {
 	GetUserWithRole(ctx context.Context, id int64) (GetUserWithRoleRow, error)
 	// Depois de redefinir, os outros links pendentes deixam de valer.
 	InvalidatePasswordResetTokens(ctx context.Context, userID int64) error
+	// session_open: a sessão ainda existe e não venceu (para "online" e "expirou").
+	ListAccessLog(ctx context.Context, arg ListAccessLogParams) ([]ListAccessLogRow, error)
 	ListPartyContacts(ctx context.Context, partyID int64) ([]PartyContact, error)
 	ListProductPackagings(ctx context.Context, productID int64) ([]ProductPackaging, error)
 	// Quem fornece este produto (preferidos primeiro).
@@ -81,6 +90,8 @@ type Querier interface {
 	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]ListSuppliersRow, error)
 	// Gestão de usuários (tela do administrador).
 	ListUsers(ctx context.Context) ([]ListUsersRow, error)
+	// Último acesso de cada usuário (só aparece quem já entrou alguma vez).
+	ListUsersLastSeen(ctx context.Context) ([]ListUsersLastSeenRow, error)
 	// Trava as linhas dos administradores ativos até o fim da transação.
 	// Quem chegar depois ESPERA, e só então enxerga o que mudou. Ordenado por id
 	// para todas as transações travarem na mesma ordem (evita deadlock).
@@ -88,6 +99,8 @@ type Querier interface {
 	// Municípios do IBGE (tabela de referência, sem organização).
 	// Busca sem acento; quem começa com o texto aparece primeiro.
 	SearchCities(ctx context.Context, arg SearchCitiesParams) ([]City, error)
+	// Última atividade (chamada no máximo uma vez por minuto por sessão).
+	TouchSessionLog(ctx context.Context, id int64) error
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (int64, error)
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (int64, error)

@@ -73,6 +73,7 @@ não existe "organização" nas tabelas: o banco inteiro é de uma empresa só.
   | `users.manage` | usuários, papéis e permissões |
   | `company.edit` | alterar os dados da empresa |
   | `queues.view` | painel da fila de tarefas (River UI) |
+  | `audit.view` | registro de acessos (nenhum papel tem por padrão: só o admin) |
 
 - **Papéis ficam no banco** (`roles`, `role_permissions`) e o administrador cria
   e edita pela tela *Administração → Papéis e permissões*. Cada usuário tem
@@ -168,6 +169,24 @@ Testes que provam cada caso: `internal/user/concurrency_test.go` (corrida do
 
 Ao criar uma tela de edição nova: devolva `version` no GET, exija no PUT e use
 `ClaimPartyVersion` (pessoas) ou `WHERE version = @version` na query.
+
+## Registro de acessos
+
+Tabela `access_log` (migration `00009`): uma linha por sessão e uma por
+tentativa de login que falhou. Tela: *Administração → Acessos* (permissão
+`audit.view`).
+
+- **Entrou**: hora, e-mail, IP real (ver "IP do cliente") e navegador.
+- **Última atividade**: gravada no máximo 1x por minuto por sessão, a cada
+  requisição e enquanto a tela está aberta (pelo canal de tempo real). Daí sai
+  "Online agora" (atividade há menos de 3 min) e "Sem atividade desde...".
+- **Saiu**: `logout`, `password_changed` ou `deactivated`. As sessões só
+  terminam por `EndSession` / `EndUserSessions`, que exigem o motivo: o
+  compilador não deixa encerrar sessão sem registrar.
+- **Falhas**: `wrong_password`, `unknown_email`, `inactive_user`, gravadas
+  numa transação separada (a do login é desfeita).
+- Quem só fecha o navegador não tem hora de saída (não há como saber): a tela
+  mostra a última atividade, ou "Sessão expirou" quando a sessão venceu.
 
 ## Tempo real
 

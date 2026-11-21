@@ -23,6 +23,63 @@ export function formatPostalCode(value?: string | null): string {
   return d.length === 8 ? `${d.slice(0, 5)}-${d.slice(5)}` : (value ?? '')
 }
 
+const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+const timeFormatter = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' })
+
+// 21/11/2026 14:32
+export function formatDateTime(iso: string): string {
+  return dateTimeFormatter.format(new Date(iso))
+}
+
+// "hoje 14:32", "ontem 09:10" ou "18/11/2026 16:05"
+export function formatWhen(iso: string): string {
+  const d = new Date(iso)
+  const today = new Date()
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
+  if (d.toDateString() === today.toDateString()) return `hoje ${timeFormatter.format(d)}`
+  if (d.toDateString() === yesterday.toDateString()) return `ontem ${timeFormatter.format(d)}`
+  return dateTimeFormatter.format(d)
+}
+
+// Duração entre duas datas: "menos de 1 min", "8 min", "2 h 15 min", "3 dias"
+export function formatDuration(fromIso: string, toIso: string): string {
+  const min = Math.round((new Date(toIso).getTime() - new Date(fromIso).getTime()) / 60000)
+  if (min < 1) return 'menos de 1 min'
+  if (min < 60) return `${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return min % 60 ? `${h} h ${min % 60} min` : `${h} h`
+  const days = Math.round(h / 24)
+  return days === 1 ? '1 dia' : `${days} dias`
+}
+
+// Resumo do navegador e do aparelho a partir do User-Agent:
+// "Chrome · Android", "Safari · iPhone", "Edge · Windows".
+export function describeDevice(ua?: string | null): { label: string, icon: string } {
+  if (!ua) return { label: 'Desconhecido', icon: 'i-lucide-circle-help' }
+  const browser
+    = /Edg\//.test(ua) ? 'Edge'
+      : /OPR\//.test(ua) ? 'Opera'
+        : /SamsungBrowser/.test(ua) ? 'Samsung Internet'
+          : /Firefox\//.test(ua) ? 'Firefox'
+            : /Chrome\//.test(ua) ? 'Chrome'
+              : /Safari\//.test(ua) ? 'Safari'
+                : ua.split(/[ /]/)[0] || 'Navegador'
+  const system
+    = /iPhone/.test(ua) ? 'iPhone'
+      : /iPad/.test(ua) ? 'iPad'
+        : /Android/.test(ua) ? 'Android'
+          : /Windows/.test(ua) ? 'Windows'
+            : /Mac OS X|Macintosh/.test(ua) ? 'Mac'
+              : /Linux/.test(ua) ? 'Linux'
+                : ''
+  const mobile = /iPhone|Android.*Mobile|Mobile Safari/.test(ua)
+  const tablet = /iPad|Android(?!.*Mobile)/.test(ua)
+  return {
+    label: system ? `${browser} · ${system}` : browser,
+    icon: mobile ? 'i-lucide-smartphone' : tablet ? 'i-lucide-tablet' : 'i-lucide-monitor',
+  }
+}
+
 // Safra: meses em que o fornecedor tem o produto.
 //   []              -> "Ano todo"
 //   [1,2,3,12]      -> "dez–mar"      (atravessa a virada do ano)

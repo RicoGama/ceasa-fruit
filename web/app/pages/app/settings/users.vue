@@ -39,7 +39,7 @@ const users = computed(() => (data.value ?? []).filter(u => showInactive.value |
 const columns: TableColumn<User>[] = [
   { accessorKey: 'name', header: 'Usuário' },
   { accessorKey: 'roleName', header: 'Papel' },
-  { accessorKey: 'createdAt', header: 'Desde', meta: { class: { th: 'hidden md:table-cell', td: 'hidden md:table-cell' } } },
+  { accessorKey: 'lastSeenAt', header: 'Último acesso', meta: { class: { th: 'hidden md:table-cell', td: 'hidden md:table-cell' } } },
   { accessorKey: 'active', header: 'Situação' },
   { id: 'actions' },
 ]
@@ -47,6 +47,7 @@ const columns: TableColumn<User>[] = [
 function rowActions(u: User): DropdownMenuItem[] {
   return [
     { label: 'Editar', icon: 'i-lucide-pencil', onSelect: () => openEdit(u) },
+    ...(auth.can('audit.view') ? [{ label: 'Ver acessos', icon: 'i-lucide-history', to: `/app/settings/access?userId=${u.id}&days=30` }] : []),
     ...(u.active
       ? [{ label: 'Reenviar convite', icon: 'i-lucide-mail', onSelect: () => resendInvite(u) }]
       : []),
@@ -165,8 +166,9 @@ async function resendInvite(u: User) {
         <template #roleName-cell="{ row }">
           {{ row.original.roleName }}
         </template>
-        <template #createdAt-cell="{ row }">
-          {{ formatDate(row.original.createdAt) }}
+        <template #lastSeenAt-cell="{ row }">
+          <span v-if="row.original.lastSeenAt" class="whitespace-nowrap">{{ formatWhen(row.original.lastSeenAt) }}</span>
+          <span v-else class="text-dimmed">Nunca entrou</span>
         </template>
         <template #active-cell="{ row }">
           <UBadge

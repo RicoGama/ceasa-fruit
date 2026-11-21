@@ -441,6 +441,11 @@ func TestIntegrationPasswordReset(t *testing.T) {
 
 	// A sessão aberta antes da troca foi encerrada.
 	carla.expect(http.StatusUnauthorized, "GET", "/auth/me", nil, nil)
+	// ...e o registro de acessos diz por quê.
+	var ended int
+	if err := env.pool.QueryRow(ctx, "SELECT count(*) FROM access_log WHERE email = $1 AND end_reason = 'password_changed'", email).Scan(&ended); err != nil || ended != 1 {
+		t.Errorf("password_changed entries = %d (%v)", ended, err)
+	}
 	// Senha antiga não entra mais; a nova entra.
 	anon.expect(http.StatusUnauthorized, "POST", "/auth/login", map[string]any{"email": email, "password": "senha-antiga-1"}, nil)
 	anon.expect(http.StatusOK, "POST", "/auth/login", map[string]any{"email": email, "password": "senha-nova-123"}, nil)

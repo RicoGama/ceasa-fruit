@@ -37,6 +37,7 @@ const adminLinks = computed<NavigationMenuItem[]>(() => {
       { label: 'Papéis e permissões', icon: 'i-lucide-shield-check', to: '/app/settings/roles' },
     )
   }
+  if (auth.can('audit.view')) items.push({ label: 'Acessos', icon: 'i-lucide-history', to: '/app/settings/access' })
   if (auth.can('company.edit')) items.push({ label: 'Dados da empresa', icon: 'i-lucide-building-2', to: '/app/settings/company' })
   // Painel do River (fora do Nuxt): abre em outra aba.
   if (auth.can('queues.view')) items.push({ label: 'Filas', icon: 'i-lucide-list-checks', to: '/admin/queues', external: true, target: '_blank' })
