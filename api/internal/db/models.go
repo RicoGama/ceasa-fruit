@@ -24,6 +24,19 @@ type AccessLog struct {
 	EndReason  *string
 }
 
+type AuditLog struct {
+	ID          int64
+	OccurredAt  time.Time
+	TxID        int64
+	ActorUserID *int64
+	EntityType  string
+	EntityID    int64
+	TableName   string
+	RowID       *int64
+	Action      string
+	Changes     []byte
+}
+
 type City struct {
 	ID        int32
 	Name      string

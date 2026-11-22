@@ -141,6 +141,7 @@ useUnsavedChangesGuard(() => dirty.value && !saving.value)
     <template #header>
       <AppNavbar :title="props.role?.name">
         <template #right>
+          <AuditHistoryButton v-if="props.role" entity-type="role" :entity-id="props.role.id" :title="props.role.name" />
           <template v-if="!isSystem">
             <UBadge v-if="dirty" label="Não salvo" color="warning" variant="subtle" class="hidden sm:inline-flex" />
             <UButton type="submit" form="role-form" label="Salvar" icon="i-lucide-check" :loading="saving" />

@@ -65,8 +65,8 @@ export const permissionGroups = [
         actions: [{ permission: 'company.edit', label: 'Alterar' }],
       },
       {
-        label: 'Registro de acessos',
-        description: 'Quem entrou, quando, de onde e como saiu',
+        label: 'Registro de acessos e alterações',
+        description: 'Quem entrou, quando e de onde; e o histórico de tudo o que foi alterado nos cadastros',
         actions: [{ permission: 'audit.view', label: 'Ver' }],
       },
       {

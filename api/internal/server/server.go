@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/access"
+	"github.com/RicoGama/ceasa-fruit/api/internal/audit"
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/city"
 	"github.com/RicoGama/ceasa-fruit/api/internal/company"
@@ -198,6 +199,7 @@ func build(d Deps) (http.Handler, huma.API) {
 		return database.InTx(ctx, func(tx postgres.Tx) error { return fn(tx) })
 	})
 	fleet.Register(authed, database, fleet.Options{TraccarConfigured: d.TraccarConfigured})
+	audit.Register(authed, database)
 	// "Este CNPJ já está cadastrado?": usado pelos cadastros de fornecedor e cliente.
 	party.RegisterLookup(authed, func(ctx context.Context, fn func(party.LookupStore) error) error {
 		return database.InReadTx(ctx, func(tx postgres.Tx) error { return fn(tx) })

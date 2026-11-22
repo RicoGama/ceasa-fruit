@@ -235,18 +235,18 @@ func (h *handler) delete(ctx context.Context, in *idInput) (*struct{}, error) {
 	return nil, mapError(err)
 }
 
-// savePermissions troca todas as permissões do papel pela lista recebida.
-// (Aqui apagar e inserir de novo é seguro: nada aponta para essas linhas.)
+// savePermissions deixa o papel com exatamente as permissões recebidas,
+// mexendo só no que mudou (o histórico mostra o que entrou e o que saiu).
 func savePermissions(ctx context.Context, tx postgres.Tx, roleID int64, perms []auth.Permission) error {
-	if err := tx.DeleteRolePermissions(ctx, roleID); err != nil {
-		return err
-	}
-	if len(perms) == 0 {
-		return nil
-	}
 	codes := make([]string, len(perms))
 	for i, p := range perms {
 		codes[i] = string(p)
+	}
+	if err := tx.RemoveRolePermissionsNotIn(ctx, db.RemoveRolePermissionsNotInParams{RoleID: roleID, Permissions: codes}); err != nil {
+		return err
+	}
+	if len(codes) == 0 {
+		return nil
 	}
 	return tx.AddRolePermissions(ctx, db.AddRolePermissionsParams{RoleID: roleID, Permissions: codes})
 }

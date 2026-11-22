@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 )
 
 const (
@@ -188,7 +189,9 @@ func LoadSession(loader SessionLoader, logger *slog.Logger) func(http.Handler) h
 			// mudar o papel de alguém (ou as permissões do papel), vale na
 			// hora, sem precisar sair e entrar de novo.
 			s := SessionFromRow(hash, row)
-			next.ServeHTTP(w, r.WithContext(WithSession(r.Context(), s)))
+			// O usuário também vai para as transações (histórico de alterações).
+			ctx := postgres.WithActor(WithSession(r.Context(), s), s.UserID)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }

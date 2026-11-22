@@ -384,26 +384,57 @@ func FromDB(p db.Party, cityName, cityState *string, contacts []db.PartyContact)
 
 // ContactStore é o que SaveContacts precisa do banco.
 type ContactStore interface {
-	DeletePartyContacts(ctx context.Context, partyID int64) error
+	ListPartyContacts(ctx context.Context, partyID int64) ([]db.PartyContact, error)
 	CreatePartyContact(ctx context.Context, arg db.CreatePartyContactParams) error
+	UpdatePartyContact(ctx context.Context, arg db.UpdatePartyContactParams) error
+	DeletePartyContact(ctx context.Context, id int64) error
 }
 
-// SaveContacts substitui todos os contatos da pessoa pelos recebidos.
-// Apagar e inserir de novo é mais simples que comparar item a item, e a
-// lista é pequena (no máximo 20).
+// SaveContacts deixa a pessoa com exatamente os contatos recebidos, na ordem
+// da tela. A tela não manda o id do contato, então a posição é a referência:
+// o 1º contato da tela atualiza o 1º gravado, e assim por diante; sobrando de
+// um lado, inclui ou remove. Só o que mudou é gravado (o histórico de
+// alterações mostra "trocou o telefone do Seu Jorge", e não "apagou e criou
+// todos os contatos").
 func SaveContacts(ctx context.Context, s ContactStore, partyID int64, contacts []ContactInput) error {
-	if err := s.DeletePartyContacts(ctx, partyID); err != nil {
+	current, err := s.ListPartyContacts(ctx, partyID)
+	if err != nil {
 		return err
 	}
 	for i, c := range contacts {
+		pos := int32(i)
+		if i < len(current) {
+			old := current[i]
+			if old.Name == c.Name && eqStr(old.Role, c.Role) && eqStr(old.Phone, c.Phone) &&
+				old.IsWhatsapp == c.IsWhatsapp && eqStr(old.Email, c.Email) && old.Position == pos {
+				continue
+			}
+			if err := s.UpdatePartyContact(ctx, db.UpdatePartyContactParams{
+				ID: old.ID, Name: c.Name, Role: c.Role, Phone: c.Phone, IsWhatsapp: c.IsWhatsapp, Email: c.Email, Position: pos,
+			}); err != nil {
+				return err
+			}
+			continue
+		}
 		if err := s.CreatePartyContact(ctx, db.CreatePartyContactParams{
-			PartyID: partyID, Name: c.Name, Role: c.Role,
-			Phone: c.Phone, IsWhatsapp: c.IsWhatsapp, Email: c.Email, Position: int32(i),
+			PartyID: partyID, Name: c.Name, Role: c.Role, Phone: c.Phone, IsWhatsapp: c.IsWhatsapp, Email: c.Email, Position: pos,
 		}); err != nil {
 			return err
 		}
 	}
+	for _, old := range current[min(len(contacts), len(current)):] {
+		if err := s.DeletePartyContact(ctx, old.ID); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func eqStr(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }
 
 // Timestamps aparece nas respostas de qualquer cadastro.

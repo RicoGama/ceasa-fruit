@@ -99,6 +99,17 @@ func TestNotifyAfterCommitOnly(t *testing.T) {
 		return id, err
 	}
 	name := "Teste realtime " + time.Now().Format("150405.000000")
+	// O histórico de alterações (audit_log) também avisa a cada gravação:
+	// aqui interessa só o aviso do produto.
+	nextChange := func(d time.Duration) (Event, bool) {
+		deadline := time.Now().Add(d)
+		for {
+			ev, ok := next(events, time.Until(deadline))
+			if !ok || ev.Topic != "audit_log" {
+				return ev, ok
+			}
+		}
+	}
 
 	// 1. ROLLBACK: ninguém é avisado de algo que não aconteceu.
 	_ = database.InTx(ctx, func(tx postgres.Tx) error {
@@ -107,7 +118,7 @@ func TestNotifyAfterCommitOnly(t *testing.T) {
 		}
 		return pgx.ErrTxClosed // força o ROLLBACK
 	})
-	if ev, got := next(events, 700*time.Millisecond); got {
+	if ev, got := nextChange(700*time.Millisecond); got {
 		t.Fatalf("rolled back insert produced %v", ev)
 	}
 
@@ -126,7 +137,7 @@ func TestNotifyAfterCommitOnly(t *testing.T) {
 					return err
 				}
 			}
-			if ev, got := next(events, 500*time.Millisecond); got {
+			if ev, got := nextChange(500*time.Millisecond); got {
 				t.Errorf("event before commit: %v", ev)
 			}
 			return nil
@@ -134,11 +145,11 @@ func TestNotifyAfterCommitOnly(t *testing.T) {
 		close(committed)
 	}()
 	<-committed
-	ev, got := next(events, 3*time.Second)
+	ev, got := nextChange(3*time.Second)
 	if !got || ev != (Event{"products", id}) {
 		t.Fatalf("after commit: got %v (%v), want products/%d", ev, got, id)
 	}
-	if extra, got := next(events, 500*time.Millisecond); got {
+	if extra, got := nextChange(500*time.Millisecond); got {
 		t.Errorf("expected one event per transaction, also got %v", extra)
 	}
 	_ = database.InTx(ctx, func(tx postgres.Tx) error {

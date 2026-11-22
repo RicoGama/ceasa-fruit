@@ -21,6 +21,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All changes (administrator) */
+        get: operations["list-history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit/{entityType}/{entityId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * AuditChange history of one record
+         * @description Who changed what and when. Allowed for whoever can see that kind of record.
+         */
+        get: operations["get-entity-history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -594,6 +631,45 @@ export interface components {
             postalCode?: string;
             street?: string;
         };
+        AuditChange: {
+            /** @enum {string} */
+            action: "created" | "updated" | "deleted";
+            fields: components["schemas"]["AuditField"][];
+            /** Format: int64 */
+            rowId: number | null;
+            /** @description e.g. parties, party_contacts, suppliers */
+            table: string;
+        };
+        AuditEvent: {
+            /** @description null = the system (sync, seed, script) */
+            actor: components["schemas"]["AuditRef"];
+            changes: components["schemas"]["AuditChange"][];
+            /** Format: int64 */
+            entityId: number;
+            entityName: string;
+            /** @enum {string} */
+            entityType: "party" | "product" | "user" | "role" | "company" | "vehicle" | "driver";
+            /**
+             * Format: int64
+             * @description Id of the newest row of the event (for keys and pagination)
+             */
+            id: number;
+            /** Format: date-time */
+            occurredAt: string;
+        };
+        AuditField: {
+            /** @description Column name, e.g. phone, consignment_commission */
+            name: string;
+            /** @description Value after (absent when deleted) */
+            new?: unknown;
+            /** @description Value before (absent when created) */
+            old?: unknown;
+        };
+        AuditRef: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
         City: {
             /**
              * Format: int32
@@ -1012,6 +1088,20 @@ export interface components {
              */
             readonly $schema?: string;
             email: string;
+        };
+        HistoryBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/HistoryBody.json
+             */
+            readonly $schema?: string;
+            events: components["schemas"]["AuditEvent"][];
+            /** Format: int64 */
+            nextBefore: number | null;
+            refs: {
+                [key: string]: string;
+            };
         };
         ListCustomersOutputBody: {
             /**
@@ -2000,6 +2090,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListOutputBody2"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-history": {
+        parameters: {
+            query?: {
+                days?: number;
+                /** @description Only changes made by this user */
+                actorId?: number;
+                entityType?: "party" | "product" | "user" | "role" | "company" | "vehicle" | "driver" | "all";
+                before?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-entity-history": {
+        parameters: {
+            query?: {
+                /** @description Only rows older than this id */
+                before?: number;
+            };
+            header?: never;
+            path: {
+                entityType: "party" | "product" | "user" | "role" | "company" | "vehicle" | "driver";
+                entityId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryBody"];
                 };
             };
             /** @description Error */

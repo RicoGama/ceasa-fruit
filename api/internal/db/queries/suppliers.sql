@@ -117,9 +117,13 @@ SELECT * FROM party_contacts
 WHERE party_id = @party_id
 ORDER BY position, id;
 
--- name: DeletePartyContacts :exec
-DELETE FROM party_contacts
-WHERE party_id = @party_id;
+-- name: UpdatePartyContact :exec
+UPDATE party_contacts
+SET name = @name, role = @role, phone = @phone, is_whatsapp = @is_whatsapp, email = @email, position = @position
+WHERE id = @id;
+
+-- name: DeletePartyContact :exec
+DELETE FROM party_contacts WHERE id = @id;
 
 -- name: CreatePartyContact :exec
 INSERT INTO party_contacts (party_id, name, role, phone, is_whatsapp, email, position)

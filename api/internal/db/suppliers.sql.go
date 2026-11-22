@@ -232,13 +232,12 @@ func (q *Queries) DeactivateSupplier(ctx context.Context, partyID int64) (int64,
 	return result.RowsAffected(), nil
 }
 
-const deletePartyContacts = `-- name: DeletePartyContacts :exec
-DELETE FROM party_contacts
-WHERE party_id = $1
+const deletePartyContact = `-- name: DeletePartyContact :exec
+DELETE FROM party_contacts WHERE id = $1
 `
 
-func (q *Queries) DeletePartyContacts(ctx context.Context, partyID int64) error {
-	_, err := q.db.Exec(ctx, deletePartyContacts, partyID)
+func (q *Queries) DeletePartyContact(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, deletePartyContact, id)
 	return err
 }
 
@@ -567,6 +566,35 @@ func (q *Queries) UpdateParty(ctx context.Context, arg UpdatePartyParams) (int64
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const updatePartyContact = `-- name: UpdatePartyContact :exec
+UPDATE party_contacts
+SET name = $1, role = $2, phone = $3, is_whatsapp = $4, email = $5, position = $6
+WHERE id = $7
+`
+
+type UpdatePartyContactParams struct {
+	Name       string
+	Role       *string
+	Phone      *string
+	IsWhatsapp bool
+	Email      *string
+	Position   int32
+	ID         int64
+}
+
+func (q *Queries) UpdatePartyContact(ctx context.Context, arg UpdatePartyContactParams) error {
+	_, err := q.db.Exec(ctx, updatePartyContact,
+		arg.Name,
+		arg.Role,
+		arg.Phone,
+		arg.IsWhatsapp,
+		arg.Email,
+		arg.Position,
+		arg.ID,
+	)
+	return err
 }
 
 const updateSupplier = `-- name: UpdateSupplier :execrows

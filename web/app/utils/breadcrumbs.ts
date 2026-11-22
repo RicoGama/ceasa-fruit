@@ -36,6 +36,7 @@ const rules: [RegExp, Crumb[]][] = [
   [/^\/app\/products\/[^/]+$/, [home, registries, products, { label: 'Produto' }]],
   [/^\/app\/settings\/users$/, [home, admin, { label: 'Usuários' }]],
   [/^\/app\/settings\/company$/, [home, admin, { label: 'Dados da empresa' }]],
+  [/^\/app\/settings\/changes$/, [home, admin, { label: 'Histórico de alterações' }]],
   [/^\/app\/settings\/access$/, [home, admin, { label: 'Registro de acessos' }]],
   [/^\/app\/settings\/roles\/?$/, [home, admin, { label: 'Papéis e permissões' }]],
   [/^\/app\/settings\/roles\/new$/, [home, admin, roles, { label: 'Novo papel' }]],

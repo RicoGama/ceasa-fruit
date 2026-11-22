@@ -142,6 +142,7 @@ async function onSubmit(_: FormSubmitEvent<unknown>) {
     <template #header>
       <AppNavbar>
         <template #right>
+          <AuditHistoryButton v-if="data" entity-type="company" :entity-id="1" title="Dados da empresa" />
           <UButton type="submit" form="company-form" label="Salvar" icon="i-lucide-check" :loading="saving" />
         </template>
       </AppNavbar>

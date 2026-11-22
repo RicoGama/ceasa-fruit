@@ -25,6 +25,7 @@ na ordem abaixo; os comentários no código explicam cada conceito.
 | 15 | `internal/supplier/supplier.go` | Huma: struct tags, validação, interfaces, embedding, closures, transação com várias tabelas |
 | 15b | `internal/product/product.go` | cadastro com lista filha (embalagens): atualizar, criar e remover numa transação; papéis na rota |
 | 15a | `internal/customer/customer.go` + `internal/party/save.go` | o mesmo desenho do fornecedor; um papel novo em cima de uma pessoa que já existe (`party.Existing`) |
+| 15e | `internal/audit/audit.go` | histórico de alterações: gatilho no banco + context com o usuário + agrupamento por transação |
 | 15d | `internal/fleet/` | frota: cliente HTTP de outro sistema (Traccar), goroutine de sincronização com o banco, generics (`deref[T]`) |
 | 15c | `internal/supplierproduct/supplierproduct.go` | relação muitos-para-muitos com dados na ligação, rotas aninhadas (`/suppliers/{id}/products`), permissão dupla (`Protect` duas vezes = E) |
 | 16 | `internal/city/city.go` | uma rota pequena de consulta (municípios do IBGE) |
@@ -398,3 +399,26 @@ caminhão (FMC130) -> Traccar na nuvem -> fleet.Syncer (a cada 15 s) -> vehicle_
 - **Testes**: `internal/server/fleet_test.go` usa um Traccar falso (posições
   atrasadas, internet caindo, token errado). O teste de ponta a ponta usou um
   Traccar 6.17 de verdade com o rastreador simulado pelo protocolo OsmAnd.
+
+## Histórico de alterações
+
+"Quem mudou o preço, quando, de quanto para quanto", em todo cadastro.
+
+- **Gatilho `audit_row`** (migration `00013`) em cada tabela de cadastro grava
+  em `audit_log`, na mesma transação, só os campos que mudaram:
+  `{"phone": ["21999990000", "21988887777"]}`. Salvar sem mudar nada não grava.
+  Senha, `version`, `updated_at` e a última posição dos veículos ficam de fora.
+- **Quem fez**: o middleware de sessão põe o usuário no `context`
+  (`postgres.WithActor`) e toda transação de escrita faz
+  `set_config('app.actor_id', ...)`. Sem usuário (sincronização da frota, seed,
+  script) aparece como "Sistema".
+- **Um "salvar" = um evento**: tudo o que a transação gravou (pessoa +
+  fornecedor + contatos) tem o mesmo `tx_id` e a API junta.
+- **Contatos e permissões são salvos pela diferença** (`party.SaveContacts`,
+  `role.savePermissions`): o histórico mostra "trocou o telefone do Seu
+  Jorge", e não "apagou e criou todos".
+- **Rotas**: `GET /audit/{tipo}/{id}` (quem vê o cadastro vê o histórico) e
+  `GET /audit` (geral, `audit.view`). Ids de outros cadastros (produto,
+  papel, município) vêm com o nome em `refs`.
+- **Regra**: `TestEveryTableIsAudited` reprova tabela nova sem o gatilho;
+  exceções listadas no teste com o motivo.

@@ -174,17 +174,47 @@ func (f *fakeStore) ListPartyContacts(_ context.Context, partyID int64) ([]db.Pa
 	return f.contacts[partyID], nil
 }
 
-func (f *fakeStore) DeletePartyContacts(_ context.Context, partyID int64) error {
-	delete(f.contacts, partyID)
+func (f *fakeStore) UpdatePartyContact(_ context.Context, a db.UpdatePartyContactParams) error {
+	for pid, list := range f.contacts {
+		for i := range list {
+			if list[i].ID == a.ID {
+				f.contacts[pid][i] = db.PartyContact{ID: a.ID, PartyID: pid, Name: a.Name, Role: a.Role,
+					Phone: a.Phone, IsWhatsapp: a.IsWhatsapp, Email: a.Email, Position: a.Position}
+			}
+		}
+	}
+	return nil
+}
+
+func (f *fakeStore) DeletePartyContact(_ context.Context, id int64) error {
+	for pid, list := range f.contacts {
+		for i := range list {
+			if list[i].ID == id {
+				f.contacts[pid] = append(list[:i:i], list[i+1:]...)
+				return nil
+			}
+		}
+	}
 	return nil
 }
 
 func (f *fakeStore) CreatePartyContact(_ context.Context, a db.CreatePartyContactParams) error {
 	f.contacts[a.PartyID] = append(f.contacts[a.PartyID], db.PartyContact{
-		ID: int64(len(f.contacts[a.PartyID]) + 1), PartyID: a.PartyID, Name: a.Name,
+		ID: f.nextContactID(), PartyID: a.PartyID, Name: a.Name,
 		Role: a.Role, Phone: a.Phone, IsWhatsapp: a.IsWhatsapp, Email: a.Email, Position: a.Position,
 	})
 	return nil
+}
+
+// nextContactID: ids únicos entre todas as pessoas, como no banco.
+func (f *fakeStore) nextContactID() int64 {
+	var n int64
+	for _, list := range f.contacts {
+		for _, c := range list {
+			n = max(n, c.ID)
+		}
+	}
+	return n + 1
 }
 
 // testEnv guarda a API de teste e o banco falso.

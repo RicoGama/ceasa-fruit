@@ -201,6 +201,7 @@ const originOptions = Object.entries(productOriginLabels).map(([value, label]) =
     <template #header>
       <AppNavbar :title="props.product ? title : undefined">
         <template #right>
+          <AuditHistoryButton v-if="props.product" entity-type="product" :entity-id="props.product.id" :title="title" />
           <template v-if="canEdit">
             <UBadge v-if="dirty" label="Não salvo" color="warning" variant="subtle" class="hidden sm:inline-flex" />
             <UButton label="Cancelar" color="neutral" variant="ghost" to="/app/products" class="hidden sm:inline-flex" />

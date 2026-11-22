@@ -47,12 +47,22 @@ const columns: TableColumn<User>[] = [
 function rowActions(u: User): DropdownMenuItem[] {
   return [
     { label: 'Editar', icon: 'i-lucide-pencil', onSelect: () => openEdit(u) },
-    ...(auth.can('audit.view') ? [{ label: 'Ver acessos', icon: 'i-lucide-history', to: `/app/settings/access?userId=${u.id}&days=30` }] : []),
+    { label: 'Histórico do cadastro', icon: 'i-lucide-history', onSelect: () => { historyOf.value = { id: u.id, title: u.name } } },
+    ...(auth.can('audit.view')
+      ? [
+          { label: 'Ver acessos', icon: 'i-lucide-log-in', to: `/app/settings/access?userId=${u.id}&days=30` },
+          { label: 'Alterações que fez', icon: 'i-lucide-file-pen-line', to: `/app/settings/changes?actorId=${u.id}&days=30` },
+        ]
+      : []),
     ...(u.active
       ? [{ label: 'Reenviar convite', icon: 'i-lucide-mail', onSelect: () => resendInvite(u) }]
       : []),
   ]
 }
+
+// Histórico de alterações do cadastro do usuário (painel lateral).
+const historyOf = ref<{ id: number, title: string } | null>(null)
+const historyOpen = computed({ get: () => !!historyOf.value, set: (v) => { if (!v) historyOf.value = null } })
 
 // --- Modal de criar/editar ----------------------------------------------------
 const schema = z.object({
@@ -187,6 +197,8 @@ async function resendInvite(u: User) {
       </UTable>
     </template>
   </UDashboardPanel>
+
+  <AuditHistorySlideover v-if="historyOf" v-model:open="historyOpen" entity-type="user" :entity-id="historyOf.id" :title="historyOf.title" />
 
   <UModal
     v-model:open="modalOpen"

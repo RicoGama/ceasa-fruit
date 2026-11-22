@@ -31,12 +31,16 @@ SET name = @name, description = @description,
     version = version + 1, updated_at = now()
 WHERE id = @id AND version = @version AND key IS DISTINCT FROM 'admin';
 
--- name: DeleteRolePermissions :exec
-DELETE FROM role_permissions WHERE role_id = @role_id;
+-- Deixa o papel com exatamente estas permissões, mexendo só no que mudou
+-- (o histórico mostra "ganhou X, perdeu Y", e não "apagou tudo e criou tudo").
+-- name: RemoveRolePermissionsNotIn :exec
+DELETE FROM role_permissions
+WHERE role_id = @role_id AND NOT (permission = ANY (@permissions::text[]));
 
 -- name: AddRolePermissions :exec
 INSERT INTO role_permissions (role_id, permission)
-SELECT @role_id, unnest(@permissions::text[]);
+SELECT @role_id, unnest(@permissions::text[])
+ON CONFLICT DO NOTHING;
 
 -- Só apaga papel sem nenhum usuário (nem desativado) e que não seja o admin.
 -- name: DeleteRole :execrows

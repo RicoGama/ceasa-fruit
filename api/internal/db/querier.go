@@ -11,6 +11,15 @@ import (
 
 type Querier interface {
 	AddRolePermissions(ctx context.Context, arg AddRolePermissionsParams) error
+	AuditCityNames(ctx context.Context, ids []int64) ([]AuditCityNamesRow, error)
+	AuditCompanyNames(ctx context.Context, ids []int64) ([]AuditCompanyNamesRow, error)
+	AuditDriverNames(ctx context.Context, ids []int64) ([]AuditDriverNamesRow, error)
+	AuditPartyNames(ctx context.Context, ids []int64) ([]AuditPartyNamesRow, error)
+	AuditProductNames(ctx context.Context, ids []int64) ([]AuditProductNamesRow, error)
+	AuditRoleNames(ctx context.Context, ids []int64) ([]AuditRoleNamesRow, error)
+	// Nomes para mostrar no lugar dos ids (quem fez, de qual cadastro, qual produto...).
+	AuditUserNames(ctx context.Context, ids []int64) ([]AuditUserNamesRow, error)
+	AuditVehicleNames(ctx context.Context, ids []int64) ([]AuditVehicleNamesRow, error)
 	// Soma 1 na versão sem conferir (ações que não vêm de um formulário, como
 	// inativar): quem estiver com a tela aberta recebe 409 ao salvar.
 	BumpPartyVersion(ctx context.Context, id int64) error
@@ -58,12 +67,11 @@ type Querier interface {
 	DeactivateVehicle(ctx context.Context, id int64) (int64, error)
 	// Limpeza do histórico antigo (FLEET_RETENTION_DAYS).
 	DeleteOldVehiclePositions(ctx context.Context, before time.Time) (int64, error)
-	DeletePartyContacts(ctx context.Context, partyID int64) error
+	DeletePartyContact(ctx context.Context, id int64) error
 	// Apaga as embalagens que saíram da lista (as que ficaram vêm em keep_ids).
 	DeleteProductPackagingsExcept(ctx context.Context, arg DeleteProductPackagingsExceptParams) error
 	// Só apaga papel sem nenhum usuário (nem desativado) e que não seja o admin.
 	DeleteRole(ctx context.Context, id int64) (int64, error)
-	DeleteRolePermissions(ctx context.Context, roleID int64) error
 	DeleteSupplierProduct(ctx context.Context, arg DeleteSupplierProductParams) (int64, error)
 	// Encerra uma sessão: apaga da tabela sessions e fecha a linha no histórico
 	// com o motivo, numa operação só.
@@ -98,6 +106,12 @@ type Querier interface {
 	InvalidatePasswordResetTokens(ctx context.Context, userID int64) error
 	// session_open: a sessão ainda existe e não venceu (para "online" e "expirou").
 	ListAccessLog(ctx context.Context, arg ListAccessLogParams) ([]ListAccessLogRow, error)
+	// Histórico geral (tela do administrador), com filtros.
+	ListAudit(ctx context.Context, arg ListAuditParams) ([]AuditLog, error)
+	// Histórico de alterações (migration 00013).
+	// Histórico de um cadastro, do mais novo para o mais antigo.
+	// before_id: paginação ("carregar mais" a partir do último que a tela tem).
+	ListAuditForEntity(ctx context.Context, arg ListAuditForEntityParams) ([]AuditLog, error)
 	ListCustomers(ctx context.Context, arg ListCustomersParams) ([]ListCustomersRow, error)
 	// Frota: motoristas, veículos, posições e a sincronização com o Traccar.
 	// ---------------------------------------------------------------------------
@@ -145,6 +159,9 @@ type Querier interface {
 	RecentEmailFailures(ctx context.Context, arg RecentEmailFailuresParams) ([]time.Time, error)
 	// Falhas recentes vindas deste IP (com qualquer e-mail).
 	RecentIPFailures(ctx context.Context, arg RecentIPFailuresParams) ([]time.Time, error)
+	// Deixa o papel com exatamente estas permissões, mexendo só no que mudou
+	// (o histórico mostra "ganhou X, perdeu Y", e não "apagou tudo e criou tudo").
+	RemoveRolePermissionsNotIn(ctx context.Context, arg RemoveRolePermissionsNotInParams) error
 	SaveFleetSync(ctx context.Context, arg SaveFleetSyncParams) error
 	// Municípios do IBGE (tabela de referência, sem organização).
 	// Busca sem acento; quem começa com o texto aparece primeiro.
@@ -159,6 +176,7 @@ type Querier interface {
 	// Só grava se a versão for a que a tela leu (0 linhas = alterado por outra pessoa).
 	UpdateDriver(ctx context.Context, arg UpdateDriverParams) (Driver, error)
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (int64, error)
+	UpdatePartyContact(ctx context.Context, arg UpdatePartyContactParams) error
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (int64, error)
 	UpdateProductPackaging(ctx context.Context, arg UpdateProductPackagingParams) (int64, error)

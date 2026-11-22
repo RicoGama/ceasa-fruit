@@ -41,12 +41,16 @@ const columns: TableColumn<Driver>[] = [
 ]
 
 function rowActions(d: Driver): DropdownMenuItem[] {
-  if (!canEdit.value) return []
   return [
-    { label: 'Editar', icon: 'i-lucide-pencil', onSelect: () => openEdit(d) },
-    ...(d.active ? [{ label: 'Inativar', icon: 'i-lucide-archive', color: 'error' as const, onSelect: () => deactivate(d) }] : []),
+    ...(canEdit.value ? [{ label: 'Editar', icon: 'i-lucide-pencil', onSelect: () => openEdit(d) }] : []),
+    { label: 'Histórico', icon: 'i-lucide-history', onSelect: () => { historyOf.value = { id: d.id, title: d.name } } },
+    ...(canEdit.value && d.active ? [{ label: 'Inativar', icon: 'i-lucide-archive', color: 'error' as const, onSelect: () => deactivate(d) }] : []),
   ]
 }
+
+// Histórico de alterações de um motorista (painel lateral).
+const historyOf = ref<{ id: number, title: string } | null>(null)
+const historyOpen = computed({ get: () => !!historyOf.value, set: (v) => { if (!v) historyOf.value = null } })
 
 // --- Formulário --------------------------------------------------------------------------
 const schema = z.object({
@@ -191,7 +195,7 @@ const categoryOptions = licenseCategories.map(c => ({ label: c, value: c }))
           {{ row.original.vehicleCount || '—' }}
         </template>
         <template #actions-cell="{ row }">
-          <div v-if="canEdit" class="text-right">
+          <div class="text-right">
             <UDropdownMenu :items="rowActions(row.original)" :content="{ align: 'end' }">
               <UButton icon="i-lucide-ellipsis-vertical" color="neutral" variant="ghost" aria-label="Ações" />
             </UDropdownMenu>
@@ -207,6 +211,8 @@ const categoryOptions = licenseCategories.map(c => ({ label: c, value: c }))
       </UTable>
     </template>
   </UDashboardPanel>
+
+  <AuditHistorySlideover v-if="historyOf" v-model:open="historyOpen" entity-type="driver" :entity-id="historyOf.id" :title="historyOf.title" />
 
   <UModal v-model:open="modalOpen" :title="editing ? `Editar ${editing.name}` : 'Novo motorista'">
     <template #body>

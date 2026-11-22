@@ -13,6 +13,7 @@ import (
 const addRolePermissions = `-- name: AddRolePermissions :exec
 INSERT INTO role_permissions (role_id, permission)
 SELECT $1, unnest($2::text[])
+ON CONFLICT DO NOTHING
 `
 
 type AddRolePermissionsParams struct {
@@ -56,15 +57,6 @@ func (q *Queries) DeleteRole(ctx context.Context, id int64) (int64, error) {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const deleteRolePermissions = `-- name: DeleteRolePermissions :exec
-DELETE FROM role_permissions WHERE role_id = $1
-`
-
-func (q *Queries) DeleteRolePermissions(ctx context.Context, roleID int64) error {
-	_, err := q.db.Exec(ctx, deleteRolePermissions, roleID)
-	return err
 }
 
 const getRole = `-- name: GetRole :one
@@ -167,6 +159,23 @@ func (q *Queries) ListRoles(ctx context.Context) ([]ListRolesRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const removeRolePermissionsNotIn = `-- name: RemoveRolePermissionsNotIn :exec
+DELETE FROM role_permissions
+WHERE role_id = $1 AND NOT (permission = ANY ($2::text[]))
+`
+
+type RemoveRolePermissionsNotInParams struct {
+	RoleID      int64
+	Permissions []string
+}
+
+// Deixa o papel com exatamente estas permissões, mexendo só no que mudou
+// (o histórico mostra "ganhou X, perdeu Y", e não "apagou tudo e criou tudo").
+func (q *Queries) RemoveRolePermissionsNotIn(ctx context.Context, arg RemoveRolePermissionsNotInParams) error {
+	_, err := q.db.Exec(ctx, removeRolePermissionsNotIn, arg.RoleID, arg.Permissions)
+	return err
 }
 
 const updateRole = `-- name: UpdateRole :execrows

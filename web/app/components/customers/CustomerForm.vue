@@ -156,6 +156,7 @@ const statusOptions = toOptions(supplierStatusLabels)
     <template #header>
       <AppNavbar :title="props.customer ? title : undefined">
         <template #right>
+          <AuditHistoryButton v-if="props.customer" entity-type="party" :entity-id="props.customer.id" :title="title" />
           <template v-if="canEdit">
             <UBadge v-if="dirty" label="Não salvo" color="warning" variant="subtle" class="hidden sm:inline-flex" />
             <UButton label="Cancelar" color="neutral" variant="ghost" to="/app/customers" class="hidden sm:inline-flex" />

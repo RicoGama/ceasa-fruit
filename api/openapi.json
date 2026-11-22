@@ -182,6 +182,132 @@
         },
         "type": "object"
       },
+      "AuditChange": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "created",
+              "updated",
+              "deleted"
+            ],
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/AuditField"
+            },
+            "type": "array"
+          },
+          "rowId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "table": {
+            "description": "e.g. parties, party_contacts, suppliers",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "rowId",
+          "action",
+          "fields"
+        ],
+        "type": "object"
+      },
+      "AuditEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/AuditRef",
+            "description": "null = the system (sync, seed, script)"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/AuditChange"
+            },
+            "type": "array"
+          },
+          "entityId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "entityName": {
+            "type": "string"
+          },
+          "entityType": {
+            "enum": [
+              "party",
+              "product",
+              "user",
+              "role",
+              "company",
+              "vehicle",
+              "driver"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "description": "Id of the newest row of the event (for keys and pagination)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "occurredAt",
+          "actor",
+          "entityType",
+          "entityId",
+          "entityName",
+          "changes"
+        ],
+        "type": "object"
+      },
+      "AuditField": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Column name, e.g. phone, consignment_commission",
+            "type": "string"
+          },
+          "new": {
+            "description": "Value after (absent when deleted)"
+          },
+          "old": {
+            "description": "Value before (absent when created)"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "AuditRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
       "City": {
         "additionalProperties": false,
         "properties": {
@@ -1449,6 +1575,45 @@
         },
         "required": [
           "email"
+        ],
+        "type": "object"
+      },
+      "HistoryBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/HistoryBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEvent"
+            },
+            "type": "array"
+          },
+          "nextBefore": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "refs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "events",
+          "refs",
+          "nextBefore"
         ],
         "type": "object"
       },
@@ -4355,6 +4520,187 @@
         ],
         "x-permissions": [
           "audit.view"
+        ]
+      }
+    },
+    "/audit": {
+      "get": {
+        "operationId": "list-history",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "days",
+            "schema": {
+              "default": 7,
+              "format": "int32",
+              "maximum": 366,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only changes made by this user",
+            "explode": false,
+            "in": "query",
+            "name": "actorId",
+            "schema": {
+              "description": "Only changes made by this user",
+              "format": "int64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "entityType",
+            "schema": {
+              "default": "all",
+              "enum": [
+                "party",
+                "product",
+                "user",
+                "role",
+                "company",
+                "vehicle",
+                "driver",
+                "all"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "before",
+            "schema": {
+              "format": "int64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "All changes (administrator)",
+        "tags": [
+          "Audit"
+        ],
+        "x-permissions": [
+          "audit.view"
+        ]
+      }
+    },
+    "/audit/{entityType}/{entityId}": {
+      "get": {
+        "description": "Who changed what and when. Allowed for whoever can see that kind of record.",
+        "operationId": "get-entity-history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "enum": [
+                "party",
+                "product",
+                "user",
+                "role",
+                "company",
+                "vehicle",
+                "driver"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only rows older than this id",
+            "explode": false,
+            "in": "query",
+            "name": "before",
+            "schema": {
+              "description": "Only rows older than this id",
+              "format": "int64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "AuditChange history of one record",
+        "tags": [
+          "Audit"
+        ],
+        "x-permissions": [
+          "audit.view",
+          "company.edit",
+          "customers.view",
+          "fleet.view",
+          "products.view",
+          "suppliers.view",
+          "users.manage"
         ]
       }
     },

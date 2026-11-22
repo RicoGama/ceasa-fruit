@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand/v2"
+	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -72,13 +73,37 @@ func (d DB) InReadTx(ctx context.Context, fn func(Tx) error) error {
 	return d.run(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly}, fn)
 }
 
+// actorKey guarda no context quem está fazendo a requisição.
+type actorKey struct{}
+
+// WithActor marca o context com o usuário logado (feito pelo middleware de
+// sessão). As transações abertas com esse context registram o usuário no
+// histórico de alterações.
+func WithActor(ctx context.Context, userID int64) context.Context {
+	return context.WithValue(ctx, actorKey{}, userID)
+}
+
+// ActorFrom devolve o usuário logado guardado por WithActor.
+func ActorFrom(ctx context.Context) (int64, bool) {
+	id, ok := ctx.Value(actorKey{}).(int64)
+	return id, ok
+}
+
 // maxAttempts: quantas vezes uma transação é tentada em caso de deadlock.
 const maxAttempts = 3
 
 func (d DB) run(ctx context.Context, opts pgx.TxOptions, fn func(Tx) error) error {
 	var err error
+	actor, hasActor := ActorFrom(ctx)
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		err = pgx.BeginTxFunc(ctx, d.pool, opts, func(tx pgx.Tx) error {
+			// Quem está gravando: o gatilho do histórico (audit_row, migration
+			// 00013) lê daqui. "true" = só vale nesta transação.
+			if hasActor && opts.AccessMode != pgx.ReadOnly {
+				if _, err := tx.Exec(ctx, "SELECT set_config('app.actor_id', $1, true)", strconv.FormatInt(actor, 10)); err != nil {
+					return err
+				}
+			}
 			return fn(Tx{Queries: db.New(tx), Raw: tx})
 		})
 		if !isRetryable(err) || attempt == maxAttempts {

@@ -47,11 +47,16 @@ function rowActions(v: Vehicle): DropdownMenuItem[] {
   return [
     ...(v.trackerImei ? [{ label: 'Ver no mapa', icon: 'i-lucide-map', to: `/app/fleet?veiculo=${v.id}` }] : []),
     ...(canEdit.value ? [{ label: 'Editar', icon: 'i-lucide-pencil', onSelect: () => openEdit(v) }] : []),
+    { label: 'Histórico', icon: 'i-lucide-history', onSelect: () => { historyOf.value = { id: v.id, title: formatPlate(v.plate) } } },
     ...(canEdit.value && v.active
       ? [{ label: 'Inativar', icon: 'i-lucide-archive', color: 'error' as const, onSelect: () => deactivate(v) }]
       : []),
   ]
 }
+
+// Histórico de alterações de um veículo (painel lateral).
+const historyOf = ref<{ id: number, title: string } | null>(null)
+const historyOpen = computed({ get: () => !!historyOf.value, set: (v) => { if (!v) historyOf.value = null } })
 
 // --- Formulário -------------------------------------------------------------------
 const plateRe = /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/
@@ -224,6 +229,8 @@ const driverOptions = computed(() => [
       </UTable>
     </template>
   </UDashboardPanel>
+
+  <AuditHistorySlideover v-if="historyOf" v-model:open="historyOpen" entity-type="vehicle" :entity-id="historyOf.id" :title="historyOf.title" />
 
   <UModal v-model:open="modalOpen" :title="editing ? `Editar ${formatPlate(editing.plate)}` : 'Novo veículo'">
     <template #body>

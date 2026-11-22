@@ -14,6 +14,7 @@ confiável): um servidor e um banco por cliente, sem multi-tenant.
 2b. Cadastro de produtos com embalagens ✅ (API + tela; gerente e admin editam)
 2d. Produtos de cada fornecedor (safra, nome na nota dele, modalidade, preferencial), "quem fornece" no produto e filtro por produto na lista ✅
 2e. Registro de acessos (só admin): quem entrou, quando, de qual aparelho, se está online e como saiu, inclusive tentativas que falharam ✅
+2f. Histórico de alterações em todos os cadastros: quem mudou o quê, quando, de quanto para quanto (botão "Histórico" em cada cadastro e página geral para o administrador) ✅
 2c. Tempo real em todas as telas: cadastros e alterações aparecem na hora para todo mundo ✅
 3. Cadastro de clientes ✅ (API + tela; mesmo CNPJ de um fornecedor aproveita o cadastro. Crédito, prazo, tabela de preço e entrega esperam as respostas da reunião)
 4. Controle de estoque com aviso de perda
