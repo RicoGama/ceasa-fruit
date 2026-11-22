@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PartyMatch } from '~/types'
+import type { CNPJData, PartyMatch } from '~/types'
 
 // Bloco "Identificação" de fornecedor e cliente: tipo de pessoa, CPF/CNPJ,
 // nome e apelido. Os campos do papel (tipo, situação...) entram pelo slot.
@@ -19,9 +19,12 @@ const props = defineProps<{
   // Cadastro já salvo que também tem o outro papel (cliente que também é
   // fornecedor): avisa que os dados da pessoa são compartilhados.
   sharedWith?: { role: 'supplier' | 'customer', id: number } | null
+  // Pode editar (sem isso, não oferece consultar a Receita).
+  editable?: boolean
 }>()
 
 const emit = defineEmits<{ 'use-existing': [match: PartyMatch] }>()
+const toast = useToast()
 
 const api = useApi()
 const auth = useAuthStore()
@@ -59,6 +62,24 @@ const alreadyHasRole = computed(() => !!found.value
 // Papel que a pessoa já tem (para o texto do aviso).
 const existingRole = computed(() => found.value?.isSupplier ? 'fornecedor' : 'cliente')
 const otherRole = computed<'supplier' | 'customer'>(() => props.role === 'customer' ? 'supplier' : 'customer')
+
+// Dados da Receita: preenche nome e endereço; telefone e e-mail só se
+// estiverem vazios (o que a pessoa digitou não se perde).
+function fillFromReceita(r: CNPJData) {
+  const s = props.state
+  s.legalName = r.legalName
+  if (r.tradeName) s.tradeName = r.tradeName
+  const a = r.address
+  if (a.postalCode) s.address.postalCode = formatPostalCode(a.postalCode)
+  if (a.street) s.address.street = a.street
+  if (a.number) s.address.number = a.number
+  if (a.complement) s.address.complement = a.complement
+  if (a.district) s.address.district = a.district
+  if (a.city) s.address.city = a.city
+  if (r.phone && !s.phone) s.phone = formatPhone(r.phone)
+  if (r.email && !s.email) s.email = r.email
+  toast.add({ title: 'Dados da Receita preenchidos', description: 'Confira e salve.', color: 'success' })
+}
 
 function useExisting() {
   if (!found.value) return
@@ -129,6 +150,14 @@ function useExisting() {
           @blur="onDocumentBlur"
         />
       </UFormField>
+      <!-- CNPJ: consulta a Receita (cadastro novo: sozinho; edição: no botão) -->
+      <PartyCnpjLookup
+        v-if="isCompany && !reusing && editable"
+        :cnpj="state.document"
+        :auto="lookup && !found"
+        class="sm:col-span-2"
+        @fill="fillFromReceita"
+      />
       <UFormField :label="isCompany ? 'Razão social' : 'Nome completo'" name="legalName" required>
         <UInput v-model="state.legalName" class="w-full" />
       </UFormField>

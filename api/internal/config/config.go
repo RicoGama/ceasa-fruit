@@ -32,6 +32,9 @@ type Config struct {
 	TrustedProxies []string
 	SMTP           SMTP
 	Fleet          Fleet
+	// CNPJ: endereços dos serviços de consulta (trocados nos testes).
+	CNPJBrasilAPIURL string
+	CNPJCNPJaURL     string
 }
 
 // Fleet: rastreamento dos caminhões pelo Traccar (servidor na nuvem).
@@ -76,6 +79,8 @@ func Load() Config {
 			TLS:      getEnv("SMTP_TLS", "none"),
 			From:     getEnv("SMTP_FROM", "CEASA Fruit <nao-responda@ceasafruit.test>"),
 		},
+		CNPJBrasilAPIURL: getEnv("CNPJ_BRASILAPI_URL", "https://brasilapi.com.br/api/cnpj/v1"),
+		CNPJCNPJaURL:     getEnv("CNPJ_CNPJA_URL", "https://open.cnpja.com/office"),
 		Fleet: Fleet{
 			TraccarURL:    strings.TrimSuffix(getEnv("TRACCAR_URL", ""), "/"),
 			TraccarToken:  getEnv("TRACCAR_TOKEN", ""),

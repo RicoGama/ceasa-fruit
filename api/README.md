@@ -422,3 +422,22 @@ caminhão (FMC130) -> Traccar na nuvem -> fleet.Syncer (a cada 15 s) -> vehicle_
   papel, município) vêm com o nome em `refs`.
 - **Regra**: `TestEveryTableIsAudited` reprova tabela nova sem o gatilho;
   exceções listadas no teste com o motivo.
+
+## Consulta de CNPJ (Receita)
+
+`GET /cnpj/{cnpj}` (`internal/cnpj`) devolve razão social, nome fantasia,
+situação, endereço com o município do IBGE, telefone e e-mail públicos.
+
+- **Quem consulta é a API do box**, não o navegador: o resultado fica 24 h em
+  memória (os serviços gratuitos limitam consultas) e, sem internet, a tela
+  recebe 503 e pede o preenchimento à mão.
+- **Dois serviços, um de reserva do outro**: BrasilAPI e CNPJá (aberta). 404
+  = CNPJ não existe; erro de rede, limite (429) ou 5xx = tenta o próximo.
+  Endereços trocáveis por `CNPJ_BRASILAPI_URL` e `CNPJ_CNPJA_URL`.
+- **Município**: pelo código do IBGE quando vem; senão pelo nome + UF, sem acento.
+- **A tela nunca preenche sozinha**: mostra o que achou (com aviso se o CNPJ
+  estiver BAIXADO/INAPTO) e a pessoa clica em "Preencher". Telefone e e-mail
+  já digitados não são trocados.
+- **Testes** (`internal/server/cnpj_test.go`) usam servidores falsos no formato
+  documentado de cada serviço; os serviços de verdade não estavam acessíveis
+  do ambiente de desenvolvimento.

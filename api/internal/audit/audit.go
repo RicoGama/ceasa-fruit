@@ -63,9 +63,9 @@ type AuditField struct {
 
 // AuditChange é o que aconteceu com uma linha de uma tabela.
 type AuditChange struct {
-	Table  string  `json:"table" doc:"e.g. parties, party_contacts, suppliers"`
-	RowID  *int64  `json:"rowId"`
-	Action string  `json:"action" enum:"created,updated,deleted"`
+	Table  string       `json:"table" doc:"e.g. parties, party_contacts, suppliers"`
+	RowID  *int64       `json:"rowId"`
+	Action string       `json:"action" enum:"created,updated,deleted"`
 	Fields []AuditField `json:"fields"`
 }
 
@@ -77,13 +77,13 @@ type AuditRef struct {
 
 // AuditEvent é tudo o que uma pessoa gravou num "salvar" de um cadastro.
 type AuditEvent struct {
-	ID         int64     `json:"id" doc:"Id of the newest row of the event (for keys and pagination)"`
-	OccurredAt time.Time `json:"occurredAt"`
-	Actor      *AuditRef      `json:"actor" doc:"null = the system (sync, seed, script)"`
-	EntityType string    `json:"entityType" enum:"party,product,user,role,company,vehicle,driver"`
-	EntityID   int64     `json:"entityId"`
-	EntityName string    `json:"entityName"`
-	Changes    []AuditChange  `json:"changes"`
+	ID         int64         `json:"id" doc:"Id of the newest row of the event (for keys and pagination)"`
+	OccurredAt time.Time     `json:"occurredAt"`
+	Actor      *AuditRef     `json:"actor" doc:"null = the system (sync, seed, script)"`
+	EntityType string        `json:"entityType" enum:"party,product,user,role,company,vehicle,driver"`
+	EntityID   int64         `json:"entityId"`
+	EntityName string        `json:"entityName"`
+	Changes    []AuditChange `json:"changes"`
 
 	txID int64
 }

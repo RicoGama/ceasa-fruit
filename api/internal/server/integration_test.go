@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/RicoGama/ceasa-fruit/api/internal/cnpj"
 	"io"
 	"log/slog"
 	"net/http"
@@ -85,7 +86,8 @@ type integrationEnv struct {
 	mailer *fakeMailer
 }
 
-func setupIntegrationEnv(t *testing.T) *integrationEnv {
+// opts ajusta as dependências do servidor (ex.: serviços de CNPJ falsos).
+func setupIntegrationEnv(t *testing.T, opts ...func(*Deps)) *integrationEnv {
 	t.Helper() // erros apontam para a linha de quem chamou, não para cá
 
 	url := os.Getenv("TEST_DATABASE_URL")
@@ -124,7 +126,13 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 		_ = q.Stop(stopCtx)
 	})
 
-	srv := httptest.NewServer(New(Deps{Logger: logger, Pool: pool, Queue: q, AppURL: "http://app.test"}))
+	deps := Deps{Logger: logger, Pool: pool, Queue: q, AppURL: "http://app.test",
+		// Nunca consulta a Receita de verdade nos testes.
+		CNPJProviders: []cnpj.Provider{cnpj.BrasilAPI{BaseURL: "http://127.0.0.1:1"}}}
+	for _, o := range opts {
+		o(&deps)
+	}
+	srv := httptest.NewServer(New(deps))
 	t.Cleanup(srv.Close)
 	return &integrationEnv{srv: srv, pool: pool, queue: q, mailer: mailer}
 }

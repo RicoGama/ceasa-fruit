@@ -166,6 +166,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cnpj/{cnpj}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public data of a CNPJ at the Federal Revenue (Receita Federal)
+         * @description Company name, status and address, to fill in registrations. Needs internet on the server.
+         */
+        get: operations["lookup-cnpj"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/company": {
         parameters: {
             query?: never;
@@ -669,6 +689,43 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
+        };
+        CNPJAddress: {
+            city: components["schemas"]["City"];
+            complement: string | null;
+            district: string | null;
+            number: string | null;
+            postalCode: string | null;
+            street: string | null;
+        };
+        CNPJData: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CNPJData.json
+             */
+            readonly $schema?: string;
+            /** @description Situação ATIVA */
+            active: boolean;
+            address: components["schemas"]["CNPJAddress"];
+            cnpj: string;
+            email: string | null;
+            /** @description Razão social */
+            legalName: string;
+            /** @description Atividade principal (CNAE) */
+            mainActivity: string | null;
+            /** @description Início da atividade (AAAA-MM-DD) */
+            openedOn: string | null;
+            /** @description Só os números, com DDD */
+            phone: string | null;
+            /** @description Optante pelo Simples Nacional */
+            simples: boolean | null;
+            /** @description Serviço que respondeu */
+            source: string;
+            /** @description Situação cadastral como a Receita escreve: ATIVA, BAIXADA, INAPTA, SUSPENSA, NULA */
+            status: string;
+            /** @description Nome fantasia */
+            tradeName: string | null;
         };
         City: {
             /**
@@ -2350,6 +2407,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["City"][];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "lookup-cnpj": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description CNPJ, with or without mask */
+                cnpj: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNPJData"];
                 };
             };
             /** @description Error */

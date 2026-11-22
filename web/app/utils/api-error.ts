@@ -30,6 +30,8 @@ const translations: Record<string, string> = {
   'supplier not found': 'Fornecedor não encontrado',
   'customer not found': 'Cliente não encontrado',
   'vehicle not found': 'Veículo não encontrado',
+  'CNPJ not found at the Federal Revenue': 'CNPJ não encontrado na Receita',
+  'could not reach the Federal Revenue lookup': 'Não deu para consultar a Receita agora (sem internet?)',
   'driver not found': 'Motorista não encontrado',
   'a vehicle with this plate already exists': 'Já existe um veículo com esta placa',
   'this tracker is already in another vehicle': 'Este rastreador já está em outro veículo',

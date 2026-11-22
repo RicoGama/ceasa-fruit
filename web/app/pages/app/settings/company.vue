@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import type { City, Company } from '~/types'
+import type { City, CNPJData, Company } from '~/types'
 
 definePageMeta({ layout: 'dashboard', permission: 'company.edit' })
 useHead({ title: 'Dados da empresa · CEASA Fruit' })
@@ -46,6 +46,22 @@ watch(data, (c) => {
   Object.assign(state, toState(c))
   savedSnapshot.value = JSON.stringify(state)
 })
+
+// Dados da Receita: nome e endereço; telefone e e-mail só se vazios.
+function fillFromReceita(r: CNPJData) {
+  state.name = r.legalName
+  if (r.tradeName) state.tradeName = r.tradeName
+  const a = r.address
+  if (a.postalCode) state.postalCode = formatPostalCode(a.postalCode)
+  if (a.street) state.street = a.street
+  if (a.number) state.number = a.number
+  if (a.complement) state.complement = a.complement
+  if (a.district) state.district = a.district
+  if (a.city) state.city = a.city
+  if (r.phone && !state.phone) state.phone = formatPhone(r.phone)
+  if (r.email && !state.email) state.email = r.email
+  toast.add({ title: 'Dados da Receita preenchidos', description: 'Confira e salve.', color: 'success' })
+}
 
 // Tempo real: outra pessoa salvou os dados da empresa.
 async function reloadCompany() {
@@ -184,6 +200,7 @@ async function onSubmit(_: FormSubmitEvent<unknown>) {
                 @blur="state.document = formatDocument(state.document)"
               />
             </UFormField>
+            <PartyCnpjLookup :cnpj="state.document" class="sm:col-span-4" @fill="fillFromReceita" />
             <UFormField label="Inscrição estadual" name="stateRegistration" class="sm:col-span-2">
               <UInput v-model="state.stateRegistration" class="w-full" />
             </UFormField>

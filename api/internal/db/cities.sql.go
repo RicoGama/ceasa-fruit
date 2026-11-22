@@ -9,6 +9,36 @@ import (
 	"context"
 )
 
+const findCityByName = `-- name: FindCityByName :one
+SELECT id, name, state_code FROM cities
+WHERE state_code = $1 AND unaccent(lower(name)) = unaccent(lower($2))
+LIMIT 1
+`
+
+type FindCityByNameParams struct {
+	State string
+	Name  string
+}
+
+// Município pelo nome e UF, sem acento nem maiúsculas ("SAO GONCALO", "RJ").
+func (q *Queries) FindCityByName(ctx context.Context, arg FindCityByNameParams) (City, error) {
+	row := q.db.QueryRow(ctx, findCityByName, arg.State, arg.Name)
+	var i City
+	err := row.Scan(&i.ID, &i.Name, &i.StateCode)
+	return i, err
+}
+
+const getCity = `-- name: GetCity :one
+SELECT id, name, state_code FROM cities WHERE id = $1
+`
+
+func (q *Queries) GetCity(ctx context.Context, id int32) (City, error) {
+	row := q.db.QueryRow(ctx, getCity, id)
+	var i City
+	err := row.Scan(&i.ID, &i.Name, &i.StateCode)
+	return i, err
+}
+
 const searchCities = `-- name: SearchCities :many
 
 SELECT id, name, state_code

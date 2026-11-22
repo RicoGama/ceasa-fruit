@@ -118,7 +118,7 @@ func TestNotifyAfterCommitOnly(t *testing.T) {
 		}
 		return pgx.ErrTxClosed // força o ROLLBACK
 	})
-	if ev, got := nextChange(700*time.Millisecond); got {
+	if ev, got := nextChange(700 * time.Millisecond); got {
 		t.Fatalf("rolled back insert produced %v", ev)
 	}
 
@@ -137,7 +137,7 @@ func TestNotifyAfterCommitOnly(t *testing.T) {
 					return err
 				}
 			}
-			if ev, got := nextChange(500*time.Millisecond); got {
+			if ev, got := nextChange(500 * time.Millisecond); got {
 				t.Errorf("event before commit: %v", ev)
 			}
 			return nil
@@ -145,11 +145,11 @@ func TestNotifyAfterCommitOnly(t *testing.T) {
 		close(committed)
 	}()
 	<-committed
-	ev, got := nextChange(3*time.Second)
+	ev, got := nextChange(3 * time.Second)
 	if !got || ev != (Event{"products", id}) {
 		t.Fatalf("after commit: got %v (%v), want products/%d", ev, got, id)
 	}
-	if extra, got := nextChange(500*time.Millisecond); got {
+	if extra, got := nextChange(500 * time.Millisecond); got {
 		t.Errorf("expected one event per transaction, also got %v", extra)
 	}
 	_ = database.InTx(ctx, func(tx postgres.Tx) error {

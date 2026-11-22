@@ -308,6 +308,145 @@
         ],
         "type": "object"
       },
+      "CNPJAddress": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "$ref": "#/components/schemas/City"
+          },
+          "complement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "district": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "postalCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "postalCode",
+          "street",
+          "number",
+          "complement",
+          "district",
+          "city"
+        ],
+        "type": "object"
+      },
+      "CNPJData": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/CNPJData.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "active": {
+            "description": "Situação ATIVA",
+            "type": "boolean"
+          },
+          "address": {
+            "$ref": "#/components/schemas/CNPJAddress"
+          },
+          "cnpj": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legalName": {
+            "description": "Razão social",
+            "type": "string"
+          },
+          "mainActivity": {
+            "description": "Atividade principal (CNAE)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "openedOn": {
+            "description": "Início da atividade (AAAA-MM-DD)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "description": "Só os números, com DDD",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "simples": {
+            "description": "Optante pelo Simples Nacional",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "source": {
+            "description": "Serviço que respondeu",
+            "type": "string"
+          },
+          "status": {
+            "description": "Situação cadastral como a Receita escreve: ATIVA, BAIXADA, INAPTA, SUSPENSA, NULA",
+            "type": "string"
+          },
+          "tradeName": {
+            "description": "Nome fantasia",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "cnpj",
+          "legalName",
+          "tradeName",
+          "status",
+          "active",
+          "openedOn",
+          "mainActivity",
+          "simples",
+          "address",
+          "phone",
+          "email",
+          "source"
+        ],
+        "type": "object"
+      },
       "City": {
         "additionalProperties": false,
         "properties": {
@@ -4972,6 +5111,61 @@
         "summary": "Search cities (IBGE)",
         "tags": [
           "Reference data"
+        ]
+      }
+    },
+    "/cnpj/{cnpj}": {
+      "get": {
+        "description": "Company name, status and address, to fill in registrations. Needs internet on the server.",
+        "operationId": "lookup-cnpj",
+        "parameters": [
+          {
+            "description": "CNPJ, with or without mask",
+            "in": "path",
+            "name": "cnpj",
+            "required": true,
+            "schema": {
+              "description": "CNPJ, with or without mask",
+              "maxLength": 18,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CNPJData"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Public data of a CNPJ at the Federal Revenue (Receita Federal)",
+        "tags": [
+          "Parties"
+        ],
+        "x-permissions": [
+          "suppliers.edit",
+          "customers.edit",
+          "company.edit"
         ]
       }
     },

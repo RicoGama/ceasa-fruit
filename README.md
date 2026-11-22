@@ -16,7 +16,7 @@ confiável): um servidor e um banco por cliente, sem multi-tenant.
 2e. Registro de acessos (só admin): quem entrou, quando, de qual aparelho, se está online e como saiu, inclusive tentativas que falharam ✅
 2f. Histórico de alterações em todos os cadastros: quem mudou o quê, quando, de quanto para quanto (botão "Histórico" em cada cadastro e página geral para o administrador) ✅
 2c. Tempo real em todas as telas: cadastros e alterações aparecem na hora para todo mundo ✅
-3. Cadastro de clientes ✅ (API + tela; mesmo CNPJ de um fornecedor aproveita o cadastro. Crédito, prazo, tabela de preço e entrega esperam as respostas da reunião)
+3. Cadastro de clientes ✅ · Consulta de CNPJ na Receita (preenche razão social, nome fantasia, endereço e avisa se o CNPJ não está ativo) ✅ · (API + tela; mesmo CNPJ de um fornecedor aproveita o cadastro. Crédito, prazo, tabela de preço e entrega esperam as respostas da reunião)
 4. Controle de estoque com aviso de perda
 5. Venda
 6. Rota de venda

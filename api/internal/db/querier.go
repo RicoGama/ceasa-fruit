@@ -80,6 +80,9 @@ type Querier interface {
 	EndUserSessions(ctx context.Context, arg EndUserSessionsParams) error
 	// Cria a empresa só com o nome, se ainda não existir (usado pelo make seed).
 	EnsureCompany(ctx context.Context, name string) error
+	// Município pelo nome e UF, sem acento nem maiúsculas ("SAO GONCALO", "RJ").
+	FindCityByName(ctx context.Context, arg FindCityByNameParams) (City, error)
+	GetCity(ctx context.Context, id int32) (City, error)
 	// Empresa desta instalação (um registro só, id = 1).
 	GetCompany(ctx context.Context) (GetCompanyRow, error)
 	GetCustomer(ctx context.Context, id int64) (GetCustomerRow, error)

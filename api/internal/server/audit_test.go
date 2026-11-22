@@ -151,7 +151,7 @@ func TestIntegrationAudit(t *testing.T) {
 	// --- Quem vê o quê ---------------------------------------------------------------
 	seller := newClient(t, env.srv.URL)
 	seller.expect(http.StatusOK, "POST", "/auth/login", map[string]any{"email": "vend@test.com", "password": "senha-vend-123"}, nil)
-	seller.expect(http.StatusOK, "GET", path, nil, &h)                                             // vê fornecedores
+	seller.expect(http.StatusOK, "GET", path, nil, &h)                                           // vê fornecedores
 	seller.expect(http.StatusForbidden, "GET", fmt.Sprintf("/audit/role/%d", role.ID), nil, nil) // não gerencia papéis
 	seller.expect(http.StatusForbidden, "GET", "/audit", nil, nil)                               // geral: só administrador
 

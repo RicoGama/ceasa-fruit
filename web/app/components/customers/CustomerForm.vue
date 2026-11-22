@@ -187,6 +187,7 @@ const statusOptions = toOptions(supplierStatusLabels)
           :lookup="!props.customer && canEdit"
           :reusing="reusing"
           :shared-with="props.customer?.alsoSupplier ? { role: 'supplier', id: props.customer.id } : null"
+          :editable="canEdit"
           @use-existing="useExisting"
         >
           <UFormField label="Tipo de cliente" name="customerType">

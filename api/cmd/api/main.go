@@ -17,6 +17,7 @@ import (
 	"riverqueue.com/riverui"
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
+	"github.com/RicoGama/ceasa-fruit/api/internal/cnpj"
 	"github.com/RicoGama/ceasa-fruit/api/internal/config"
 	"github.com/RicoGama/ceasa-fruit/api/internal/fleet"
 	"github.com/RicoGama/ceasa-fruit/api/internal/fleet/traccar"
@@ -130,6 +131,9 @@ func run(logger *slog.Logger) error {
 			QueueUI:           queueUI,
 			Realtime:          hub,
 			TraccarConfigured: cfg.Fleet.TraccarURL != "",
+			CNPJProviders: []cnpj.Provider{
+				cnpj.BrasilAPI{BaseURL: cfg.CNPJBrasilAPIURL}, cnpj.CNPJa{BaseURL: cfg.CNPJCNPJaURL},
+			},
 		}),
 		// Timeouts protegem o servidor de clientes lentos ou travados.
 		ReadHeaderTimeout: 5 * time.Second,

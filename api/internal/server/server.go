@@ -4,8 +4,10 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -13,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -20,6 +23,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/audit"
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/city"
+	"github.com/RicoGama/ceasa-fruit/api/internal/cnpj"
 	"github.com/RicoGama/ceasa-fruit/api/internal/company"
 	"github.com/RicoGama/ceasa-fruit/api/internal/customer"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
@@ -68,6 +72,9 @@ type Deps struct {
 	Realtime http.Handler
 	// TraccarConfigured: há servidor de rastreamento (o mapa explica se não houver).
 	TraccarConfigured bool
+	// CNPJProviders: serviços de consulta de CNPJ, em ordem. Vazio = os
+	// padrões (BrasilAPI e CNPJá).
+	CNPJProviders []cnpj.Provider
 }
 
 // New devolve o http.Handler raiz da aplicação.
@@ -200,6 +207,11 @@ func build(d Deps) (http.Handler, huma.API) {
 	})
 	fleet.Register(authed, database, fleet.Options{TraccarConfigured: d.TraccarConfigured})
 	audit.Register(authed, database)
+	providers := d.CNPJProviders
+	if len(providers) == 0 {
+		providers = []cnpj.Provider{cnpj.BrasilAPI{}, cnpj.CNPJa{}}
+	}
+	cnpj.Register(authed, &cnpj.Service{Providers: providers, Logger: d.Logger, Cities: cityResolver(database)})
 	// "Este CNPJ já está cadastrado?": usado pelos cadastros de fornecedor e cliente.
 	party.RegisterLookup(authed, func(ctx context.Context, fn func(party.LookupStore) error) error {
 		return database.InReadTx(ctx, func(tx postgres.Tx) error { return fn(tx) })
@@ -256,5 +268,37 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 				"client_ip", middleware.GetClientIP(r.Context()),
 			)
 		})
+	}
+}
+
+// cityResolver acha o município do CNPJ no cadastro do IBGE: pelo código
+// (quando o serviço informa) ou pelo nome + UF.
+func cityResolver(database postgres.DB) cnpj.CityResolver {
+	return func(ctx context.Context, ibge int32, name, state string) (*party.City, error) {
+		var out *party.City
+		err := database.InReadTx(ctx, func(tx postgres.Tx) error {
+			if ibge != 0 {
+				c, err := tx.GetCity(ctx, ibge)
+				if err == nil {
+					out = &party.City{ID: c.ID, Name: c.Name, State: c.StateCode}
+					return nil
+				}
+				if !errors.Is(err, pgx.ErrNoRows) {
+					return err
+				}
+			}
+			if name == "" || state == "" {
+				return nil
+			}
+			c, err := tx.FindCityByName(ctx, db.FindCityByNameParams{State: strings.ToUpper(state), Name: name})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			if err == nil {
+				out = &party.City{ID: c.ID, Name: c.Name, State: c.StateCode}
+			}
+			return err
+		})
+		return out, err
 	}
 }
