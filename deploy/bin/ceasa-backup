@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# Backup do banco do CEASA Fruit.
+#
+# 1. pg_dump do banco + um "manifesto" com quantas linhas cada tabela tinha,
+#    os dois tirados da MESMA foto do banco (o teste de restauração confere
+#    linha a linha que o backup volta igual).
+# 2. Guarda essa foto, criptografada, com o restic em cada destino:
+#      - disco do servidor (sempre)
+#      - HD externo (se configurado e conectado)
+#      - nuvem (se configurada e se a internet estiver no ar)
+# 3. Apaga as fotos antigas: últimas 8, 1 por dia por 7 dias, 1 por semana
+#    por 4 semanas, 1 por mês por 12 meses (configurável no ops.env).
+#
+# Roda sozinho 4 vezes por dia (ceasa-backup.timer). Na mão: sudo ceasa-backup
+# Não para o sistema: o pg_dump lê uma foto consistente sem travar ninguém.
+source /opt/ceasa-fruit/current/deploy/lib/common.sh
+source /opt/ceasa-fruit/current/deploy/lib/notify.sh
+require_root
+load_all_env
+
+exec 9>/run/ceasa-backup.lock
+flock -n 9 || die "já tem um backup rodando"
+
+reason=${1:-agendado}
+work=$SPOOL_DIR/.new
+rm -rf "$work" && install -d -m 0700 "$work"
+
+fail() {
+  record_status backup falhou "$*"
+  notify "Backup FALHOU" "O backup do banco não foi feito.
+
+Motivo: $*
+
+O sistema continua funcionando, mas sem backup novo. Veja com: sudo ceasa-backup" || true
+  die "$*"
+}
+trap 'fail "erro inesperado na linha $LINENO"' ERR
+
+# --- 1. Foto do banco ----------------------------------------------------------------
+info "lendo o banco ($reason)"
+# Uma sessão do psql segura uma transação aberta; o pg_export_snapshot dá o
+# nome da foto, que o pg_dump usa (--snapshot) para ler exatamente o mesmo.
+coproc PSQL { sudo -u postgres psql -qAtX -v ON_ERROR_STOP=1 -d "$DB_NAME" 2>&1; }
+psql_send() { printf '%s\n' "$1" >&"${PSQL[1]}"; }
+psql_read() { local line; IFS= read -r -t 60 line <&"${PSQL[0]}" || return 1; printf '%s' "$line"; }
+
+psql_send "BEGIN ISOLATION LEVEL REPEATABLE READ, READ ONLY;"
+psql_send "SELECT pg_export_snapshot();"
+snapshot=$(psql_read) || fail "o Postgres não respondeu"
+[[ $snapshot =~ ^[0-9A-F-]+$ ]] || fail "não consegui a foto do banco: $snapshot"
+
+# Contagem de cada tabela, na mesma foto, como JSON numa linha só.
+psql_send "SELECT json_object_agg(t, n ORDER BY t) FROM (
+  SELECT c.relname AS t,
+         (xpath('/row/n/text()', query_to_xml(format('SELECT count(*) AS n FROM public.%I', c.relname), false, true, '')))[1]::text::bigint AS n
+  FROM pg_class c JOIN pg_namespace s ON s.oid = c.relnamespace
+  WHERE s.nspname = 'public' AND c.relkind IN ('r', 'p')) x;"
+counts=$(psql_read) || fail "não consegui contar as linhas"
+psql_send "SELECT coalesce(max(version_id), 0) FROM goose_db_version WHERE is_applied;"
+schema=$(psql_read) || fail "não consegui ler a versão do banco"
+
+sudo -u postgres pg_dump --snapshot="$snapshot" --format=custom --compress=0 -d "$DB_NAME" >"$work/ceasa.dump" ||
+  fail "o pg_dump falhou"
+psql_send "COMMIT;"
+psql_send '\q'
+wait "$PSQL_PID" 2>/dev/null || true
+
+cat >"$work/manifest.json" <<JSON
+{
+  "createdAt": "$(now_iso)",
+  "reason": "$reason",
+  "appVersion": "$(cat "$CURRENT_LINK/VERSION")",
+  "postgres": "$(psql_admin -c 'SHOW server_version')",
+  "schemaVersion": $schema,
+  "dumpBytes": $(stat -c %s "$work/ceasa.dump"),
+  "tables": $counts
+}
+JSON
+
+# A foto nova substitui a anterior na pasta de envio.
+rm -rf "$SPOOL_DIR/current" && mv "$work" "$SPOOL_DIR/current"
+size=$(du -h "$SPOOL_DIR/current/ceasa.dump" | cut -f1)
+ok "foto do banco: $size, versão do banco $schema"
+trap - ERR
+
+# --- 2. Envio para cada destino ---------------------------------------------------------
+local_ok=no
+failures=()
+while read -r name repo; do
+  label=$(target_label "$name")
+  if [[ $name == usb ]] && ! usb_ready; then
+    record_status "backup-$name" falhou "HD externo não conectado"
+    warn "$label: não conectado, pulando"
+    continue
+  fi
+  # A nuvem tem prazo: se a internet do box estiver fora, desiste e tenta no
+  # próximo horário (o aviso só sai depois de ALERT_BACKUP_REMOTE_HOURS).
+  limit=; [[ $name == remote ]] && limit=${BACKUP_REMOTE_TIMEOUT:-2h}
+  rc=0; restic_probe "$repo" 60 || rc=$?
+  if (( rc != 0 && rc != 10 )); then
+    msg="não respondeu (sem internet ou destino fora do ar)"
+    [[ $name != remote ]] && msg="não consegui abrir o repositório (código $rc)"
+    record_status "backup-$name" falhou "$msg"
+    failures+=("$label: $msg")
+    warn "$label: $msg"
+    continue
+  fi
+  {
+    # Primeiro uso do destino: cria o repositório.
+    if (( rc == 10 )); then
+      info "$label: criando o repositório de backup"
+      [[ $name == local || $name == usb ]] && install -d -m 0700 "$repo"
+      RESTIC_TIMEOUT=$limit run_restic "$repo" init >/dev/null
+    fi
+    RESTIC_TIMEOUT=$limit run_restic "$repo" backup --quiet --host ceasa-fruit --tag ceasa --tag "$reason" \
+      --compression max "$SPOOL_DIR/current" &&
+    RESTIC_TIMEOUT=$limit run_restic "$repo" forget --quiet --host ceasa-fruit --tag ceasa --prune \
+      --keep-last "${BACKUP_KEEP_LAST:-8}" --keep-daily "${BACKUP_KEEP_DAILY:-7}" \
+      --keep-weekly "${BACKUP_KEEP_WEEKLY:-4}" --keep-monthly "${BACKUP_KEEP_MONTHLY:-12}"
+  } >"$STATE_DIR/backup-$name.log" 2>&1 && result=ok || result=falhou
+
+  if [[ $result == ok ]]; then
+    record_status "backup-$name" ok "foto de $size"
+    ok "$label"
+    [[ $name == local ]] && local_ok=yes
+  else
+    msg=$(tail -3 "$STATE_DIR/backup-$name.log" | tr '\n' ' ')
+    record_status "backup-$name" falhou "$msg"
+    failures+=("$label: $msg")
+    warn "$label falhou: $msg"
+  fi
+done < <(backup_targets)
+
+# O disco do servidor é o mínimo. HD externo e nuvem têm mais folga antes de
+# avisar (o HD pode estar desconectado, a internet cai): quem avisa é o
+# ceasa-status, quando passar do prazo configurado.
+if [[ $local_ok != yes ]]; then
+  fail "não consegui gravar nem no disco do servidor: ${failures[*]}"
+fi
+record_status backup ok "foto de $size"
+ok "backup concluído"

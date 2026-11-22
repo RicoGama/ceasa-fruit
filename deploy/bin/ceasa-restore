@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Restaura o banco do CEASA Fruit a partir de um backup.
+#
+#   sudo ceasa-restore --list                  lista os backups (do disco do servidor)
+#   sudo ceasa-restore --list --from usb       ... do HD externo (ou --from remote, nuvem)
+#   sudo ceasa-restore                         restaura o MAIS RECENTE
+#   sudo ceasa-restore --snapshot 1a2b3c4d     restaura um backup específico
+#   sudo ceasa-restore --file arquivo.dump     restaura um arquivo do pg_dump
+#
+# Antes de trocar o banco, guarda uma cópia do banco atual em
+# /var/backups/ceasa-fruit/before-restore-<data>.dump (dá para desfazer).
+# O sistema fica fora do ar durante a restauração (minutos).
+source /opt/ceasa-fruit/current/deploy/lib/common.sh
+source /opt/ceasa-fruit/current/deploy/lib/setup.sh
+require_root
+load_all_env
+
+from=local snapshot=latest list=no yes=no file=
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --from) from=$2; shift 2 ;;
+    --snapshot) snapshot=$2; shift 2 ;;
+    --list) list=yes; shift ;;
+    --file) file=$2; shift 2 ;;
+    --yes) yes=yes; shift ;;
+    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
+    *) die "opção desconhecida: $1 (veja --help)" ;;
+  esac
+done
+
+if [[ -z $file ]]; then
+  repo=$(backup_targets | awk -v n="$from" '$1 == n {print $2}')
+  [[ -n $repo ]] || die "destino \"$from\" não configurado (use local, usb ou remote)"
+  [[ $from == usb ]] && { usb_ready || die "HD externo não conectado"; }
+  label=$(target_label "$from")
+fi
+
+if [[ $list == yes ]]; then
+  info "backups no $label (mais recente por último)"
+  run_restic "$repo" snapshots --host ceasa-fruit --compact
+  exit 0
+fi
+
+exec 9>/run/ceasa-backup.lock
+flock -w 600 9 || die "um backup está rodando; tente de novo em alguns minutos"
+
+work=$BACKUP_DIR/restore
+rm -rf "$work" && install -d -m 0700 "$work"
+trap 'rm -rf "$work"' EXIT
+
+spool=$SPOOL_DIR/current
+if [[ -n $file ]]; then
+  [[ -r $file ]] || die "arquivo não encontrado: $file"
+  when="$(date -r "$file" '+%d/%m/%Y às %H:%M') (arquivo $(basename "$file"))"
+else
+  run_restic "$repo" dump --host ceasa-fruit "$snapshot" "$spool/manifest.json" >"$work/manifest.json" ||
+    die "backup \"$snapshot\" não encontrado no $label (veja --list)"
+  created=$(sed -nE 's/.*"createdAt": "([^"]+)".*/\1/p' "$work/manifest.json")
+  when=$(date -d "$created" '+%d/%m/%Y às %H:%M')
+fi
+
+cat <<MSG
+
+${_Y}${_B}Isto vai SUBSTITUIR todos os dados do sistema pelo backup de $when.${_N}
+Tudo o que foi lançado depois disso some (o banco atual fica guardado à parte).
+O sistema fica fora do ar durante a restauração.
+
+MSG
+if [[ $yes != yes ]]; then
+  read -r -p "Para continuar, digite RESTAURAR: " answer
+  [[ $answer == RESTAURAR ]] || die "cancelado"
+fi
+
+if [[ -n $file ]]; then
+  cp "$file" "$work/ceasa.dump"
+else
+  info "baixando o backup do $label"
+  run_restic "$repo" dump --host ceasa-fruit "$snapshot" "$spool/ceasa.dump" >"$work/ceasa.dump"
+fi
+
+info "parando o sistema"
+touch "$STATE_DIR/maintenance"
+systemctl stop ceasa-web ceasa-api
+
+safety=$BACKUP_DIR/before-restore-$(date +%Y%m%d-%H%M%S).dump
+info "guardando o banco atual em $safety"
+sudo -u postgres pg_dump --format=custom -d "$DB_NAME" >"$safety"
+chmod 0600 "$safety"
+
+restore_database "$work/ceasa.dump"
+
+info "subindo o sistema"
+systemctl start ceasa-api ceasa-web
+rm -f "$STATE_DIR/maintenance"
+wait_for_app 120 || die "o sistema não voltou depois da restauração (journalctl -u ceasa-api)"
+log_event "banco restaurado do backup de $when"
+ok "dados restaurados do backup de $when"
+echo "   Se precisar desfazer: sudo ceasa-restore --file $safety"

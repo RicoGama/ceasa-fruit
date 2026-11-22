@@ -1,0 +1,33 @@
+# Front (Nuxt, Node). Repassa /api para a API na mesma máquina.
+[Unit]
+Description=CEASA Fruit - telas (Nuxt)
+After=network-online.target ceasa-api.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+User=ceasa
+Group=ceasa
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+Environment=NUXT_API_URL=http://127.0.0.1:8080
+ExecStart=/usr/bin/node /opt/ceasa-fruit/current/web/server/index.mjs
+Restart=always
+RestartSec=2
+TimeoutStopSec=20
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

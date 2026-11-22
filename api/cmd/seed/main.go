@@ -37,7 +37,7 @@ func main() {
 	flag.Parse()
 
 	if err := run(*email, *name, *company, *password); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
+		fmt.Fprintln(os.Stderr, "erro:", err)
 		os.Exit(1)
 	}
 }
@@ -49,7 +49,7 @@ func run(email, name, companyName, password string) error {
 		password = rand.Text()[:16] // 16 caracteres aleatórios
 	}
 	if len(password) < 8 {
-		return errors.New("password must have at least 8 characters")
+		return errors.New("a senha precisa ter pelo menos 8 caracteres")
 	}
 
 	pool, err := postgres.Connect(ctx, config.Load().DatabaseURL)
@@ -81,7 +81,7 @@ func run(email, name, companyName, password string) error {
 		adminKey := auth.RoleKeyAdmin
 		adminRole, err := q.GetRoleIDByKey(ctx, &adminKey)
 		if err != nil {
-			return fmt.Errorf("admin role not found (migration 00006): %w", err)
+			return fmt.Errorf("papel de administrador não encontrado (migration 00006): %w", err)
 		}
 		user, err := q.GetUserByEmail(ctx, email)
 		switch {
@@ -102,10 +102,11 @@ func run(email, name, companyName, password string) error {
 		return err
 	}
 
-	action := "updated"
+	// Mensagens em português: aparecem para quem instala o servidor.
+	action := "atualizado"
 	if created {
-		action = "created"
+		action = "criado"
 	}
-	fmt.Printf("Admin %s.\n\n  E-mail: %s\n  Senha:  %s\n\n", action, email, password)
+	fmt.Printf("Administrador %s.\n\n  E-mail: %s\n  Senha:  %s\n\n", action, email, password)
 	return nil
 }

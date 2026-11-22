@@ -1,0 +1,11 @@
+# Toda semana: restaura o último backup num banco à parte e confere os dados.
+[Unit]
+Description=CEASA Fruit - teste semanal de restauração
+
+[Timer]
+OnCalendar=Sun *-*-* 14:00
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# Situação do servidor do CEASA Fruit.
+#
+#   sudo ceasa-status           mostra tudo: serviços, backups, disco, no-break...
+#   ceasa-status --alert        (usado a cada 5 min pelo ceasa-healthcheck.timer)
+#                               manda e-mail quando um problema aparece, lembra
+#                               a cada 24h enquanto continuar, e avisa quando
+#                               ele se resolve.
+source /opt/ceasa-fruit/current/deploy/lib/common.sh
+source /opt/ceasa-fruit/current/deploy/lib/notify.sh
+require_root
+load_all_env
+
+alert=no quiet=no
+for arg in "$@"; do
+  case $arg in
+    --alert) alert=yes ;;
+    --quiet) quiet=yes ;;
+    -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
+  esac
+done
+
+# Durante uma atualização ou restauração o sistema fica fora do ar de
+# propósito: não avisa (por até 30 minutos).
+if [[ $alert == yes && -f $STATE_DIR/maintenance ]] &&
+   (( $(now_epoch) - $(stat -c %Y "$STATE_DIR/maintenance") < 1800 )); then
+  exit 0
+fi
+
+# Cada verificação vira uma linha: nome|ok ou falhou|texto
+results=()
+check() { results+=("$1|$2|$3"); }
+
+# --- Serviços ----------------------------------------------------------------------------
+for svc in ceasa-api ceasa-web caddy; do
+  if systemctl is-active --quiet "$svc"; then check "svc-$svc" ok "$svc rodando"
+  else check "svc-$svc" falhou "o serviço $svc está parado (journalctl -u $svc)"; fi
+done
+if pg_isready -q; then check svc-postgres ok "PostgreSQL respondendo"
+else check svc-postgres falhou "o PostgreSQL não responde (journalctl -u postgresql)"; fi
+
+if curl -fsS -m 5 -o /dev/null http://127.0.0.1:8080/health; then check api-health ok "API respondendo (banco ok)"
+else check api-health falhou "a API não responde ou não alcança o banco"; fi
+if curl -fsSk -m 10 -o /dev/null https://localhost/login; then check site ok "telas abrindo pelo HTTPS"
+else check site falhou "as telas não abrem pelo endereço do sistema (Caddy ou Nuxt)"; fi
+
+# --- Disco ----------------------------------------------------------------------------------
+limit=${ALERT_DISK_PERCENT:-85}
+while read -r used mount; do
+  used=${used%\%}
+  if (( used >= limit )); then check "disk-$mount" falhou "disco $mount com ${used}% ocupado"
+  else check "disk-$mount" ok "disco $mount: ${used}% ocupado"; fi
+done < <(df --output=pcent,target / "$BACKUP_DIR" 2>/dev/null | tail -n +2 | sort -u -k2)
+
+# Espelhamento de discos (RAID por software): um disco com defeito aparece como [U_].
+if [[ -r /proc/mdstat ]] && grep -q '^md' /proc/mdstat; then
+  if grep -q '\[[U]*_[U_]*\]' /proc/mdstat; then check raid falhou "espelhamento de discos DEGRADADO: um disco falhou (cat /proc/mdstat)"
+  else check raid ok "espelhamento de discos ok"; fi
+fi
+
+# Saúde dos discos (SMART), quando o disco informa.
+if command -v smartctl >/dev/null; then
+  while read -r dev; do
+    out=$(smartctl -H "/dev/$dev" 2>/dev/null) || true
+    if grep -qiE 'PASSED|OK$' <<<"$out"; then check "smart-$dev" ok "disco $dev saudável (SMART)"
+    elif grep -qiE 'FAILED' <<<"$out"; then check "smart-$dev" falhou "disco $dev com defeito segundo o SMART: troque logo"; fi
+  done < <(lsblk -dno NAME,TYPE 2>/dev/null | awk '$2 == "disk" {print $1}')
+fi
+
+# --- Backups ------------------------------------------------------------------------------------
+age_check() {
+  local name=$1 label=$2 max=$3 hint=$4 last hours status_msg
+  last=$(last_ok_epoch "$name")
+  status_msg=$(cut -d' ' -f3- "$STATE_DIR/status/$name" 2>/dev/null || true)
+  if (( last == 0 )); then
+    check "$name" falhou "$label: nenhum backup ainda. $hint"
+    return
+  fi
+  hours=$(hours_since "$last")
+  local when; when=$(date -d "@$last" '+%d/%m %H:%M')
+  if (( hours >= max )); then
+    check "$name" falhou "$label: último backup em $when (há ${hours}h). $hint ${status_msg:+Último erro: $status_msg}"
+  else
+    check "$name" ok "$label: último backup em $when"
+  fi
+}
+age_check backup-local "Backup no disco do servidor" "${ALERT_BACKUP_LOCAL_HOURS:-12}" "Rode: sudo ceasa-backup"
+if [[ ${BACKUP_USB_ENABLED:-no} == yes ]]; then
+  age_check backup-usb "Backup no HD externo" "${ALERT_BACKUP_USB_HOURS:-36}" "Confira se o HD externo está ligado."
+fi
+if [[ -n ${RESTIC_REMOTE_REPOSITORY:-} ]]; then
+  age_check backup-remote "Backup na nuvem" "${ALERT_BACKUP_REMOTE_HOURS:-72}" "Confira a internet do box."
+fi
+last=$(last_ok_epoch restore-test)
+if (( last == 0 )); then
+  # Instalação nova: só cobra depois de uma semana.
+  installed=$(stat -c %Y "$OPS_ENV")
+  if (( $(now_epoch) - installed > 8 * 86400 )); then
+    check restore-test falhou "o teste de restauração nunca passou (sudo ceasa-restore-test)"
+  else
+    check restore-test ok "teste de restauração: roda no domingo (ou: sudo ceasa-restore-test)"
+  fi
+elif (( $(hours_since "$last") > 8 * 24 )); then
+  check restore-test falhou "o teste de restauração não passa há mais de 8 dias (sudo ceasa-restore-test)"
+else
+  check restore-test ok "teste de restauração: $(cut -d' ' -f3- "$STATE_DIR/status/restore-test")"
+fi
+
+# --- No-break -------------------------------------------------------------------------------------
+if [[ ${UPS_ENABLED:-no} == yes ]]; then
+  ups=$(upsc nobreak@localhost ups.status 2>/dev/null || echo "?")
+  charge=$(upsc nobreak@localhost battery.charge 2>/dev/null || echo "?")
+  case $ups in
+    *OB*) check ups falhou "SEM ENERGIA: o servidor está no no-break (bateria em ${charge}%)" ;;
+    *OL*) check ups ok "no-break na tomada (bateria em ${charge}%)" ;;
+    *) check ups falhou "o servidor não consegue falar com o no-break (cabo USB?)" ;;
+  esac
+fi
+
+# --- Mostrar ---------------------------------------------------------------------------------------
+problems=()
+for r in "${results[@]}"; do
+  IFS='|' read -r _ status msg <<<"$r"
+  [[ $status == ok ]] || problems+=("$msg")
+done
+
+if [[ $quiet != yes ]]; then
+  echo "${_B}CEASA Fruit $(cat "$CURRENT_LINK/VERSION")${_N} em $(hostname) — $(date '+%d/%m/%Y %H:%M')"
+  echo "Endereço: https://${SERVER_HOSTS%% *}"
+  echo
+  for r in "${results[@]}"; do
+    IFS='|' read -r _ status msg <<<"$r"
+    if [[ $status == ok ]]; then printf '  %s✔%s %s\n' "$_G" "$_N" "$msg"
+    else printf '  %s✘ %s%s\n' "$_R" "$msg" "$_N"; fi
+  done
+  echo
+  if ((${#problems[@]} == 0)); then echo "${_G}Tudo certo.${_N}"
+  else echo "${_R}${#problems[@]} problema(s).${_N}"; fi
+fi
+
+# --- Avisos por e-mail --------------------------------------------------------------------------------
+if [[ $alert == yes ]]; then
+  adir=$STATE_DIR/alerts
+  install -d -m 0700 "$adir"
+  new=() reminder=() solved=()
+  for r in "${results[@]}"; do
+    IFS='|' read -r name status msg <<<"$r"
+    f=$adir/$name
+    if [[ $status == ok ]]; then
+      if [[ -f $f ]]; then solved+=("$msg"); rm -f "$f"; fi
+    elif [[ ! -f $f ]]; then
+      new+=("$msg"); now_epoch >"$f"
+    elif (( $(now_epoch) - $(cat "$f") >= 86400 )); then
+      reminder+=("$msg"); now_epoch >"$f"
+    fi
+  done
+  list() { printf -- '- %s\n' "$@"; }
+  if ((${#new[@]} + ${#reminder[@]} > 0)); then
+    body=""
+    ((${#new[@]})) && body+="Problemas novos:
+$(list "${new[@]}")
+
+"
+    ((${#reminder[@]})) && body+="Continuam sem solução (lembrete diário):
+$(list "${reminder[@]}")
+
+"
+    ((${#solved[@]})) && body+="Resolvidos:
+$(list "${solved[@]}")
+"
+    notify "$(( ${#new[@]} + ${#reminder[@]} )) problema(s) no servidor" "$body" || true
+  elif ((${#solved[@]})); then
+    notify "Problema resolvido" "Voltou ao normal:
+$(list "${solved[@]}")" || true
+  fi
+fi
+
+# No modo de aviso a rotina sempre termina bem (o problema já foi por e-mail).
+[[ $alert == yes ]] && exit 0
+((${#problems[@]} == 0))

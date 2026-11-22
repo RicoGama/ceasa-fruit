@@ -1,0 +1,9 @@
+[Unit]
+Description=CEASA Fruit - teste de restauração do backup
+After=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ceasa-restore-test
+Nice=10
+IOSchedulingClass=idle

@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Prepara um HD externo (USB) para receber os backups.
+#
+#   sudo ceasa-usb-setup              lista os discos USB conectados
+#   sudo ceasa-usb-setup /dev/sdb     APAGA o disco e prepara para backup
+#
+# Dá para preparar dois HDs e revezar (um fica no box, o outro em casa):
+# os dois recebem o nome CEASA-BACKUP e o servidor usa o que estiver ligado.
+source /opt/ceasa-fruit/current/deploy/lib/common.sh
+require_root
+load_all_env
+LABEL=CEASA-BACKUP
+MNT=${BACKUP_USB_MOUNT:-/mnt/ceasa-backup}
+
+if [[ $# -eq 0 ]]; then
+  info "discos USB conectados:"
+  lsblk -dpno NAME,SIZE,MODEL,TRAN | awk '$NF == "usb"' | sed 's/^/   /'
+  echo
+  echo "Para preparar um deles (APAGA tudo nele): sudo ceasa-usb-setup /dev/sdX"
+  exit 0
+fi
+
+disk=$1
+[[ -b $disk ]] || die "$disk não é um disco"
+case $(lsblk -dno TYPE "$disk") in disk|loop) ;; *) die "informe o disco inteiro (ex.: /dev/sdb), não uma partição" ;; esac
+# Nunca mexe num disco em uso: com partição montada (o disco do sistema) ou
+# que faz parte do espelhamento (RAID), LVM ou ZFS.
+if lsblk -rno MOUNTPOINTS "$disk" 2>/dev/null | grep -q .; then
+  die "$disk tem partição em uso (montada): não é um HD de backup"
+fi
+if lsblk -rno FSTYPE "$disk" 2>/dev/null | grep -qE 'linux_raid_member|LVM2_member|zfs_member'; then
+  die "$disk faz parte do espelhamento/LVM dos discos do servidor!"
+fi
+[[ $(lsblk -dno TRAN "$disk") == usb ]] || warn "$disk não parece ser USB"
+
+lsblk -po NAME,SIZE,MODEL,FSTYPE,LABEL "$disk"
+echo
+echo "${_R}${_B}TUDO o que estiver em $disk será apagado.${_N}"
+read -r -p "Para continuar, digite o nome do disco ($disk): " answer
+[[ $answer == "$disk" ]] || die "cancelado"
+
+umount "$disk"* 2>/dev/null || true
+wipefs -aq "$disk"
+parted -s "$disk" mklabel gpt mkpart ceasa-backup ext4 0% 100%
+partprobe "$disk" 2>/dev/null || true
+udevadm settle 2>/dev/null || true
+part=
+for _ in $(seq 1 10); do
+  part=$(lsblk -lpno NAME,TYPE "$disk" | awk '$2 == "part" {print $1; exit}')
+  [[ -n $part && -b $part ]] && break
+  sleep 1
+done
+[[ -n $part && -b $part ]] || die "a partição nova não apareceu em $disk; desligue e ligue o HD e tente de novo"
+mkfs.ext4 -q -F -L "$LABEL" "$part"
+
+# Monta pelo nome (qualquer HD preparado serve) e só quando for usado
+# (automount): o servidor liga normalmente sem o HD.
+install -d "$MNT"
+if ! grep -q "LABEL=$LABEL" /etc/fstab; then
+  echo "LABEL=$LABEL $MNT ext4 nofail,noatime,x-systemd.automount,x-systemd.idle-timeout=10min,x-systemd.device-timeout=5s 0 2" >>/etc/fstab
+fi
+systemctl daemon-reload
+systemctl restart "$(systemd-escape -p --suffix=automount "$MNT")" 2>/dev/null || mount "$MNT"
+usb_ready || die "não consegui montar o HD em $MNT"
+install -d -m 0700 "$MNT/restic"
+set_env_value "$OPS_ENV" BACKUP_USB_ENABLED yes
+ok "HD preparado em $MNT"
+info "fazendo o primeiro backup nele"
+/usr/local/sbin/ceasa-backup "hd-novo"

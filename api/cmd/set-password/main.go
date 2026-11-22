@@ -34,7 +34,7 @@ func main() {
 		os.Exit(2)
 	}
 	if err := run(*email, *password); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
+		fmt.Fprintln(os.Stderr, "erro:", err)
 		os.Exit(1)
 	}
 }
@@ -46,7 +46,7 @@ func run(email, password string) error {
 		password = rand.Text()[:16]
 	}
 	if len(password) < 8 {
-		return errors.New("password must have at least 8 characters")
+		return errors.New("a senha precisa ter pelo menos 8 caracteres")
 	}
 
 	pool, err := postgres.Connect(ctx, config.Load().DatabaseURL)
@@ -63,7 +63,7 @@ func run(email, password string) error {
 	err = postgres.NewDB(pool).InTx(ctx, func(q postgres.Tx) error {
 		user, err := q.GetUserByEmail(ctx, email)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("no user with email %q", email)
+			return fmt.Errorf("nenhum usuário com o e-mail %q", email)
 		}
 		if err != nil {
 			return err
@@ -80,6 +80,6 @@ func run(email, password string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Password updated; open sessions were ended.\n\n  E-mail: %s\n  Senha:  %s\n\n", email, password)
+	fmt.Printf("Senha trocada; as sessões abertas foram encerradas.\n\n  E-mail: %s\n  Senha:  %s\n\n", email, password)
 	return nil
 }

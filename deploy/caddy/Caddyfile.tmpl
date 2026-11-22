@@ -1,0 +1,42 @@
+# Gerado por ceasa-fruit (deploy/caddy/Caddyfile.tmpl). Não edite à mão:
+# é refeito a cada instalação/atualização. Os endereços vêm de SERVER_HOSTS
+# em /etc/ceasa-fruit/ops.env.
+{
+	# HTTPS na rede do box com certificado próprio (não há domínio na
+	# internet). Os aparelhos instalam o certificado uma vez: /certificado
+	local_certs
+	skip_install_trust
+}
+
+__HTTPS_SITES__ {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3000
+
+	# Sistema fora do ar (atualizando ou reiniciando): página de aviso que
+	# se recarrega sozinha, em vez de "502 Bad Gateway".
+	handle_errors {
+		@api path /api/*
+		handle @api {
+			respond "Sistema em atualização. Tente de novo em instantes." 503
+		}
+		handle {
+			root * __APP_ROOT__/current/deploy/www
+			rewrite * /maintenance.html
+			file_server
+		}
+	}
+}
+
+__HTTP_SITES__ {
+	# Certificado para instalar nos celulares e computadores do box.
+	handle /certificado {
+		root * /var/lib/ceasa-fruit/www
+		rewrite * /ceasa-fruit-ca.crt
+		header Content-Type application/x-x509-ca-cert
+		header Content-Disposition "attachment; filename=ceasa-fruit-ca.crt"
+		file_server
+	}
+	handle {
+		redir https://{host}{uri} permanent
+	}
+}

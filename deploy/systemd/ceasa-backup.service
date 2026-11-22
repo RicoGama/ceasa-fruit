@@ -1,0 +1,9 @@
+[Unit]
+Description=CEASA Fruit - backup do banco
+After=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ceasa-backup
+Nice=10
+IOSchedulingClass=idle

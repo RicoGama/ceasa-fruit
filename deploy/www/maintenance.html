@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="10">
+<title>Atualizando · CEASA Fruit</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif;
+         background: #f4f6fa; color: #1f2937; }
+  @media (prefers-color-scheme: dark) { body { background: #0f172a; color: #e5e7eb; } }
+  main { max-width: 28rem; padding: 2rem 1.5rem; text-align: center; }
+  h1 { font-size: 1.4rem; margin: 1rem 0 .5rem; }
+  p { line-height: 1.5; opacity: .8; }
+  .spin { width: 2.5rem; height: 2.5rem; border-radius: 50%; border: .3rem solid #cbd5e1; border-top-color: #1d4ed8;
+          margin: 0 auto; animation: s 1s linear infinite; }
+  @keyframes s { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<main>
+  <div class="spin" aria-hidden="true"></div>
+  <h1>O sistema está reiniciando</h1>
+  <p>Leva menos de um minuto. Esta página tenta de novo sozinha a cada 10 segundos.</p>
+  <p>Se demorar mais de 5 minutos, avise o responsável pelo sistema.</p>
+</main>
+</body>
+</html>

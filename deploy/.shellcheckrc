@@ -1,0 +1,7 @@
+# shellcheck -x bin/* install.sh lib/*.sh
+# SC2024: "sudo -u postgres pg_dump > arquivo" é de propósito: quem grava (ou
+#         lê) o arquivo é o root; o usuário postgres não enxerga as pastas de
+#         backup (0700 root).
+# SC2012: os nomes de pasta das versões são sempre "AAAA.MM.DD-commit".
+# SC1091/SC2034: os scripts carregam lib/*.sh do caminho instalado.
+disable=SC2024,SC2012,SC2119,SC1091,SC2034

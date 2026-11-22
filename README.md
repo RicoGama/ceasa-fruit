@@ -37,6 +37,7 @@ Convenção: **código em inglês** (identificadores, banco, rotas, JSON); **com
 ceasa-fruit/
 ├── api/                # API em Go (ver api/README.md)
 ├── web/                # front em Nuxt (ver web/README.md)
+├── deploy/             # instalação no servidor do box, backup e avisos (ver deploy/MANUAL.md)
 ├── docker/             # inicialização do Postgres no Docker
 ├── scripts/            # db-setup-local.sql (Postgres sem Docker)
 ├── Caddyfile           # vhosts locais: ceasa-fruit.test:6240 e api.ceasa-fruit.test:6240
@@ -161,3 +162,17 @@ Abra http://ceasa-fruit.test:6240. O hot reload do Nuxt funciona pelo vhost tamb
 - http://localhost:8080/docs — documentação interativa (dá para testar os endpoints)
 - http://localhost:8080/health — health check
 - http://localhost:8080/openapi.json — contrato OpenAPI (vai gerar o cliente do Nuxt)
+
+## Servidor do box (produção)
+
+Instalação num Ubuntu Server 26.04 com um comando, atualização com volta
+automática, backup 4x por dia (disco do servidor, HD externo e nuvem) com
+teste semanal de restauração, e avisos por e-mail. Tudo em
+[deploy/MANUAL.md](deploy/MANUAL.md).
+
+```bash
+./deploy/build-release.sh
+```
+
+Gera `dist/ceasa-fruit-<versão>.tar.gz`, o pacote que vai para o servidor.
+Os scripts de `deploy/` passam no `shellcheck` (`deploy/.shellcheckrc`).

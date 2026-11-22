@@ -1,0 +1,34 @@
+# API em Go. Sobe sozinha ao ligar o servidor e reinicia se cair.
+# As migrations do banco rodam automaticamente quando ela sobe.
+[Unit]
+Description=CEASA Fruit - API
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
+# Tenta para sempre (ex.: Postgres demorando a subir depois de faltar luz).
+StartLimitIntervalSec=0
+
+[Service]
+User=ceasa
+Group=ceasa
+EnvironmentFile=/etc/ceasa-fruit/ceasa.env
+ExecStart=/opt/ceasa-fruit/current/bin/ceasa-api
+Restart=always
+RestartSec=2
+TimeoutStopSec=20
+
+# Proteções: o processo só enxerga o que precisa.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

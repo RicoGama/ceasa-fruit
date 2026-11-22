@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Chamado pelo NUT (upsmon) a cada evento do no-break: manda o aviso por e-mail.
+# NOTIFYTYPE vem do upsmon (ONBATT, ONLINE, LOWBATT...).
+source /opt/ceasa-fruit/current/deploy/lib/common.sh
+source /opt/ceasa-fruit/current/deploy/lib/notify.sh
+load_all_env
+charge=$(upsc nobreak@localhost battery.charge 2>/dev/null || echo "")
+charge=${charge:+${charge}%}; charge=${charge:-sem leitura}
+runtime=$(upsc nobreak@localhost battery.runtime 2>/dev/null || echo "")
+mins=${runtime:+ (cerca de $((runtime / 60)) minutos de bateria)}
+case ${NOTIFYTYPE:-} in
+  ONBATT) notify "SEM ENERGIA no box" "Faltou luz: o servidor está no no-break. Bateria: ${charge}${mins}.
+Se a bateria acabar, o servidor se desliga sozinho com segurança e volta quando a energia voltar." ;;
+  ONLINE) notify "Energia voltou" "O no-break voltou para a tomada. Bateria: ${charge}." ;;
+  LOWBATT|FSD) notify "Bateria do no-break acabando: desligando o servidor" "O servidor vai se desligar agora para não corromper os dados. Ele volta quando a energia voltar (se a BIOS estiver com 'ligar ao voltar a energia')." ;;
+  REPLBATT) notify "Trocar a bateria do no-break" "O no-break informou que a bateria precisa ser trocada." ;;
+  COMMBAD|NOCOMM) notify "Sem comunicação com o no-break" "O servidor parou de receber informações do no-break. Confira o cabo USB." ;;
+  COMMOK) notify "Comunicação com o no-break restabelecida" "O servidor voltou a falar com o no-break." ;;
+  *) log_event "no-break: ${NOTIFYTYPE:-?} ${1:-}" ;;
+esac

@@ -1,0 +1,6 @@
+[Unit]
+Description=CEASA Fruit - verificação de saúde e avisos por e-mail
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ceasa-status --alert --quiet

@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# Atualiza o CEASA Fruit para uma versão nova, com volta automática.
+#
+#   sudo ceasa-update ceasa-fruit-2026.12.01-abc1234.tar.gz
+#
+# Passo a passo:
+#   1. backup do banco (se falhar, não atualiza);
+#   2. para o sistema (as telas mostram "reiniciando, volta em instantes");
+#   3. troca a versão e sobe a API, que aplica as migrations do banco;
+#   4. confere se API e telas respondem.
+# Se algo der errado no passo 3 ou 4, VOLTA SOZINHO: versão anterior e, se as
+# migrations já tinham mexido no banco, o banco do backup do passo 1.
+#
+#   sudo ceasa-update --rollback     volta para a versão anterior (sem mexer no banco)
+source /opt/ceasa-fruit/current/deploy/lib/common.sh
+source /opt/ceasa-fruit/current/deploy/lib/setup.sh
+source /opt/ceasa-fruit/current/deploy/lib/notify.sh
+require_root
+load_all_env
+
+[[ $# -eq 1 ]] || { sed -n '2,16p' "$0"; exit 1; }
+
+exec 8>/run/ceasa-update.lock
+flock -n 8 || die "já tem uma atualização rodando"
+
+previous=$(readlink -f "$CURRENT_LINK")
+previous_version=$(cat "$previous/VERSION")
+
+switch_to() {
+  ln -sfn "$1" "$CURRENT_LINK.tmp" && mv -T "$CURRENT_LINK.tmp" "$CURRENT_LINK"
+  install_commands
+  install_units "$1"
+}
+
+# --- Voltar para a versão anterior, sem mexer no banco ------------------------------------
+if [[ $1 == --rollback ]]; then
+  # A anterior fica anotada a cada atualização que dá certo.
+  older=$(cat "$STATE_DIR/previous-release" 2>/dev/null || true)
+  [[ -n $older && -d $older && $older != "$previous" ]] || die "não há versão anterior registrada para voltar"
+  info "voltando de $previous_version para $(cat "$older/VERSION")"
+  touch "$STATE_DIR/maintenance"
+  systemctl stop ceasa-web ceasa-api
+  switch_to "$older"
+  render_caddy && systemctl reload caddy
+  systemctl start ceasa-api ceasa-web
+  rm -f "$STATE_DIR/maintenance"
+  wait_for_app 120 || die "o sistema não voltou (journalctl -u ceasa-api)"
+  echo "$previous" >"$STATE_DIR/previous-release"
+  ok "voltou para $(cat "$older/VERSION")"
+  exit 0
+fi
+
+# --- 0. Abre o pacote ------------------------------------------------------------------------
+package=$(readlink -f "$1")
+[[ -r $package ]] || die "pacote não encontrado: $1"
+incoming=$RELEASES_DIR/.incoming
+rm -rf "$incoming" && mkdir -p "$incoming"
+tar -xzf "$package" -C "$incoming"
+dir=$(find "$incoming" -mindepth 1 -maxdepth 1 -type d | head -1)
+[[ -x $dir/bin/ceasa-api && -r $dir/VERSION ]] || die "pacote inválido (falta bin/ceasa-api ou VERSION)"
+version=$(cat "$dir/VERSION")
+new=$RELEASES_DIR/$version
+[[ $new != "$previous" ]] || die "a versão $version já está em uso"
+rm -rf "$new" && mv "$dir" "$new" && rm -rf "$incoming"
+chown -R root:root "$new"
+info "atualizando de $previous_version para $version"
+
+# --- 1. Backup antes ----------------------------------------------------------------------------
+info "backup antes de atualizar"
+/usr/local/sbin/ceasa-backup "antes-de-$version" || die "o backup falhou: atualização cancelada (nada foi mudado)"
+before_dump=$BACKUP_DIR/before-update-$version.dump
+cp "$SPOOL_DIR/current/ceasa.dump" "$before_dump" && chmod 0600 "$before_dump"
+schema_before=$(schema_version)
+
+# --- 2 e 3. Troca a versão ------------------------------------------------------------------------
+touch "$STATE_DIR/maintenance"
+systemctl stop ceasa-web ceasa-api
+switch_to "$new"
+load_all_env
+render_msmtp
+render_caddy && systemctl reload caddy
+
+rollback() {
+  trap - ERR
+  local why=$1
+  warn "$why: voltando para $previous_version"
+  journalctl -u ceasa-api -u ceasa-web -n 40 --no-pager >"$STATE_DIR/update-failed.log" 2>&1 || true
+  systemctl stop ceasa-web ceasa-api || true
+  if [[ $(schema_version) != "$schema_before" ]]; then
+    warn "as migrations da versão nova já tinham mudado o banco: restaurando o backup de antes"
+    restore_database "$before_dump"
+  fi
+  switch_to "$previous"
+  if render_caddy; then systemctl reload caddy || true; fi
+  systemctl start ceasa-api ceasa-web
+  wait_for_app 120 || warn "a versão anterior também não respondeu: veja sudo ceasa-status"
+  rm -rf "$new" # a versão que falhou não fica para trás
+  rm -f "$STATE_DIR/maintenance"
+  notify "Atualização para $version FALHOU" "A atualização deu errado ($why) e o sistema voltou sozinho para a versão $previous_version.
+Nenhum dado foi perdido. Os logs do erro estão em $STATE_DIR/update-failed.log." || true
+  die "atualização cancelada ($why); sistema de volta na versão $previous_version"
+}
+
+# Qualquer erro daqui para frente também volta para a versão anterior.
+trap 'rollback "erro inesperado na linha $LINENO"' ERR
+
+info "subindo a versão nova (aplica as migrations do banco)"
+systemctl start ceasa-api
+wait_for_url http://127.0.0.1:8080/health 120 || rollback "a API não subiu"
+systemctl start ceasa-web
+wait_for_app 60 || rollback "as telas não abriram"
+rm -f "$STATE_DIR/maintenance"
+trap - ERR
+
+# --- 4. Limpeza: guarda as 3 versões mais recentes ---------------------------------------------------
+# (A atual, a anterior e mais uma; as outras são apagadas.)
+old_releases=$(ls -1dt "$RELEASES_DIR"/*/ | sed 's:/$::' | { grep -vx -e "$new" -e "$previous" || true; } | tail -n +2)
+[[ -z $old_releases ]] || xargs -r rm -rf <<<"$old_releases"
+find "$BACKUP_DIR" -maxdepth 1 -name 'before-update-*.dump' -mtime +30 -delete
+echo "$previous" >"$STATE_DIR/previous-release"
+log_event "atualizado de $previous_version para $version"
+ok "CEASA Fruit $version no ar (banco: versão $schema_before -> $(schema_version))"
+echo "   Se precisar voltar: sudo ceasa-update --rollback"

@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Teste de restauração: prova que o backup volta.
+#
+# Pega o último backup (do HD externo, se houver; senão do disco do
+# servidor), restaura num banco à parte (ceasa_restore_test) e confere que
+# cada tabela tem exatamente as linhas que tinha na hora do backup. Também
+# confere a integridade dos repositórios (restic check). O banco do sistema
+# não é tocado.
+#
+# Roda sozinho todo domingo (ceasa-restore-test.timer). Na mão:
+#   sudo ceasa-restore-test
+source /opt/ceasa-fruit/current/deploy/lib/common.sh
+source /opt/ceasa-fruit/current/deploy/lib/notify.sh
+require_root
+load_all_env
+
+exec 9>/run/ceasa-backup.lock
+flock -w 3600 9 || die "um backup está demorando demais"
+
+TEST_DB=ceasa_restore_test
+work=$BACKUP_DIR/restore-test
+rm -rf "$work" && install -d -m 0700 "$work"
+cleanup() { rm -rf "$work"; sudo -u postgres dropdb --if-exists "$TEST_DB" >/dev/null 2>&1 || true; }
+trap cleanup EXIT
+
+fail() {
+  record_status restore-test falhou "$*"
+  notify "Teste de restauração FALHOU" "O teste semanal não conseguiu restaurar o backup.
+
+Motivo: $*
+
+Os backups podem não estar servindo. Veja com: sudo ceasa-restore-test" || true
+  die "$*"
+}
+
+# --- 1. Integridade de cada destino --------------------------------------------------
+from=local
+checked=()
+while read -r name repo; do
+  label=$(target_label "$name")
+  if [[ $name == usb ]] && ! usb_ready; then continue; fi
+  # Na nuvem lê só uma amostra pequena (a internet do box é limitada).
+  subset=10%; limit=; [[ $name == remote ]] && subset=2% && limit=1h
+  if [[ $name == remote ]] && ! restic_probe "$repo" 60; then
+    warn "$label: sem conexão agora; confiro na próxima semana"
+    continue
+  fi
+  if RESTIC_TIMEOUT=$limit run_restic "$repo" check --read-data-subset="$subset" >"$work/check-$name.log" 2>&1; then
+    checked+=("$label")
+    ok "$label: repositório íntegro"
+    [[ $name == usb ]] && from=usb
+  else
+    fail "$label: o restic check achou problema: $(tail -2 "$work/check-$name.log" | tr '\n' ' ')"
+  fi
+done < <(backup_targets)
+
+repo=$(backup_targets | awk -v n="$from" '$1 == n {print $2}')
+label=$(target_label "$from")
+
+# --- 2. Restaura o último backup num banco à parte -----------------------------------------
+info "restaurando o último backup do $label"
+spool=$SPOOL_DIR/current
+run_restic "$repo" dump --host ceasa-fruit latest "$spool/manifest.json" >"$work/manifest.json" ||
+  fail "não consegui ler o backup do $label"
+run_restic "$repo" dump --host ceasa-fruit latest "$spool/ceasa.dump" >"$work/ceasa.dump" ||
+  fail "não consegui ler o backup do $label"
+
+sudo -u postgres dropdb --if-exists "$TEST_DB" 2>/dev/null
+sudo -u postgres createdb "$TEST_DB"
+sudo -u postgres pg_restore --no-owner --no-privileges --exit-on-error -d "$TEST_DB" <"$work/ceasa.dump" \
+  >"$work/restore.log" 2>&1 || fail "o pg_restore falhou: $(tail -3 "$work/restore.log" | tr '\n' ' ')"
+
+# --- 3. Confere tabela por tabela ----------------------------------------------------------------
+manifest=$(cat "$work/manifest.json")
+created=$(sed -nE 's/.*"createdAt": "([^"]+)".*/\1/p' <<<"$manifest")
+tables=$(sed -nE 's/.*"tables": (\{.*\}).*/\1/p' <<<"$manifest" | tr -d '{}" ' | tr ',' '\n')
+[[ -n $tables ]] || fail "manifesto do backup sem a lista de tabelas"
+total_tables=0 total_rows=0 wrong=()
+while IFS=: read -r table expected; do
+  [[ -n $table ]] || continue
+  got=$(sudo -u postgres psql -qAtX -d "$TEST_DB" -c "SELECT count(*) FROM public.\"$table\"" 2>/dev/null || echo "?")
+  if [[ $got != "$expected" ]]; then
+    wrong+=("$table: esperado $expected, veio $got")
+  fi
+  total_tables=$((total_tables + 1)); total_rows=$((total_rows + expected))
+done <<<"$tables"
+((${#wrong[@]} == 0)) || fail "o backup voltou diferente: ${wrong[*]}"
+
+when=$(date -d "$created" '+%d/%m/%Y %H:%M')
+record_status restore-test ok "backup de $when ($label): $total_tables tabelas, $total_rows linhas conferidas"
+ok "backup de $when restaurado: $total_tables tabelas e $total_rows linhas conferem (íntegros: ${checked[*]})"

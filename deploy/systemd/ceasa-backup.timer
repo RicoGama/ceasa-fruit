@@ -1,0 +1,13 @@
+# Backup 4 vezes por dia. O pg_dump não trava o sistema: dá para rodar com
+# gente trabalhando. Para mudar os horários: sudo systemctl edit ceasa-backup.timer
+[Unit]
+Description=CEASA Fruit - horários do backup
+
+[Timer]
+OnCalendar=*-*-* 05,11,17,23:30:00
+# Se o servidor estava desligado no horário, faz assim que ligar.
+Persistent=true
+RandomizedDelaySec=2min
+
+[Install]
+WantedBy=timers.target
