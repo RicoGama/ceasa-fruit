@@ -210,6 +210,14 @@ gravação -> gatilho no Postgres -> NOTIFY app_events (só depois do COMMIT)
 - **Os avisos vêm de gatilhos no banco** (migration `00007`), não do código Go:
   nenhuma gravação escapa (tela, seed, script), um ROLLBACK não avisa nada, e
   avisos iguais na mesma transação viram um só.
+- **Tudo é tempo real: criar, alterar, inativar e excluir.** A inativação
+  (exclusão lógica) é um UPDATE, e a exclusão de verdade tem gatilho de DELETE.
+  O teste `TestEveryTableNotifiesChanges` (`internal/postgres`) reprova tabela
+  nova sem gatilho; exceções ficam listadas no próprio teste, com o motivo.
+- Na tela: a lista recarrega sozinha; o cadastro aberto recarrega sozinho se
+  você não mexeu nele, avisa "alterado por outra pessoa" se você tem algo não
+  salvo, e avisa "excluído" se ele sumiu. Inativar também muda a versão, então
+  ninguém reativa sem perceber ao salvar uma tela antiga.
 - O aviso é só `{"topic": "suppliers", "id": 42}`; os dados o front busca pela
   API, com as permissões de sempre. Mesmo assim, cada pessoa só recebe os
   assuntos que pode ver (`topicPermission` em `realtime.go`).
