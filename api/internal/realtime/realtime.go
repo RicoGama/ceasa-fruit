@@ -167,6 +167,7 @@ func (h *Hub) Close() {
 // Assunto que não está aqui (company, resync) vai para todos os logados.
 var topicPermission = map[string]auth.Permission{
 	"suppliers":  auth.SuppliersView,
+	"customers":  auth.CustomersView,
 	"access_log": auth.AuditView,
 	"products":   auth.ProductsView,
 	"users":      auth.UsersManage,

@@ -301,7 +301,7 @@ func TestIntegrationUsersAndRoles(t *testing.T) {
 	sellerClient.expect(http.StatusOK, "POST", "/auth/login",
 		map[string]any{"email": "vendedor@test.com", "password": "senha-do-vendedor"}, &sellerMe)
 	if sellerMe.User.Role.Name != "Vendedor" || sellerMe.User.Role.IsAdmin ||
-		!slices.Equal(sellerMe.User.Permissions, []string{"products.view", "suppliers.view"}) {
+		!slices.Equal(sellerMe.User.Permissions, []string{"customers.edit", "customers.view", "products.view", "suppliers.view"}) {
 		t.Fatalf("seller me: %+v", sellerMe.User)
 	}
 

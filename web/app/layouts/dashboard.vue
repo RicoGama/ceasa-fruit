@@ -26,7 +26,7 @@ const registryLinks = computed<NavigationMenuItem[]>(() => [
   { label: 'Cadastros', type: 'label' },
   ...(auth.can('products.view') ? [{ label: 'Produtos', icon: 'i-lucide-apple', to: '/app/products' }] : []),
   ...(auth.can('suppliers.view') ? [{ label: 'Fornecedores', icon: 'i-lucide-truck', to: '/app/suppliers' }] : []),
-  { label: 'Clientes', icon: 'i-lucide-users', ...soon },
+  ...(auth.can('customers.view') ? [{ label: 'Clientes', icon: 'i-lucide-users', to: '/app/customers' }] : []),
 ])
 
 const adminLinks = computed<NavigationMenuItem[]>(() => {

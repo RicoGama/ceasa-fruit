@@ -12,7 +12,8 @@ export type User = Schemas['User']
 export type Company = Schemas['Company']
 export type Supplier = Schemas['Supplier']
 export type SupplierSummary = Schemas['SupplierSummary']
-export type SupplierFields = Schemas['SupplierFields']
+// Campos editáveis (o corpo do cadastro, sem a pessoa reaproveitada).
+export type SupplierFields = Omit<Schemas['SupplierCreate'], 'partyId' | 'partyVersion'>
 export type City = Schemas['City']
 export type Product = Schemas['Product']
 export type ProductSummary = Schemas['ProductSummary']
@@ -20,3 +21,7 @@ export type ProductFields = Schemas['ProductFields']
 export type SupplierProduct = Schemas['SupplierProduct']
 export type ProductSupplier = Schemas['ProductSupplier']
 export type ApiErrorModel = Schemas['ErrorModel']
+export type Customer = Schemas['Customer']
+export type CustomerSummary = Schemas['CustomerSummary']
+export type CustomerFields = Omit<Schemas['CustomerCreate'], 'partyId' | 'partyVersion'>
+export type PartyMatch = Schemas['PartyMatch']

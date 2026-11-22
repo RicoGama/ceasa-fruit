@@ -24,8 +24,12 @@ type Querier interface {
 	CountAccessLog(ctx context.Context, arg CountAccessLogParams) (int64, error)
 	// Usada para impedir que o sistema fique sem nenhum administrador ativo.
 	CountActiveAdmins(ctx context.Context) (int64, error)
+	CountCustomers(ctx context.Context, arg CountCustomersParams) (int64, error)
 	CountProducts(ctx context.Context, arg CountProductsParams) (int64, error)
 	CountSuppliers(ctx context.Context, arg CountSuppliersParams) (int64, error)
+	// Clientes. A pessoa (parties, party_contacts) usa as consultas de
+	// suppliers.sql: CreateParty, UpdateParty, ClaimPartyVersion...
+	CreateCustomer(ctx context.Context, arg CreateCustomerParams) error
 	// Tentativa de login que falhou: já nasce encerrada, com o motivo.
 	CreateFailedLoginLog(ctx context.Context, arg CreateFailedLoginLogParams) error
 	// @nome é atalho do sqlc para sqlc.arg('nome'); sqlc.narg = pode ser NULL.
@@ -43,6 +47,7 @@ type Querier interface {
 	CreateSupplierProduct(ctx context.Context, arg CreateSupplierProductParams) error
 	// Queries de autenticação e senha.
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeactivateCustomer(ctx context.Context, partyID int64) (int64, error)
 	// Inativa (não apaga: estoque e vendas vão apontar para o produto) e muda a
 	// versão, para quem estiver com a tela aberta não reativar sem perceber.
 	DeactivateProduct(ctx context.Context, id int64) (int64, error)
@@ -63,6 +68,10 @@ type Querier interface {
 	EnsureCompany(ctx context.Context, name string) error
 	// Empresa desta instalação (um registro só, id = 1).
 	GetCompany(ctx context.Context) (GetCompanyRow, error)
+	GetCustomer(ctx context.Context, id int64) (GetCustomerRow, error)
+	// Pessoa pelo CPF/CNPJ, com os papéis que ela já tem. Usado ao cadastrar um
+	// cliente que já é fornecedor (ou o contrário): aproveita o mesmo cadastro.
+	GetPartyByDocument(ctx context.Context, document *string) (GetPartyByDocumentRow, error)
 	GetProduct(ctx context.Context, id int64) (Product, error)
 	GetRole(ctx context.Context, id int64) (GetRoleRow, error)
 	GetRoleIDByKey(ctx context.Context, key *string) (int64, error)
@@ -79,6 +88,7 @@ type Querier interface {
 	InvalidatePasswordResetTokens(ctx context.Context, userID int64) error
 	// session_open: a sessão ainda existe e não venceu (para "online" e "expirou").
 	ListAccessLog(ctx context.Context, arg ListAccessLogParams) ([]ListAccessLogRow, error)
+	ListCustomers(ctx context.Context, arg ListCustomersParams) ([]ListCustomersRow, error)
 	ListPartyContacts(ctx context.Context, partyID int64) ([]PartyContact, error)
 	ListProductPackagings(ctx context.Context, productID int64) ([]ProductPackaging, error)
 	// Quem fornece este produto (preferidos primeiro).
@@ -113,6 +123,7 @@ type Querier interface {
 	TouchSessionLog(ctx context.Context, id int64) error
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (int64, error)
+	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (int64, error)
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (int64, error)
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (int64, error)

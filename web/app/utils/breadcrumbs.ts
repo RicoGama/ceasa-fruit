@@ -16,6 +16,7 @@ const registries: Crumb = { label: 'Cadastros' }
 const admin: Crumb = { label: 'Administração' }
 const suppliers: Crumb = { label: 'Fornecedores', to: '/app/suppliers' }
 const products: Crumb = { label: 'Produtos', to: '/app/products' }
+const customers: Crumb = { label: 'Clientes', to: '/app/customers' }
 const roles: Crumb = { label: 'Papéis e permissões', to: '/app/settings/roles' }
 
 const rules: [RegExp, Crumb[]][] = [
@@ -23,6 +24,9 @@ const rules: [RegExp, Crumb[]][] = [
   [/^\/app\/suppliers\/?$/, [home, registries, { label: 'Fornecedores' }]],
   [/^\/app\/suppliers\/new$/, [home, registries, suppliers, { label: 'Novo fornecedor' }]],
   [/^\/app\/suppliers\/[^/]+$/, [home, registries, suppliers, { label: 'Fornecedor' }]],
+  [/^\/app\/customers\/?$/, [home, registries, { label: 'Clientes' }]],
+  [/^\/app\/customers\/new$/, [home, registries, customers, { label: 'Novo cliente' }]],
+  [/^\/app\/customers\/[^/]+$/, [home, registries, customers, { label: 'Cliente' }]],
   [/^\/app\/products\/?$/, [home, registries, { label: 'Produtos' }]],
   [/^\/app\/products\/new$/, [home, registries, products, { label: 'Novo produto' }]],
   [/^\/app\/products\/[^/]+$/, [home, registries, products, { label: 'Produto' }]],

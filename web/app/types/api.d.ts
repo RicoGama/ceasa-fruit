@@ -147,6 +147,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List customers */
+        get: operations["list-customers"];
+        put?: never;
+        /**
+         * Create a customer
+         * @description Send partyId + partyVersion to turn an existing person (e.g. a supplier with the same CNPJ) into a customer.
+         */
+        post: operations["create-customer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a customer */
+        get: operations["get-customer"];
+        /** Update a customer */
+        put: operations["update-customer"];
+        post?: never;
+        /**
+         * Deactivate a customer
+         * @description Soft delete: the customer is marked inactive, never removed, to preserve history.
+         */
+        delete: operations["deactivate-customer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/parties/by-document/{document}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find a person by CPF/CNPJ
+         * @description Used before registering a supplier or customer: if the person already exists, the screen offers to reuse it.
+         */
+        get: operations["get-party-by-document"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products": {
         parameters: {
             query?: never;
@@ -532,8 +595,173 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
             role: components["schemas"]["RoleName"];
+        };
+        Customer: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Customer.json
+             */
+            readonly $schema?: string;
+            address: components["schemas"]["Address"];
+            alsoSupplier: boolean;
+            blockedReason: string | null;
+            ceasaBox: string | null;
+            ceasaPavilion: string | null;
+            contacts: components["schemas"]["Contact"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** @enum {string} */
+            customerType: "retailer" | "supermarket" | "restaurant" | "street_vendor" | "wholesaler" | "institutional" | "consumer" | "other";
+            document: string | null;
+            email: string | null;
+            /** Format: int64 */
+            id: number;
+            legalName: string;
+            notes: string | null;
+            payment: components["schemas"]["Payment"];
+            /** @enum {string} */
+            personType: "individual" | "company";
+            phone: string | null;
+            stateRegistration: string | null;
+            /** @enum {string} */
+            status: "active" | "inactive" | "blocked";
+            /** @enum {string} */
+            taxpayerType: "taxpayer" | "exempt" | "non_taxpayer";
+            tradeName: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: int32 */
+            version: number;
+            whatsapp: string | null;
+        };
+        CustomerCreate: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CustomerCreate.json
+             */
+            readonly $schema?: string;
+            address?: components["schemas"]["AddressInput"];
+            blockedReason?: string;
+            ceasaBox?: string;
+            ceasaPavilion?: string;
+            contacts?: components["schemas"]["ContactInput"][];
+            /**
+             * @default retailer
+             * @enum {string}
+             */
+            customerType: "retailer" | "supermarket" | "restaurant" | "street_vendor" | "wholesaler" | "institutional" | "consumer" | "other";
+            /** @description CPF or CNPJ, with or without mask */
+            document?: string;
+            /** Format: email */
+            email?: string;
+            /** @description Company name (razão social) or full name */
+            legalName: string;
+            notes?: string;
+            /**
+             * Format: int64
+             * @description Reuse this person (same CPF/CNPJ already registered as supplier or customer)
+             */
+            partyId?: number;
+            /**
+             * Format: int32
+             * @description Version of the reused person, as read; 409 if someone saved in between
+             */
+            partyVersion?: number;
+            payment?: components["schemas"]["PaymentInput"];
+            /**
+             * @description individual = CPF, company = CNPJ
+             * @enum {string}
+             */
+            personType: "individual" | "company";
+            phone?: string;
+            stateRegistration?: string;
+            /**
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "inactive" | "blocked";
+            /**
+             * @default non_taxpayer
+             * @enum {string}
+             */
+            taxpayerType: "taxpayer" | "exempt" | "non_taxpayer";
+            /** @description Trade name or nickname */
+            tradeName?: string;
+            whatsapp?: string;
+        };
+        CustomerSummary: {
+            alsoSupplier: boolean;
+            ceasaBox: string | null;
+            ceasaPavilion: string | null;
+            city: components["schemas"]["City"];
+            /** @enum {string} */
+            customerType: "retailer" | "supermarket" | "restaurant" | "street_vendor" | "wholesaler" | "institutional" | "consumer" | "other";
+            document: string | null;
+            /** Format: int64 */
+            id: number;
+            legalName: string;
+            /** @enum {string} */
+            personType: "individual" | "company";
+            phone: string | null;
+            /** @enum {string} */
+            status: "active" | "inactive" | "blocked";
+            tradeName: string | null;
+            whatsapp: string | null;
+        };
+        CustomerUpdate: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CustomerUpdate.json
+             */
+            readonly $schema?: string;
+            address?: components["schemas"]["AddressInput"];
+            blockedReason?: string;
+            ceasaBox?: string;
+            ceasaPavilion?: string;
+            contacts?: components["schemas"]["ContactInput"][];
+            /**
+             * @default retailer
+             * @enum {string}
+             */
+            customerType: "retailer" | "supermarket" | "restaurant" | "street_vendor" | "wholesaler" | "institutional" | "consumer" | "other";
+            /** @description CPF or CNPJ, with or without mask */
+            document?: string;
+            /** Format: email */
+            email?: string;
+            /** @description Company name (razão social) or full name */
+            legalName: string;
+            notes?: string;
+            payment?: components["schemas"]["PaymentInput"];
+            /**
+             * @description individual = CPF, company = CNPJ
+             * @enum {string}
+             */
+            personType: "individual" | "company";
+            phone?: string;
+            stateRegistration?: string;
+            /**
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "inactive" | "blocked";
+            /**
+             * @default non_taxpayer
+             * @enum {string}
+             */
+            taxpayerType: "taxpayer" | "exempt" | "non_taxpayer";
+            /** @description Trade name or nickname */
+            tradeName?: string;
+            /**
+             * Format: int32
+             * @description The version read; 409 if someone saved in between
+             */
+            version: number;
+            whatsapp?: string;
         };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
@@ -590,6 +818,21 @@ export interface components {
              */
             readonly $schema?: string;
             email: string;
+        };
+        ListCustomersOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListCustomersOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["CustomerSummary"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
         };
         ListOutputBody: {
             /**
@@ -706,6 +949,35 @@ export interface components {
              * @example 12.5
              */
             quantity?: string;
+        };
+        PartyMatch: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PartyMatch.json
+             */
+            readonly $schema?: string;
+            address: components["schemas"]["Address"];
+            contacts: components["schemas"]["Contact"][];
+            document: string | null;
+            email: string | null;
+            /** Format: int64 */
+            id: number;
+            isCustomer: boolean;
+            isSupplier: boolean;
+            legalName: string;
+            notes: string | null;
+            payment: components["schemas"]["Payment"];
+            /** @enum {string} */
+            personType: "individual" | "company";
+            phone: string | null;
+            stateRegistration: string | null;
+            /** @enum {string} */
+            taxpayerType: "taxpayer" | "exempt" | "non_taxpayer";
+            tradeName: string | null;
+            /** Format: int32 */
+            version: number;
+            whatsapp: string | null;
         };
         Payment: {
             bank: string | null;
@@ -933,7 +1205,7 @@ export interface components {
             isAdmin: boolean;
             name: string;
             /** @description For the admin role, the whole catalog */
-            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
             /** Format: date-time */
             updatedAt: string;
             /** Format: int32 */
@@ -948,7 +1220,7 @@ export interface components {
             readonly $schema?: string;
             description?: string;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
         };
         RoleName: {
             /** Format: int64 */
@@ -966,7 +1238,7 @@ export interface components {
             readonly $schema?: string;
             description?: string;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
             /**
              * Format: int32
              * @description The version read; 409 if someone saved in between
@@ -981,6 +1253,7 @@ export interface components {
              */
             readonly $schema?: string;
             address: components["schemas"]["Address"];
+            alsoCustomer: boolean;
             blockedReason: string | null;
             ceasaBox: string | null;
             ceasaPavilion: string | null;
@@ -1020,11 +1293,11 @@ export interface components {
             version: number;
             whatsapp: string | null;
         };
-        SupplierFields: {
+        SupplierCreate: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/SupplierFields.json
+             * @example https://example.com/schemas/SupplierCreate.json
              */
             readonly $schema?: string;
             address?: components["schemas"]["AddressInput"];
@@ -1050,6 +1323,16 @@ export interface components {
             /** @description Company name (razão social) or full name */
             legalName: string;
             notes?: string;
+            /**
+             * Format: int64
+             * @description Reuse this person (same CPF/CNPJ already registered as supplier or customer)
+             */
+            partyId?: number;
+            /**
+             * Format: int32
+             * @description Version of the reused person, as read; 409 if someone saved in between
+             */
+            partyVersion?: number;
             payment?: components["schemas"]["PaymentInput"];
             /**
              * Format: int32
@@ -1122,6 +1405,7 @@ export interface components {
             stockUnit: "box" | "kg" | "unit" | "dozen" | "bag" | "bunch" | "tray" | "pack";
         };
         SupplierSummary: {
+            alsoCustomer: boolean;
             city: components["schemas"]["City"];
             /** @enum {string} */
             defaultPurchaseMode: "direct" | "consignment";
@@ -1608,6 +1892,202 @@ export interface operations {
             };
         };
     };
+    "list-customers": {
+        parameters: {
+            query?: {
+                /** @description Name or nickname (contains, accent-insensitive) or document (prefix) */
+                search?: string;
+                status?: "active" | "inactive" | "blocked" | "all";
+                customerType?: "retailer" | "supermarket" | "restaurant" | "street_vendor" | "wholesaler" | "institutional" | "consumer" | "other" | "all";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCustomersOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "create-customer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-customer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "update-customer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "deactivate-customer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-party-by-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description CPF or CNPJ, with or without mask */
+                document: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartyMatch"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-products": {
         parameters: {
             query?: {
@@ -2006,7 +2486,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SupplierFields"];
+                "application/json": components["schemas"]["SupplierCreate"];
             };
         };
         responses: {

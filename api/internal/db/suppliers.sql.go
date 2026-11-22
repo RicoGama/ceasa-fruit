@@ -242,10 +242,72 @@ func (q *Queries) DeletePartyContacts(ctx context.Context, partyID int64) error 
 	return err
 }
 
+const getPartyByDocument = `-- name: GetPartyByDocument :one
+SELECT p.id, p.person_type, p.document, p.legal_name, p.trade_name, p.state_registration, p.taxpayer_type, p.email, p.phone, p.whatsapp, p.postal_code, p.street, p.number, p.complement, p.district, p.city_id, p.pix_key_type, p.pix_key, p.bank, p.bank_branch, p.bank_account, p.bank_account_type, p.bank_account_holder, p.bank_account_holder_document, p.notes, p.created_at, p.updated_at, p.version,
+       c.name       AS city_name,
+       c.state_code AS city_state,
+       EXISTS (SELECT 1 FROM suppliers su WHERE su.party_id = p.id) AS is_supplier,
+       EXISTS (SELECT 1 FROM customers cu WHERE cu.party_id = p.id) AS is_customer
+FROM parties p
+LEFT JOIN cities c ON c.id = p.city_id
+WHERE p.document = $1
+`
+
+type GetPartyByDocumentRow struct {
+	Party      Party
+	CityName   *string
+	CityState  *string
+	IsSupplier bool
+	IsCustomer bool
+}
+
+// Pessoa pelo CPF/CNPJ, com os papéis que ela já tem. Usado ao cadastrar um
+// cliente que já é fornecedor (ou o contrário): aproveita o mesmo cadastro.
+func (q *Queries) GetPartyByDocument(ctx context.Context, document *string) (GetPartyByDocumentRow, error) {
+	row := q.db.QueryRow(ctx, getPartyByDocument, document)
+	var i GetPartyByDocumentRow
+	err := row.Scan(
+		&i.Party.ID,
+		&i.Party.PersonType,
+		&i.Party.Document,
+		&i.Party.LegalName,
+		&i.Party.TradeName,
+		&i.Party.StateRegistration,
+		&i.Party.TaxpayerType,
+		&i.Party.Email,
+		&i.Party.Phone,
+		&i.Party.Whatsapp,
+		&i.Party.PostalCode,
+		&i.Party.Street,
+		&i.Party.Number,
+		&i.Party.Complement,
+		&i.Party.District,
+		&i.Party.CityID,
+		&i.Party.PixKeyType,
+		&i.Party.PixKey,
+		&i.Party.Bank,
+		&i.Party.BankBranch,
+		&i.Party.BankAccount,
+		&i.Party.BankAccountType,
+		&i.Party.BankAccountHolder,
+		&i.Party.BankAccountHolderDocument,
+		&i.Party.Notes,
+		&i.Party.CreatedAt,
+		&i.Party.UpdatedAt,
+		&i.Party.Version,
+		&i.CityName,
+		&i.CityState,
+		&i.IsSupplier,
+		&i.IsCustomer,
+	)
+	return i, err
+}
+
 const getSupplier = `-- name: GetSupplier :one
 SELECT p.id, p.person_type, p.document, p.legal_name, p.trade_name, p.state_registration, p.taxpayer_type, p.email, p.phone, p.whatsapp, p.postal_code, p.street, p.number, p.complement, p.district, p.city_id, p.pix_key_type, p.pix_key, p.bank, p.bank_branch, p.bank_account, p.bank_account_type, p.bank_account_holder, p.bank_account_holder_document, p.notes, p.created_at, p.updated_at, p.version, s.party_id, s.supplier_type, s.default_purchase_mode, s.consignment_commission, s.payment_term_days, s.ceasa_pavilion, s.ceasa_box, s.status, s.blocked_reason, s.created_at, s.updated_at,
        c.name       AS city_name,
-       c.state_code AS city_state
+       c.state_code AS city_state,
+       EXISTS (SELECT 1 FROM customers cu WHERE cu.party_id = s.party_id) AS is_customer
 FROM suppliers s
 JOIN parties p ON p.id = s.party_id
 LEFT JOIN cities c ON c.id = p.city_id
@@ -253,10 +315,11 @@ WHERE s.party_id = $1
 `
 
 type GetSupplierRow struct {
-	Party     Party
-	Supplier  Supplier
-	CityName  *string
-	CityState *string
+	Party      Party
+	Supplier   Supplier
+	CityName   *string
+	CityState  *string
+	IsCustomer bool
 }
 
 // sqlc.embed devolve as colunas de cada tabela agrupadas (row.Party, row.Supplier).
@@ -305,6 +368,7 @@ func (q *Queries) GetSupplier(ctx context.Context, id int64) (GetSupplierRow, er
 		&i.Supplier.UpdatedAt,
 		&i.CityName,
 		&i.CityState,
+		&i.IsCustomer,
 	)
 	return i, err
 }
@@ -347,7 +411,8 @@ func (q *Queries) ListPartyContacts(ctx context.Context, partyID int64) ([]Party
 const listSuppliers = `-- name: ListSuppliers :many
 SELECT s.party_id, p.person_type, p.document, p.legal_name, p.trade_name,
        p.phone, p.whatsapp, c.name AS city_name, c.state_code AS city_state,
-       s.supplier_type, s.default_purchase_mode, s.status
+       s.supplier_type, s.default_purchase_mode, s.status,
+       EXISTS (SELECT 1 FROM customers cu WHERE cu.party_id = s.party_id) AS is_customer
 FROM suppliers s
 JOIN parties p ON p.id = s.party_id
 LEFT JOIN cities c ON c.id = p.city_id
@@ -384,6 +449,7 @@ type ListSuppliersRow struct {
 	SupplierType        string
 	DefaultPurchaseMode string
 	Status              string
+	IsCustomer          bool
 }
 
 func (q *Queries) ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]ListSuppliersRow, error) {
@@ -414,6 +480,7 @@ func (q *Queries) ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([
 			&i.SupplierType,
 			&i.DefaultPurchaseMode,
 			&i.Status,
+			&i.IsCustomer,
 		); err != nil {
 			return nil, err
 		}

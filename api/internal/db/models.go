@@ -50,6 +50,17 @@ type Company struct {
 	Version           int32
 }
 
+type Customer struct {
+	PartyID       int64
+	CustomerType  string
+	CeasaPavilion *string
+	CeasaBox      *string
+	Status        string
+	BlockedReason *string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
 type Party struct {
 	ID                        int64
 	PersonType                string

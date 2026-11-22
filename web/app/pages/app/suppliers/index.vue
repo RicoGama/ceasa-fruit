@@ -150,8 +150,9 @@ async function deactivate() {
       >
         <template #legalName-cell="{ row }">
           <NuxtLink :to="`/app/suppliers/${row.original.id}`" class="block group">
-            <p class="font-medium text-highlighted group-hover:text-primary">
+            <p class="flex flex-wrap items-center gap-x-2 font-medium text-highlighted group-hover:text-primary">
               {{ displayName(row.original) }}
+              <UBadge v-if="row.original.alsoCustomer" label="também cliente" color="neutral" variant="outline" size="sm" />
             </p>
             <p v-if="row.original.tradeName" class="text-xs text-muted">
               {{ row.original.legalName }}

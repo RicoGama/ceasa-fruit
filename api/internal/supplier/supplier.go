@@ -34,10 +34,7 @@ import (
 // ("aceite interfaces, retorne structs"): *db.Queries satisfaz essa interface
 // em produção, e os testes podem passar uma implementação falsa.
 type Store interface {
-	party.ContactStore
-	CreateParty(ctx context.Context, arg db.CreatePartyParams) (int64, error)
-	UpdateParty(ctx context.Context, arg db.UpdatePartyParams) (int64, error)
-	ClaimPartyVersion(ctx context.Context, arg db.ClaimPartyVersionParams) (int64, error)
+	party.Store
 	BumpPartyVersion(ctx context.Context, id int64) error
 	CreateSupplier(ctx context.Context, arg db.CreateSupplierParams) error
 	UpdateSupplier(ctx context.Context, arg db.UpdateSupplierParams) (int64, error)
@@ -118,6 +115,9 @@ type Supplier struct {
 	CeasaBox              *string        `json:"ceasaBox"`
 	Status                string         `json:"status" enum:"active,inactive,blocked"`
 	BlockedReason         *string        `json:"blockedReason"`
+	// O mesmo cadastro também é cliente: mudar nome, endereço ou contatos
+	// aqui muda lá também.
+	AlsoCustomer bool `json:"alsoCustomer"`
 	party.Timestamps
 }
 
@@ -134,6 +134,7 @@ type SupplierSummary struct {
 	SupplierType        string      `json:"supplierType" enum:"producer,wholesaler,cooperative,importer,other"`
 	DefaultPurchaseMode string      `json:"defaultPurchaseMode" enum:"direct,consignment"`
 	Status              string      `json:"status" enum:"active,inactive,blocked"`
+	AlsoCustomer        bool        `json:"alsoCustomer"`
 }
 
 // --- Entradas e saídas de cada operação --------------------------------------
@@ -164,14 +165,21 @@ type supplierOutput struct {
 	Body Supplier
 }
 
+// SupplierCreate são os campos editáveis + (opcional) a pessoa já cadastrada
+// que vai virar fornecedor (ex.: um cliente com o mesmo CNPJ).
+type SupplierCreate struct {
+	SupplierFields
+	party.Existing
+}
+
 type createInput struct {
-	Body SupplierFields
+	Body SupplierCreate
 }
 
 // Resolve é chamado pelo Huma depois da validação das tags (implementa huma.Resolver).
 // O receiver ponteiro (*createInput) permite alterar a entrada no lugar.
 func (in *createInput) Resolve(huma.Context) []error {
-	return in.Body.normalize()
+	return append(in.Body.normalize(), in.Body.Existing.Validate()...)
 }
 
 // SupplierUpdate são os campos editáveis + a versão que a tela leu.
@@ -274,6 +282,7 @@ func (h *handler) list(ctx context.Context, in *listSuppliersInput) (*listSuppli
 			ID: r.PartyID, PersonType: r.PersonType, Document: r.Document, LegalName: r.LegalName,
 			TradeName: r.TradeName, Phone: r.Phone, Whatsapp: r.Whatsapp,
 			SupplierType: r.SupplierType, DefaultPurchaseMode: r.DefaultPurchaseMode, Status: r.Status,
+			AlsoCustomer: r.IsCustomer,
 		}
 		if r.CityName != nil && r.CityState != nil {
 			item.City = &party.City{Name: *r.CityName, State: *r.CityState}
@@ -304,7 +313,8 @@ func (h *handler) create(ctx context.Context, in *createInput) (*supplierOutput,
 	f := &in.Body
 	var out Supplier
 	err := h.tx(ctx, func(s Store) error {
-		partyID, err := s.CreateParty(ctx, f.CreateParams())
+		// Pessoa nova, ou a que já existe (mesmo CNPJ de um cliente).
+		partyID, err := party.Save(ctx, s, &f.Fields, f.Existing)
 		if err != nil {
 			return err
 		}
@@ -315,9 +325,6 @@ func (h *handler) create(ctx context.Context, in *createInput) (*supplierOutput,
 			Status: f.Status, BlockedReason: f.BlockedReason,
 		})
 		if err != nil {
-			return err
-		}
-		if err := party.SaveContacts(ctx, s, partyID, f.Contacts); err != nil {
 			return err
 		}
 		out, err = load(ctx, s, partyID)
@@ -423,6 +430,7 @@ func load(ctx context.Context, s Store, id int64) (Supplier, error) {
 		CeasaBox:              sup.CeasaBox,
 		Status:                sup.Status,
 		BlockedReason:         sup.BlockedReason,
+		AlsoCustomer:          row.IsCustomer,
 		Timestamps:            party.Timestamps{CreatedAt: sup.CreatedAt, UpdatedAt: sup.UpdatedAt},
 	}, nil
 }
@@ -442,6 +450,8 @@ func mapError(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch {
+		case pgErr.Code == uniqueViolation && pgErr.ConstraintName == "suppliers_pkey":
+			return huma.Error409Conflict("this person is already a supplier")
 		case pgErr.Code == uniqueViolation:
 			return huma.Error409Conflict("a registration with this document already exists")
 		case pgErr.Code == foreignKeyViolation && pgErr.ConstraintName == "parties_city_id_fkey":

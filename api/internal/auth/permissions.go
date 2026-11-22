@@ -21,6 +21,8 @@ type Permission string
 const (
 	SuppliersView Permission = "suppliers.view" // ver fornecedores
 	SuppliersEdit Permission = "suppliers.edit" // cadastrar, editar e inativar fornecedores
+	CustomersView Permission = "customers.view" // ver clientes
+	CustomersEdit Permission = "customers.edit" // cadastrar, editar e inativar clientes
 	ProductsView  Permission = "products.view"  // ver produtos
 	ProductsEdit  Permission = "products.edit"  // cadastrar, editar e inativar produtos
 	UsersManage   Permission = "users.manage"   // usuários, papéis e permissões
@@ -32,6 +34,7 @@ const (
 // All é o catálogo completo, na ordem em que aparece na tela.
 var All = []Permission{
 	SuppliersView, SuppliersEdit,
+	CustomersView, CustomersEdit,
 	ProductsView, ProductsEdit,
 	UsersManage, CompanyEdit, QueuesView, AuditView,
 }
@@ -40,6 +43,7 @@ var All = []Permission{
 // (não faz sentido editar fornecedor sem poder vê-lo).
 var Implies = map[Permission]Permission{
 	SuppliersEdit: SuppliersView,
+	CustomersEdit: CustomersView,
 	ProductsEdit:  ProductsView,
 }
 

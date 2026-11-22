@@ -68,7 +68,8 @@ WHERE party_id = @party_id;
 -- name: GetSupplier :one
 SELECT sqlc.embed(p), sqlc.embed(s),
        c.name       AS city_name,
-       c.state_code AS city_state
+       c.state_code AS city_state,
+       EXISTS (SELECT 1 FROM customers cu WHERE cu.party_id = s.party_id) AS is_customer
 FROM suppliers s
 JOIN parties p ON p.id = s.party_id
 LEFT JOIN cities c ON c.id = p.city_id
@@ -77,7 +78,8 @@ WHERE s.party_id = @id;
 -- name: ListSuppliers :many
 SELECT s.party_id, p.person_type, p.document, p.legal_name, p.trade_name,
        p.phone, p.whatsapp, c.name AS city_name, c.state_code AS city_state,
-       s.supplier_type, s.default_purchase_mode, s.status
+       s.supplier_type, s.default_purchase_mode, s.status,
+       EXISTS (SELECT 1 FROM customers cu WHERE cu.party_id = s.party_id) AS is_customer
 FROM suppliers s
 JOIN parties p ON p.id = s.party_id
 LEFT JOIN cities c ON c.id = p.city_id
@@ -122,3 +124,15 @@ WHERE party_id = @party_id;
 -- name: CreatePartyContact :exec
 INSERT INTO party_contacts (party_id, name, role, phone, is_whatsapp, email, position)
 VALUES (@party_id, @name, @role, @phone, @is_whatsapp, @email, @position);
+
+-- Pessoa pelo CPF/CNPJ, com os papéis que ela já tem. Usado ao cadastrar um
+-- cliente que já é fornecedor (ou o contrário): aproveita o mesmo cadastro.
+-- name: GetPartyByDocument :one
+SELECT sqlc.embed(p),
+       c.name       AS city_name,
+       c.state_code AS city_state,
+       EXISTS (SELECT 1 FROM suppliers su WHERE su.party_id = p.id) AS is_supplier,
+       EXISTS (SELECT 1 FROM customers cu WHERE cu.party_id = p.id) AS is_customer
+FROM parties p
+LEFT JOIN cities c ON c.id = p.city_id
+WHERE p.document = @document;

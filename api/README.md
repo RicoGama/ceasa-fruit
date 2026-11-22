@@ -24,6 +24,7 @@ na ordem abaixo; os comentários no código explicam cada conceito.
 | 14 | `internal/party/party.go` | dados comuns de pessoa (endereço, contatos, PIX), normalização, structs aninhadas |
 | 15 | `internal/supplier/supplier.go` | Huma: struct tags, validação, interfaces, embedding, closures, transação com várias tabelas |
 | 15b | `internal/product/product.go` | cadastro com lista filha (embalagens): atualizar, criar e remover numa transação; papéis na rota |
+| 15a | `internal/customer/customer.go` + `internal/party/save.go` | o mesmo desenho do fornecedor; um papel novo em cima de uma pessoa que já existe (`party.Existing`) |
 | 15c | `internal/supplierproduct/supplierproduct.go` | relação muitos-para-muitos com dados na ligação, rotas aninhadas (`/suppliers/{id}/products`), permissão dupla (`Protect` duas vezes = E) |
 | 16 | `internal/city/city.go` | uma rota pequena de consulta (municípios do IBGE) |
 | 17 | `internal/company/company.go` | registro único (singleton), `Resolve()` para validar, erro de chave estrangeira |
@@ -58,7 +59,7 @@ não existe "organização" nas tabelas: o banco inteiro é de uma empresa só.
 | Produto | `products` | nome + variedade + classificação, unidade de estoque, peso médio, NCM |
 | Embalagem | `product_packagings` | pilha, pallet, caixa de 30: quantas unidades cabem (vazio = varia) |
 | Fornecedor × produto | `supplier_products` | o que cada fornecedor traz: nome na nota dele, safra (meses), modalidade própria, preferencial |
-| Cliente | `customers` | *(próximo passo: outro papel da mesma pessoa)* |
+| Cliente | `customers` | papel "cliente" de uma pessoa (tipo, box na CEASA, situação) |
 | Municípios/UFs | `cities`, `states` | lista oficial do IBGE |
 
 ### Papéis e permissões
@@ -69,6 +70,7 @@ não existe "organização" nas tabelas: o banco inteiro é de uma empresa só.
   | Permissão | O que libera |
   |---|---|
   | `suppliers.view` / `suppliers.edit` | ver / cadastrar, editar e inativar fornecedores |
+  | `customers.view` / `customers.edit` | ver / cadastrar, editar e inativar clientes |
   | `products.view` / `products.edit` | ver / cadastrar, editar e inativar produtos |
   | `users.manage` | usuários, papéis e permissões |
   | `company.edit` | alterar os dados da empresa |
@@ -334,6 +336,15 @@ make help
 
 - **Cadastro único de pessoas** (`parties`): na CEASA o mesmo CNPJ costuma ser
   fornecedor e cliente. Os dados comuns ficam uma vez só; cada papel tem sua tabela.
+  - Ao cadastrar, a tela consulta `GET /parties/by-document/{doc}`; se o CPF/CNPJ
+    já existe, oferece "usar este cadastro" e manda `partyId` + `partyVersion`
+    no `POST /customers` (ou `/suppliers`). A versão evita sobrescrever quem
+    editou a pessoa no meio tempo (409).
+  - Editar nome, endereço ou contatos pelo cliente muda o fornecedor também (é
+    a mesma linha). O gatilho `notify_party_change` (migration `00011`) avisa as
+    duas telas em tempo real. Inativar o cliente **não** inativa o fornecedor.
+  - Quem pode cadastrar fornecedor **ou** cliente pode consultar o documento, e
+    vê os dados da pessoa (inclusive banco/PIX): é o mesmo cadastro.
 - **Município pelo código IBGE** (`cities.id`): é o código que a nota fiscal exige.
   A lista vem da migration `00001`, gerada por `scripts/gen-cities-migration.py`.
 - **Consignação ou compra direta** por fornecedor (padrão), com comissão em %

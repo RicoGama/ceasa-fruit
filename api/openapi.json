@@ -542,6 +542,8 @@
               "enum": [
                 "suppliers.view",
                 "suppliers.edit",
+                "customers.view",
+                "customers.edit",
                 "products.view",
                 "products.edit",
                 "users.manage",
@@ -563,6 +565,535 @@
           "email",
           "role",
           "permissions"
+        ],
+        "type": "object"
+      },
+      "Customer": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/Customer.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "alsoSupplier": {
+            "type": "boolean"
+          },
+          "blockedReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ceasaBox": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ceasaPavilion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/Contact"
+            },
+            "type": "array"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "customerType": {
+            "enum": [
+              "retailer",
+              "supermarket",
+              "restaurant",
+              "street_vendor",
+              "wholesaler",
+              "institutional",
+              "consumer",
+              "other"
+            ],
+            "type": "string"
+          },
+          "document": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payment": {
+            "$ref": "#/components/schemas/Payment"
+          },
+          "personType": {
+            "enum": [
+              "individual",
+              "company"
+            ],
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stateRegistration": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "active",
+              "inactive",
+              "blocked"
+            ],
+            "type": "string"
+          },
+          "taxpayerType": {
+            "enum": [
+              "taxpayer",
+              "exempt",
+              "non_taxpayer"
+            ],
+            "type": "string"
+          },
+          "tradeName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "whatsapp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "customerType",
+          "ceasaPavilion",
+          "ceasaBox",
+          "status",
+          "blockedReason",
+          "alsoSupplier",
+          "personType",
+          "document",
+          "legalName",
+          "tradeName",
+          "stateRegistration",
+          "taxpayerType",
+          "email",
+          "phone",
+          "whatsapp",
+          "address",
+          "payment",
+          "contacts",
+          "version",
+          "notes",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "CustomerCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/CustomerCreate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "address": {
+            "$ref": "#/components/schemas/AddressInput"
+          },
+          "blockedReason": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "ceasaBox": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "ceasaPavilion": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/ContactInput"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "customerType": {
+            "default": "retailer",
+            "enum": [
+              "retailer",
+              "supermarket",
+              "restaurant",
+              "street_vendor",
+              "wholesaler",
+              "institutional",
+              "consumer",
+              "other"
+            ],
+            "type": "string"
+          },
+          "document": {
+            "description": "CPF or CNPJ, with or without mask",
+            "maxLength": 18,
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "maxLength": 150,
+            "type": "string"
+          },
+          "legalName": {
+            "description": "Company name (razão social) or full name",
+            "maxLength": 150,
+            "minLength": 2,
+            "type": "string"
+          },
+          "notes": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "partyId": {
+            "description": "Reuse this person (same CPF/CNPJ already registered as supplier or customer)",
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "partyVersion": {
+            "description": "Version of the reused person, as read; 409 if someone saved in between",
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentInput"
+          },
+          "personType": {
+            "description": "individual = CPF, company = CNPJ",
+            "enum": [
+              "individual",
+              "company"
+            ],
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 20,
+            "type": "string"
+          },
+          "stateRegistration": {
+            "maxLength": 20,
+            "type": "string"
+          },
+          "status": {
+            "default": "active",
+            "enum": [
+              "active",
+              "inactive",
+              "blocked"
+            ],
+            "type": "string"
+          },
+          "taxpayerType": {
+            "default": "non_taxpayer",
+            "enum": [
+              "taxpayer",
+              "exempt",
+              "non_taxpayer"
+            ],
+            "type": "string"
+          },
+          "tradeName": {
+            "description": "Trade name or nickname",
+            "maxLength": 150,
+            "type": "string"
+          },
+          "whatsapp": {
+            "maxLength": 20,
+            "type": "string"
+          }
+        },
+        "required": [
+          "personType",
+          "legalName"
+        ],
+        "type": "object"
+      },
+      "CustomerSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "alsoSupplier": {
+            "type": "boolean"
+          },
+          "ceasaBox": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ceasaPavilion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city": {
+            "$ref": "#/components/schemas/City"
+          },
+          "customerType": {
+            "enum": [
+              "retailer",
+              "supermarket",
+              "restaurant",
+              "street_vendor",
+              "wholesaler",
+              "institutional",
+              "consumer",
+              "other"
+            ],
+            "type": "string"
+          },
+          "document": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "personType": {
+            "enum": [
+              "individual",
+              "company"
+            ],
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "active",
+              "inactive",
+              "blocked"
+            ],
+            "type": "string"
+          },
+          "tradeName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "whatsapp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "personType",
+          "document",
+          "legalName",
+          "tradeName",
+          "phone",
+          "whatsapp",
+          "city",
+          "customerType",
+          "ceasaPavilion",
+          "ceasaBox",
+          "status",
+          "alsoSupplier"
+        ],
+        "type": "object"
+      },
+      "CustomerUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/CustomerUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "address": {
+            "$ref": "#/components/schemas/AddressInput"
+          },
+          "blockedReason": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "ceasaBox": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "ceasaPavilion": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/ContactInput"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "customerType": {
+            "default": "retailer",
+            "enum": [
+              "retailer",
+              "supermarket",
+              "restaurant",
+              "street_vendor",
+              "wholesaler",
+              "institutional",
+              "consumer",
+              "other"
+            ],
+            "type": "string"
+          },
+          "document": {
+            "description": "CPF or CNPJ, with or without mask",
+            "maxLength": 18,
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "maxLength": 150,
+            "type": "string"
+          },
+          "legalName": {
+            "description": "Company name (razão social) or full name",
+            "maxLength": 150,
+            "minLength": 2,
+            "type": "string"
+          },
+          "notes": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentInput"
+          },
+          "personType": {
+            "description": "individual = CPF, company = CNPJ",
+            "enum": [
+              "individual",
+              "company"
+            ],
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 20,
+            "type": "string"
+          },
+          "stateRegistration": {
+            "maxLength": 20,
+            "type": "string"
+          },
+          "status": {
+            "default": "active",
+            "enum": [
+              "active",
+              "inactive",
+              "blocked"
+            ],
+            "type": "string"
+          },
+          "taxpayerType": {
+            "default": "non_taxpayer",
+            "enum": [
+              "taxpayer",
+              "exempt",
+              "non_taxpayer"
+            ],
+            "type": "string"
+          },
+          "tradeName": {
+            "description": "Trade name or nickname",
+            "maxLength": 150,
+            "type": "string"
+          },
+          "version": {
+            "description": "The version read; 409 if someone saved in between",
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "whatsapp": {
+            "maxLength": 20,
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "personType",
+          "legalName"
         ],
         "type": "object"
       },
@@ -663,6 +1194,45 @@
         },
         "required": [
           "email"
+        ],
+        "type": "object"
+      },
+      "ListCustomersOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/ListCustomersOutputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerSummary"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "offset": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
         ],
         "type": "object"
       },
@@ -958,6 +1528,126 @@
         },
         "required": [
           "name"
+        ],
+        "type": "object"
+      },
+      "PartyMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/PartyMatch.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/Contact"
+            },
+            "type": "array"
+          },
+          "document": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "isCustomer": {
+            "type": "boolean"
+          },
+          "isSupplier": {
+            "type": "boolean"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payment": {
+            "$ref": "#/components/schemas/Payment"
+          },
+          "personType": {
+            "enum": [
+              "individual",
+              "company"
+            ],
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stateRegistration": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "taxpayerType": {
+            "enum": [
+              "taxpayer",
+              "exempt",
+              "non_taxpayer"
+            ],
+            "type": "string"
+          },
+          "tradeName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "whatsapp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "isSupplier",
+          "isCustomer",
+          "personType",
+          "document",
+          "legalName",
+          "tradeName",
+          "stateRegistration",
+          "taxpayerType",
+          "email",
+          "phone",
+          "whatsapp",
+          "address",
+          "payment",
+          "contacts",
+          "version",
+          "notes"
         ],
         "type": "object"
       },
@@ -1683,6 +2373,8 @@
               "enum": [
                 "suppliers.view",
                 "suppliers.edit",
+                "customers.view",
+                "customers.edit",
                 "products.view",
                 "products.edit",
                 "users.manage",
@@ -1742,6 +2434,8 @@
               "enum": [
                 "suppliers.view",
                 "suppliers.edit",
+                "customers.view",
+                "customers.edit",
                 "products.view",
                 "products.edit",
                 "users.manage",
@@ -1809,6 +2503,8 @@
               "enum": [
                 "suppliers.view",
                 "suppliers.edit",
+                "customers.view",
+                "customers.edit",
                 "products.view",
                 "products.edit",
                 "users.manage",
@@ -1849,6 +2545,9 @@
           },
           "address": {
             "$ref": "#/components/schemas/Address"
+          },
+          "alsoCustomer": {
+            "type": "boolean"
           },
           "blockedReason": {
             "type": [
@@ -2001,6 +2700,7 @@
           "ceasaBox",
           "status",
           "blockedReason",
+          "alsoCustomer",
           "personType",
           "document",
           "legalName",
@@ -2020,13 +2720,13 @@
         ],
         "type": "object"
       },
-      "SupplierFields": {
+      "SupplierCreate": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": [
-              "https://example.com/schemas/SupplierFields.json"
+              "https://example.com/schemas/SupplierCreate.json"
             ],
             "format": "uri",
             "readOnly": true,
@@ -2090,6 +2790,18 @@
           "notes": {
             "maxLength": 2000,
             "type": "string"
+          },
+          "partyId": {
+            "description": "Reuse this person (same CPF/CNPJ already registered as supplier or customer)",
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "partyVersion": {
+            "description": "Version of the reused person, as read; 409 if someone saved in between",
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
           },
           "payment": {
             "$ref": "#/components/schemas/PaymentInput"
@@ -2291,6 +3003,9 @@
       "SupplierSummary": {
         "additionalProperties": false,
         "properties": {
+          "alsoCustomer": {
+            "type": "boolean"
+          },
           "city": {
             "$ref": "#/components/schemas/City"
           },
@@ -2369,7 +3084,8 @@
           "city",
           "supplierType",
           "defaultPurchaseMode",
-          "status"
+          "status",
+          "alsoCustomer"
         ],
         "type": "object"
       },
@@ -3251,6 +3967,371 @@
         ]
       }
     },
+    "/customers": {
+      "get": {
+        "operationId": "list-customers",
+        "parameters": [
+          {
+            "description": "Name or nickname (contains, accent-insensitive) or document (prefix)",
+            "explode": false,
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "description": "Name or nickname (contains, accent-insensitive) or document (prefix)",
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "default": "active",
+              "enum": [
+                "active",
+                "inactive",
+                "blocked",
+                "all"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "customerType",
+            "schema": {
+              "default": "all",
+              "enum": [
+                "retailer",
+                "supermarket",
+                "restaurant",
+                "street_vendor",
+                "wholesaler",
+                "institutional",
+                "consumer",
+                "other",
+                "all"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCustomersOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "List customers",
+        "tags": [
+          "Customers"
+        ],
+        "x-permissions": [
+          "customers.view"
+        ]
+      },
+      "post": {
+        "description": "Send partyId + partyVersion to turn an existing person (e.g. a supplier with the same CNPJ) into a customer.",
+        "operationId": "create-customer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Create a customer",
+        "tags": [
+          "Customers"
+        ],
+        "x-permissions": [
+          "customers.edit"
+        ]
+      }
+    },
+    "/customers/{id}": {
+      "delete": {
+        "description": "Soft delete: the customer is marked inactive, never removed, to preserve history.",
+        "operationId": "deactivate-customer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Deactivate a customer",
+        "tags": [
+          "Customers"
+        ],
+        "x-permissions": [
+          "customers.edit"
+        ]
+      },
+      "get": {
+        "operationId": "get-customer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Get a customer",
+        "tags": [
+          "Customers"
+        ],
+        "x-permissions": [
+          "customers.view"
+        ]
+      },
+      "put": {
+        "operationId": "update-customer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Update a customer",
+        "tags": [
+          "Customers"
+        ],
+        "x-permissions": [
+          "customers.edit"
+        ]
+      }
+    },
+    "/parties/by-document/{document}": {
+      "get": {
+        "description": "Used before registering a supplier or customer: if the person already exists, the screen offers to reuse it.",
+        "operationId": "get-party-by-document",
+        "parameters": [
+          {
+            "description": "CPF or CNPJ, with or without mask",
+            "in": "path",
+            "name": "document",
+            "required": true,
+            "schema": {
+              "description": "CPF or CNPJ, with or without mask",
+              "maxLength": 18,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartyMatch"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Find a person by CPF/CNPJ",
+        "tags": [
+          "Parties"
+        ],
+        "x-permissions": [
+          "suppliers.edit",
+          "customers.edit"
+        ]
+      }
+    },
     "/products": {
       "get": {
         "operationId": "list-products",
@@ -3953,7 +5034,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SupplierFields"
+                "$ref": "#/components/schemas/SupplierCreate"
               }
             }
           },

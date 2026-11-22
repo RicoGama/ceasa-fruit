@@ -75,11 +75,24 @@ export const supplierTypeLabels = {
   other: 'Outro',
 } as const
 
+// Quem compra no box.
+export const customerTypeLabels = {
+  retailer: 'Varejão / sacolão / hortifrúti',
+  supermarket: 'Supermercado',
+  restaurant: 'Restaurante / lanchonete',
+  street_vendor: 'Feirante / ambulante',
+  wholesaler: 'Atacadista / outro box',
+  institutional: 'Instituição (escola, hospital...)',
+  consumer: 'Consumidor final',
+  other: 'Outro',
+} as const
+
 export const purchaseModeLabels = {
   direct: 'Compra direta',
   consignment: 'Consignação',
 } as const
 
+// Situação de fornecedor e de cliente (os mesmos três valores).
 export const supplierStatusLabels = {
   active: 'Ativo',
   inactive: 'Inativo',

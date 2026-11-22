@@ -23,6 +23,13 @@ export const permissionGroups = [
         ],
       },
       {
+        label: 'Clientes',
+        actions: [
+          { permission: 'customers.view', label: 'Ver' },
+          { permission: 'customers.edit', label: 'Cadastrar e editar' },
+        ],
+      },
+      {
         label: 'Produtos',
         actions: [
           { permission: 'products.view', label: 'Ver' },
@@ -69,6 +76,7 @@ export const permissionResources: readonly PermissionResource[] = (permissionGro
 // Igual à API (auth.Implies): quem edita também precisa ver.
 export const permissionImplies: Partial<Record<Permission, Permission>> = {
   'suppliers.edit': 'suppliers.view',
+  'customers.edit': 'customers.view',
   'products.edit': 'products.view',
 }
 

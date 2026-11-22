@@ -20,7 +20,9 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/city"
 	"github.com/RicoGama/ceasa-fruit/api/internal/company"
+	"github.com/RicoGama/ceasa-fruit/api/internal/customer"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/party"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/product"
 	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
@@ -189,6 +191,13 @@ func build(d Deps) (http.Handler, huma.API) {
 	}
 	supplier.Register(authed, inTx)
 	supplierproduct.Register(authed, database)
+	customer.Register(authed, func(ctx context.Context, fn func(customer.Store) error) error {
+		return database.InTx(ctx, func(tx postgres.Tx) error { return fn(tx) })
+	})
+	// "Este CNPJ já está cadastrado?": usado pelos cadastros de fornecedor e cliente.
+	party.RegisterLookup(authed, func(ctx context.Context, fn func(party.LookupStore) error) error {
+		return database.InReadTx(ctx, func(tx postgres.Tx) error { return fn(tx) })
+	})
 
 	return r, api
 }
