@@ -211,7 +211,18 @@ dos discos e no-break. Os mesmos itens geram os e-mails de aviso.
 | SEM ENERGIA no box | nada: o no-break segura e, se a bateria acabar, o servidor desliga sozinho com segurança |
 | Teste de restauração FALHOU | `sudo ceasa-restore-test` e leia a mensagem; os backups podem não estar servindo |
 
-## 8. Comandos
+## 8. Frota (rastreamento)
+
+As posições dos caminhões chegam por um Traccar na nuvem. Como montar, como
+ligar no servidor do box (`TRACCAR_URL` e `TRACCAR_TOKEN` em
+`/etc/ceasa-fruit/ceasa.env`) e como configurar os rastreadores:
+[traccar/LEIAME.md](traccar/LEIAME.md).
+
+Se as posições pararem de chegar por mais de 6 horas (internet do box fora
+muito tempo, token trocado, Traccar fora do ar), chega um e-mail. Nada se
+perde: quando a conexão volta, o box busca tudo o que faltou.
+
+## 9. Comandos
 
 | Comando | Para quê |
 |---|---|
@@ -230,7 +241,7 @@ Senha de um usuário esquecida, sem e-mail funcionando:
 sudo -u ceasa env $(sudo grep ^DATABASE_URL /etc/ceasa-fruit/ceasa.env) /opt/ceasa-fruit/current/bin/ceasa-set-password -email pessoa@empresa.com.br
 ```
 
-## 9. Onde fica cada coisa
+## 10. Onde fica cada coisa
 
 | Caminho | O que é |
 |---|---|

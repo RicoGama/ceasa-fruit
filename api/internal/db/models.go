@@ -61,6 +61,29 @@ type Customer struct {
 	UpdatedAt     time.Time
 }
 
+type Driver struct {
+	ID               int64
+	Name             string
+	Phone            *string
+	Document         *string
+	LicenseNumber    *string
+	LicenseCategory  *string
+	LicenseExpiresOn *time.Time
+	Active           bool
+	Notes            *string
+	Version          int32
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
+type FleetSync struct {
+	ID            int16
+	LastAttemptAt *time.Time
+	LastSuccessAt *time.Time
+	LastError     *string
+	LastErrorAt   *time.Time
+}
+
 type Party struct {
 	ID                        int64
 	PersonType                string
@@ -205,4 +228,45 @@ type User struct {
 	UpdatedAt    time.Time
 	Version      int32
 	RoleID       int64
+}
+
+type Vehicle struct {
+	ID                int64
+	Plate             string
+	Description       *string
+	Kind              string
+	CapacityKg        *int32
+	DriverID          *int64
+	TrackerImei       *string
+	Active            bool
+	Notes             *string
+	Version           int32
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	TraccarDeviceID   *int64
+	TraccarLastUpdate *time.Time
+	LastFixAt         *time.Time
+	LastLatitude      *float64
+	LastLongitude     *float64
+	LastSpeedKmh      *float32
+	LastCourse        *int16
+	LastIgnition      *bool
+	LastMotion        *bool
+}
+
+type VehiclePosition struct {
+	ID                int64
+	VehicleID         int64
+	TraccarPositionID int64
+	FixAt             time.Time
+	ServerAt          *time.Time
+	Latitude          float64
+	Longitude         float64
+	SpeedKmh          *float32
+	Course            *int16
+	Altitude          *float32
+	Ignition          *bool
+	Motion            *bool
+	Valid             *bool
+	Attributes        []byte
 }

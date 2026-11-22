@@ -108,6 +108,12 @@ SMTP_TLS=starttls
 SMTP_USERNAME=
 SMTP_PASSWORD=
 SMTP_FROM=CEASA Fruit <nao-responda@exemplo.com.br>
+
+# Rastreamento da frota: endereço e token do Traccar na nuvem
+# (deploy/traccar/LEIAME.md). Vazio = frota só como cadastro, sem mapa ao vivo.
+TRACCAR_URL=
+TRACCAR_TOKEN=
+FLEET_RETENTION_DAYS=180
 ENV
   umask 022
 fi
@@ -151,6 +157,8 @@ ALERT_BACKUP_LOCAL_HOURS=12
 ALERT_BACKUP_USB_HOURS=36
 ALERT_BACKUP_REMOTE_HOURS=72
 ALERT_DISK_PERCENT=85
+# Rastreamento: avisar se as posições pararam de chegar por mais de (horas).
+ALERT_FLEET_HOURS=6
 
 # No-break ligado no USB do servidor (install.sh --ups muda para yes).
 UPS_ENABLED=no

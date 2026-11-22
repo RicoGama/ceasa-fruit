@@ -20,6 +20,16 @@ const commercialLinks: NavigationMenuItem[] = [
   { label: 'Diagnóstico operacional', icon: 'i-lucide-clipboard-check', ...soon },
 ]
 
+// Frota: o mapa e os cadastros que só fazem sentido para quem vê a frota.
+const fleetLinks = computed<NavigationMenuItem[]>(() => auth.can('fleet.view')
+  ? [
+      { label: 'Frota', type: 'label' },
+      { label: 'Mapa da frota', icon: 'i-lucide-map', to: '/app/fleet', exact: true },
+      { label: 'Veículos', icon: 'i-lucide-car-front', to: '/app/fleet/vehicles' },
+      { label: 'Motoristas', icon: 'i-lucide-id-card', to: '/app/fleet/drivers' },
+    ]
+  : [])
+
 // Cada item só aparece para quem tem a permissão (computed: muda sozinho se
 // o papel da pessoa mudar).
 const registryLinks = computed<NavigationMenuItem[]>(() => [
@@ -99,6 +109,7 @@ const menuUi = {
       <template #default="{ collapsed }">
         <UNavigationMenu :collapsed="collapsed" :items="commercialLinks" orientation="vertical" tooltip popover :ui="menuUi" />
         <UNavigationMenu :collapsed="collapsed" :items="registryLinks" orientation="vertical" tooltip popover :ui="menuUi" />
+        <UNavigationMenu v-if="fleetLinks.length" :collapsed="collapsed" :items="fleetLinks" orientation="vertical" tooltip popover :ui="menuUi" />
         <UNavigationMenu
           v-if="adminLinks.length"
           :collapsed="collapsed"

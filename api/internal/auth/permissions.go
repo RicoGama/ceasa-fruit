@@ -23,6 +23,8 @@ const (
 	SuppliersEdit Permission = "suppliers.edit" // cadastrar, editar e inativar fornecedores
 	CustomersView Permission = "customers.view" // ver clientes
 	CustomersEdit Permission = "customers.edit" // cadastrar, editar e inativar clientes
+	FleetView     Permission = "fleet.view"     // ver o mapa da frota, veículos e motoristas
+	FleetEdit     Permission = "fleet.edit"     // cadastrar veículos e motoristas
 	ProductsView  Permission = "products.view"  // ver produtos
 	ProductsEdit  Permission = "products.edit"  // cadastrar, editar e inativar produtos
 	UsersManage   Permission = "users.manage"   // usuários, papéis e permissões
@@ -36,6 +38,7 @@ var All = []Permission{
 	SuppliersView, SuppliersEdit,
 	CustomersView, CustomersEdit,
 	ProductsView, ProductsEdit,
+	FleetView, FleetEdit,
 	UsersManage, CompanyEdit, QueuesView, AuditView,
 }
 
@@ -45,6 +48,7 @@ var Implies = map[Permission]Permission{
 	SuppliersEdit: SuppliersView,
 	CustomersEdit: CustomersView,
 	ProductsEdit:  ProductsView,
+	FleetEdit:     FleetView,
 }
 
 // Valid diz se a permissão existe no catálogo.

@@ -30,6 +30,7 @@ type Querier interface {
 	// Clientes. A pessoa (parties, party_contacts) usa as consultas de
 	// suppliers.sql: CreateParty, UpdateParty, ClaimPartyVersion...
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) error
+	CreateDriver(ctx context.Context, arg CreateDriverParams) (Driver, error)
 	// Tentativa de login que falhou: já nasce encerrada, com o motivo.
 	CreateFailedLoginLog(ctx context.Context, arg CreateFailedLoginLogParams) error
 	// @nome é atalho do sqlc para sqlc.arg('nome'); sqlc.narg = pode ser NULL.
@@ -47,11 +48,16 @@ type Querier interface {
 	CreateSupplierProduct(ctx context.Context, arg CreateSupplierProductParams) error
 	// Queries de autenticação e senha.
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateVehicle(ctx context.Context, arg CreateVehicleParams) (int64, error)
 	DeactivateCustomer(ctx context.Context, partyID int64) (int64, error)
+	DeactivateDriver(ctx context.Context, id int64) (int64, error)
 	// Inativa (não apaga: estoque e vendas vão apontar para o produto) e muda a
 	// versão, para quem estiver com a tela aberta não reativar sem perceber.
 	DeactivateProduct(ctx context.Context, id int64) (int64, error)
 	DeactivateSupplier(ctx context.Context, partyID int64) (int64, error)
+	DeactivateVehicle(ctx context.Context, id int64) (int64, error)
+	// Limpeza do histórico antigo (FLEET_RETENTION_DAYS).
+	DeleteOldVehiclePositions(ctx context.Context, before time.Time) (int64, error)
 	DeletePartyContacts(ctx context.Context, partyID int64) error
 	// Apaga as embalagens que saíram da lista (as que ficaram vêm em keep_ids).
 	DeleteProductPackagingsExcept(ctx context.Context, arg DeleteProductPackagingsExceptParams) error
@@ -69,6 +75,8 @@ type Querier interface {
 	// Empresa desta instalação (um registro só, id = 1).
 	GetCompany(ctx context.Context) (GetCompanyRow, error)
 	GetCustomer(ctx context.Context, id int64) (GetCustomerRow, error)
+	GetDriver(ctx context.Context, id int64) (Driver, error)
+	GetFleetSync(ctx context.Context) (FleetSync, error)
 	// Pessoa pelo CPF/CNPJ, com os papéis que ela já tem. Usado ao cadastrar um
 	// cliente que já é fornecedor (ou o contrário): aproveita o mesmo cadastro.
 	GetPartyByDocument(ctx context.Context, document *string) (GetPartyByDocumentRow, error)
@@ -84,11 +92,22 @@ type Querier interface {
 	GetUser(ctx context.Context, id int64) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserWithRole(ctx context.Context, id int64) (GetUserWithRoleRow, error)
+	GetVehicle(ctx context.Context, id int64) (GetVehicleRow, error)
+	InsertVehiclePosition(ctx context.Context, arg InsertVehiclePositionParams) (int64, error)
 	// Depois de redefinir, os outros links pendentes deixam de valer.
 	InvalidatePasswordResetTokens(ctx context.Context, userID int64) error
 	// session_open: a sessão ainda existe e não venceu (para "online" e "expirou").
 	ListAccessLog(ctx context.Context, arg ListAccessLogParams) ([]ListAccessLogRow, error)
 	ListCustomers(ctx context.Context, arg ListCustomersParams) ([]ListCustomersRow, error)
+	// Frota: motoristas, veículos, posições e a sincronização com o Traccar.
+	// ---------------------------------------------------------------------------
+	// Motoristas
+	// ---------------------------------------------------------------------------
+	ListDrivers(ctx context.Context, arg ListDriversParams) ([]ListDriversRow, error)
+	// ---------------------------------------------------------------------------
+	// Mapa e trajeto
+	// ---------------------------------------------------------------------------
+	ListFleetLive(ctx context.Context) ([]ListFleetLiveRow, error)
 	ListPartyContacts(ctx context.Context, partyID int64) ([]PartyContact, error)
 	ListProductPackagings(ctx context.Context, productID int64) ([]ProductPackaging, error)
 	// Quem fornece este produto (preferidos primeiro).
@@ -99,10 +118,20 @@ type Querier interface {
 	// Fornecedor × produto (ver migration 00008).
 	ListSupplierProducts(ctx context.Context, supplierID int64) ([]ListSupplierProductsRow, error)
 	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]ListSuppliersRow, error)
+	// ---------------------------------------------------------------------------
+	// Sincronização com o Traccar (internal/fleet/sync.go)
+	// ---------------------------------------------------------------------------
+	// Veículos com rastreador (só uma sincronização roda por vez: a da API).
+	ListTrackedVehiclesForSync(ctx context.Context) ([]ListTrackedVehiclesForSyncRow, error)
 	// Gestão de usuários (tela do administrador).
 	ListUsers(ctx context.Context) ([]ListUsersRow, error)
 	// Último acesso de cada usuário (só aparece quem já entrou alguma vez).
 	ListUsersLastSeen(ctx context.Context) ([]ListUsersLastSeenRow, error)
+	ListVehicleTrack(ctx context.Context, arg ListVehicleTrackParams) ([]ListVehicleTrackRow, error)
+	// ---------------------------------------------------------------------------
+	// Veículos
+	// ---------------------------------------------------------------------------
+	ListVehicles(ctx context.Context, arg ListVehiclesParams) ([]ListVehiclesRow, error)
 	// Trava as linhas dos administradores ativos até o fim da transação.
 	// Quem chegar depois ESPERA, e só então enxerga o que mudou. Ordenado por id
 	// para todas as transações travarem na mesma ordem (evita deadlock).
@@ -116,14 +145,19 @@ type Querier interface {
 	RecentEmailFailures(ctx context.Context, arg RecentEmailFailuresParams) ([]time.Time, error)
 	// Falhas recentes vindas deste IP (com qualquer e-mail).
 	RecentIPFailures(ctx context.Context, arg RecentIPFailuresParams) ([]time.Time, error)
+	SaveFleetSync(ctx context.Context, arg SaveFleetSyncParams) error
 	// Municípios do IBGE (tabela de referência, sem organização).
 	// Busca sem acento; quem começa com o texto aparece primeiro.
 	SearchCities(ctx context.Context, arg SearchCitiesParams) ([]City, error)
+	SetVehicleTraccarDevice(ctx context.Context, arg SetVehicleTraccarDeviceParams) error
+	SetVehicleTraccarLastUpdate(ctx context.Context, arg SetVehicleTraccarLastUpdateParams) error
 	// Última atividade (chamada no máximo uma vez por minuto por sessão).
 	TouchSessionLog(ctx context.Context, id int64) error
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (int64, error)
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (int64, error)
+	// Só grava se a versão for a que a tela leu (0 linhas = alterado por outra pessoa).
+	UpdateDriver(ctx context.Context, arg UpdateDriverParams) (Driver, error)
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (int64, error)
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (int64, error)
@@ -136,6 +170,12 @@ type Querier interface {
 	// Só altera se a versão ainda for a que a tela leu (concorrência otimista).
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	// Trocar o rastreador zera o vínculo com o Traccar: a sincronização acha o
+	// aparelho novo pelo IMEI.
+	UpdateVehicle(ctx context.Context, arg UpdateVehicleParams) (int64, error)
+	// Atualiza a última posição só se a nova for mais recente (posições guardadas
+	// sem sinal chegam depois, mais antigas).
+	UpdateVehicleLastPosition(ctx context.Context, arg UpdateVehicleLastPositionParams) error
 }
 
 var _ Querier = (*Queries)(nil)

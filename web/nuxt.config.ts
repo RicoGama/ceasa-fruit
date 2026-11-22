@@ -43,6 +43,10 @@ export default defineNuxtConfig({
     // Endereço da API em Go, visto pelo servidor do Nuxt (NUXT_API_URL).
     apiUrl: 'http://localhost:8080',
     public: {
+      // Estilo do mapa da frota (MapLibre). OpenFreeMap: gratuito, sem chave.
+      // Precisa de internet; sem ela, o mapa fica sem fundo mas os veículos
+      // continuam aparecendo. NUXT_PUBLIC_MAP_STYLE_URL troca o provedor.
+      mapStyleUrl: 'https://tiles.openfreemap.org/styles/liberty',
       brand: {
         name: 'Irmãos Faisão Frutícola',
         logo: '/brand/logo.webp',

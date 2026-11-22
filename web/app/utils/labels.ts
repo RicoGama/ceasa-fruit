@@ -129,3 +129,44 @@ export const bankAccountTypeLabels = {
 export function toOptions<T extends Record<string, string>>(labels: T) {
   return Object.entries(labels).map(([value, label]) => ({ value: value as keyof T & string, label }))
 }
+
+// --- Frota ---------------------------------------------------------------------
+export const vehicleKindLabels = {
+  truck: 'Caminhão',
+  van: 'Van / furgão',
+  pickup: 'Picape',
+  car: 'Carro',
+  motorcycle: 'Moto',
+  other: 'Outro',
+} as const
+
+// Situação no mapa (calculada pela API a partir da última posição).
+export const vehicleStatusLabels = {
+  moving: 'Andando',
+  idle: 'Parado, motor ligado',
+  stopped: 'Parado',
+  offline: 'Sem sinal',
+  waiting: 'Aguardando o rastreador',
+  no_tracker: 'Sem rastreador',
+} as const
+
+export const vehicleStatusColors = {
+  moving: 'success',
+  idle: 'warning',
+  stopped: 'info',
+  offline: 'neutral',
+  waiting: 'neutral',
+  no_tracker: 'neutral',
+} as const
+
+// Cor do marcador no mapa (as mesmas cores dos selos acima).
+export const vehicleStatusHex = {
+  moving: '#16a34a',
+  idle: '#d97706',
+  stopped: '#2563eb',
+  offline: '#6b7280',
+  waiting: '#9ca3af',
+  no_tracker: '#9ca3af',
+} as const
+
+export const licenseCategories = ['B', 'C', 'D', 'E', 'AB', 'AC', 'AD', 'AE'] as const

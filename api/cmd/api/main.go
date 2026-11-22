@@ -18,6 +18,8 @@ import (
 
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
 	"github.com/RicoGama/ceasa-fruit/api/internal/config"
+	"github.com/RicoGama/ceasa-fruit/api/internal/fleet"
+	"github.com/RicoGama/ceasa-fruit/api/internal/fleet/traccar"
 	"github.com/RicoGama/ceasa-fruit/api/internal/mail"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
@@ -104,18 +106,30 @@ func run(logger *slog.Logger) error {
 	}
 	go hub.Run(ctx)
 
+	// Frota: busca as posições dos caminhões no Traccar (se configurado).
+	if cfg.Fleet.TraccarURL != "" {
+		syncer := &fleet.Syncer{
+			DB: database, Client: traccar.New(cfg.Fleet.TraccarURL, cfg.Fleet.TraccarToken), Logger: logger,
+			Interval: cfg.Fleet.SyncInterval, Retention: time.Duration(cfg.Fleet.RetentionDays) * 24 * time.Hour,
+		}
+		go syncer.Run(ctx)
+	} else {
+		logger.Info("fleet: TRACCAR_URL not set, tracking disabled")
+	}
+
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
 		Handler: server.New(server.Deps{
-			Logger:         logger,
-			Pool:           pool,
-			CORSOrigins:    cfg.CORSOrigins,
-			TrustedProxies: cfg.TrustedProxies,
-			CookieSecure:   cfg.CookieSecure,
-			AppURL:         cfg.AppURL,
-			Queue:          q,
-			QueueUI:        queueUI,
-			Realtime:       hub,
+			Logger:            logger,
+			Pool:              pool,
+			CORSOrigins:       cfg.CORSOrigins,
+			TrustedProxies:    cfg.TrustedProxies,
+			CookieSecure:      cfg.CookieSecure,
+			AppURL:            cfg.AppURL,
+			Queue:             q,
+			QueueUI:           queueUI,
+			Realtime:          hub,
+			TraccarConfigured: cfg.Fleet.TraccarURL != "",
 		}),
 		// Timeouts protegem o servidor de clientes lentos ou travados.
 		ReadHeaderTimeout: 5 * time.Second,

@@ -19,7 +19,7 @@ confiável): um servidor e um banco por cliente, sem multi-tenant.
 4. Controle de estoque com aviso de perda
 5. Venda
 6. Rota de venda
-7. (Futuro) Caminhões de entrega nas rotas via mapa
+7. Frota ✅ (veículos, motoristas com validade da CNH, mapa ao vivo com os caminhões pelo rastreador Teltonika + Traccar na nuvem, trajeto do dia; rotas de entrega esperam a reunião)
 
 ## Stack
 

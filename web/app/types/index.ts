@@ -25,3 +25,7 @@ export type Customer = Schemas['Customer']
 export type CustomerSummary = Schemas['CustomerSummary']
 export type CustomerFields = Omit<Schemas['CustomerCreate'], 'partyId' | 'partyVersion'>
 export type PartyMatch = Schemas['PartyMatch']
+export type Vehicle = Schemas['Vehicle']
+export type Driver = Schemas['Driver']
+export type TrackPoint = Schemas['TrackPoint']
+export type FleetSyncStatus = Schemas['SyncStatus']

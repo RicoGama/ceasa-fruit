@@ -190,6 +190,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/drivers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List drivers */
+        get: operations["list-drivers"];
+        put?: never;
+        /** Create a driver */
+        post: operations["create-driver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/drivers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a driver */
+        get: operations["get-driver"];
+        /** Update a driver */
+        put: operations["update-driver"];
+        post?: never;
+        /** Deactivate a driver */
+        delete: operations["deactivate-driver"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fleet/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Live map: every active vehicle with its last position */
+        get: operations["get-fleet-live"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/parties/by-document/{document}": {
         parameters: {
             query?: never;
@@ -438,6 +492,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/vehicles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List vehicles */
+        get: operations["list-vehicles"];
+        put?: never;
+        /** Create a vehicle */
+        post: operations["create-vehicle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vehicles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a vehicle */
+        get: operations["get-vehicle"];
+        /** Update a vehicle */
+        put: operations["update-vehicle"];
+        post?: never;
+        /** Deactivate a vehicle */
+        delete: operations["deactivate-vehicle"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vehicles/{id}/track": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Positions of a vehicle in a period (at most 48 h) */
+        get: operations["get-vehicle-track"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -595,7 +703,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
             role: components["schemas"]["RoleName"];
         };
         Customer: {
@@ -763,6 +871,92 @@ export interface components {
             version: number;
             whatsapp?: string;
         };
+        Driver: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Driver.json
+             */
+            readonly $schema?: string;
+            active: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            document: string | null;
+            /** Format: int64 */
+            id: number;
+            /** @enum {string|null} */
+            licenseCategory: "B" | "C" | "D" | "E" | "AB" | "AC" | "AD" | "AE" | null;
+            /** @description YYYY-MM-DD */
+            licenseExpiresOn: string | null;
+            licenseNumber: string | null;
+            name: string;
+            notes: string | null;
+            phone: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+            /**
+             * Format: int64
+             * @description Active vehicles that have this driver as the usual one
+             */
+            vehicleCount: number;
+            /** Format: int32 */
+            version: number;
+        };
+        DriverFields: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DriverFields.json
+             */
+            readonly $schema?: string;
+            /** @description Default true */
+            active?: boolean;
+            /** @description CPF, with or without mask */
+            document?: string;
+            /** @enum {string} */
+            licenseCategory?: "B" | "C" | "D" | "E" | "AB" | "AC" | "AD" | "AE";
+            /**
+             * Format: date
+             * @description YYYY-MM-DD
+             */
+            licenseExpiresOn?: string;
+            /** @description Driver's license (CNH) number */
+            licenseNumber?: string;
+            name: string;
+            notes?: string;
+            phone?: string;
+        };
+        DriverRef: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
+        DriverUpdate: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DriverUpdate.json
+             */
+            readonly $schema?: string;
+            /** @description Default true */
+            active?: boolean;
+            /** @description CPF, with or without mask */
+            document?: string;
+            /** @enum {string} */
+            licenseCategory?: "B" | "C" | "D" | "E" | "AB" | "AC" | "AD" | "AE";
+            /**
+             * Format: date
+             * @description YYYY-MM-DD
+             */
+            licenseExpiresOn?: string;
+            /** @description Driver's license (CNH) number */
+            licenseNumber?: string;
+            name: string;
+            notes?: string;
+            phone?: string;
+            /** Format: int32 */
+            version: number;
+        };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
             location?: string;
@@ -833,6 +1027,15 @@ export interface components {
             offset: number;
             /** Format: int64 */
             total: number;
+        };
+        ListDriversOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListDriversOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["Driver"][];
         };
         ListOutputBody: {
             /**
@@ -905,6 +1108,45 @@ export interface components {
             offset: number;
             /** Format: int64 */
             total: number;
+        };
+        ListVehiclesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListVehiclesOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["Vehicle"][];
+        };
+        LiveOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LiveOutputBody.json
+             */
+            readonly $schema?: string;
+            sync: components["schemas"]["SyncStatus"];
+            vehicles: components["schemas"]["Vehicle"][];
+        };
+        LivePosition: {
+            /**
+             * Format: int32
+             * @description Heading in degrees (0 = north)
+             */
+            course: number;
+            /**
+             * Format: date-time
+             * @description When the GPS measured it
+             */
+            fixAt: string;
+            ignition: boolean | null;
+            /** Format: double */
+            latitude: number;
+            /** Format: double */
+            longitude: number;
+            motion: boolean | null;
+            /** Format: float */
+            speedKmh: number;
         };
         LoginInputBody: {
             /**
@@ -1205,7 +1447,7 @@ export interface components {
             isAdmin: boolean;
             name: string;
             /** @description For the admin role, the whole catalog */
-            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
             /** Format: date-time */
             updatedAt: string;
             /** Format: int32 */
@@ -1220,7 +1462,7 @@ export interface components {
             readonly $schema?: string;
             description?: string;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
         };
         RoleName: {
             /** Format: int64 */
@@ -1238,7 +1480,7 @@ export interface components {
             readonly $schema?: string;
             description?: string;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
             /**
              * Format: int32
              * @description The version read; 409 if someone saved in between
@@ -1491,6 +1733,48 @@ export interface components {
             version: number;
             whatsapp?: string;
         };
+        SyncStatus: {
+            /** @description A Traccar server is configured (TRACCAR_URL) */
+            configured: boolean;
+            /** @description Already in Portuguese, for the screen */
+            lastError: string | null;
+            /**
+             * Format: date-time
+             * @description Since when this problem is happening
+             */
+            lastErrorAt: string | null;
+            /** Format: date-time */
+            lastSuccessAt: string | null;
+        };
+        TrackOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TrackOutputBody.json
+             */
+            readonly $schema?: string;
+            /** Format: double */
+            distanceKm: number;
+            /** Format: float */
+            maxSpeedKmh: number;
+            /**
+             * Format: int64
+             * @description Time with speed above 3 km/h
+             */
+            movingMinutes: number;
+            points: components["schemas"]["TrackPoint"][];
+        };
+        TrackPoint: {
+            ignition: boolean | null;
+            /** Format: double */
+            lat: number;
+            /** Format: double */
+            lng: number;
+            /** Format: float */
+            speedKmh: number;
+            /** Format: date-time */
+            t: string;
+        };
         UpdateCompanyInputBody: {
             /**
              * Format: uri
@@ -1591,6 +1875,95 @@ export interface components {
              * Format: int32
              * @description Send it back on update (optimistic locking)
              */
+            version: number;
+        };
+        Vehicle: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Vehicle.json
+             */
+            readonly $schema?: string;
+            active: boolean;
+            /** Format: int32 */
+            capacityKg: number | null;
+            /** Format: date-time */
+            createdAt: string;
+            description: string | null;
+            driver: components["schemas"]["DriverRef"];
+            /** Format: int64 */
+            id: number;
+            /** @enum {string} */
+            kind: "truck" | "van" | "pickup" | "car" | "motorcycle" | "other";
+            lastPosition: components["schemas"]["LivePosition"];
+            notes: string | null;
+            plate: string;
+            /** @enum {string} */
+            status: "moving" | "idle" | "stopped" | "offline" | "waiting" | "no_tracker";
+            trackerImei: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: int32 */
+            version: number;
+        };
+        VehicleFields: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/VehicleFields.json
+             */
+            readonly $schema?: string;
+            /** @description Default true */
+            active?: boolean;
+            /** Format: int32 */
+            capacityKg?: number;
+            /** @description Brand, model, body (e.g. Volvo VM 270 box truck) */
+            description?: string;
+            /**
+             * Format: int64
+             * @description Usual driver
+             */
+            driverId?: number;
+            /**
+             * @default truck
+             * @enum {string}
+             */
+            kind: "truck" | "van" | "pickup" | "car" | "motorcycle" | "other";
+            notes?: string;
+            /** @description ABC1234 or ABC1D23, with or without dash */
+            plate: string;
+            /** @description IMEI printed on the tracker; empty = no tracker */
+            trackerImei?: string;
+        };
+        VehicleUpdate: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/VehicleUpdate.json
+             */
+            readonly $schema?: string;
+            /** @description Default true */
+            active?: boolean;
+            /** Format: int32 */
+            capacityKg?: number;
+            /** @description Brand, model, body (e.g. Volvo VM 270 box truck) */
+            description?: string;
+            /**
+             * Format: int64
+             * @description Usual driver
+             */
+            driverId?: number;
+            /**
+             * @default truck
+             * @enum {string}
+             */
+            kind: "truck" | "van" | "pickup" | "car" | "motorcycle" | "other";
+            notes?: string;
+            /** @description ABC1234 or ABC1D23, with or without dash */
+            plate: string;
+            /** @description IMEI printed on the tracker; empty = no tracker */
+            trackerImei?: string;
+            /** Format: int32 */
             version: number;
         };
     };
@@ -2044,6 +2417,195 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-drivers": {
+        parameters: {
+            query?: {
+                search?: string;
+                status?: "active" | "inactive" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListDriversOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "create-driver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DriverFields"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Driver"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-driver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Driver"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "update-driver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DriverUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Driver"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "deactivate-driver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-fleet-live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveOutputBody"];
+                };
             };
             /** @description Error */
             default: {
@@ -2851,6 +3413,203 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-vehicles": {
+        parameters: {
+            query?: {
+                /** @description Plate, description or driver */
+                search?: string;
+                status?: "active" | "inactive" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListVehiclesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "create-vehicle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VehicleFields"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Vehicle"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-vehicle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Vehicle"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "update-vehicle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VehicleUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Vehicle"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "deactivate-vehicle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-vehicle-track": {
+        parameters: {
+            query: {
+                /** @description Start (RFC 3339) */
+                from: string;
+                /** @description End (RFC 3339); at most 48 h after from */
+                to: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrackOutputBody"];
+                };
             };
             /** @description Error */
             default: {

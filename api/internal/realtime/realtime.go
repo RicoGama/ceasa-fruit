@@ -166,12 +166,17 @@ func (h *Hub) Close() {
 // topicPermission: quem precisa de qual permissão para receber cada assunto.
 // Assunto que não está aqui (company, resync) vai para todos os logados.
 var topicPermission = map[string]auth.Permission{
-	"suppliers":  auth.SuppliersView,
-	"customers":  auth.CustomersView,
-	"access_log": auth.AuditView,
-	"products":   auth.ProductsView,
-	"users":      auth.UsersManage,
-	"roles":      auth.UsersManage,
+	"suppliers": auth.SuppliersView,
+	"customers": auth.CustomersView,
+	// frota
+	"vehicles":          auth.FleetView,
+	"drivers":           auth.FleetView,
+	"vehicle_positions": auth.FleetView,
+	"fleet_sync":        auth.FleetView,
+	"access_log":        auth.AuditView,
+	"products":          auth.ProductsView,
+	"users":             auth.UsersManage,
+	"roles":             auth.UsersManage,
 	// fornecedor × produto: a aba do fornecedor e a lista no produto
 	"supplier_products": auth.SuppliersView,
 	"product_suppliers": auth.SuppliersView,

@@ -22,6 +22,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/company"
 	"github.com/RicoGama/ceasa-fruit/api/internal/customer"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
+	"github.com/RicoGama/ceasa-fruit/api/internal/fleet"
 	"github.com/RicoGama/ceasa-fruit/api/internal/party"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/product"
@@ -64,6 +65,8 @@ type Deps struct {
 	QueueUI http.Handler
 	// Realtime entrega as mudanças do banco às telas (GET /events). Opcional.
 	Realtime http.Handler
+	// TraccarConfigured: há servidor de rastreamento (o mapa explica se não houver).
+	TraccarConfigured bool
 }
 
 // New devolve o http.Handler raiz da aplicação.
@@ -194,6 +197,7 @@ func build(d Deps) (http.Handler, huma.API) {
 	customer.Register(authed, func(ctx context.Context, fn func(customer.Store) error) error {
 		return database.InTx(ctx, func(tx postgres.Tx) error { return fn(tx) })
 	})
+	fleet.Register(authed, database, fleet.Options{TraccarConfigured: d.TraccarConfigured})
 	// "Este CNPJ já está cadastrado?": usado pelos cadastros de fornecedor e cliente.
 	party.RegisterLookup(authed, func(ctx context.Context, fn func(party.LookupStore) error) error {
 		return database.InReadTx(ctx, func(tx postgres.Tx) error { return fn(tx) })

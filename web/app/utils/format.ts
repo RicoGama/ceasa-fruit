@@ -121,3 +121,19 @@ export function formatNcm(value?: string | null): string {
 export function displayName(p: { tradeName?: string | null, legalName: string }): string {
   return p.tradeName || p.legalName
 }
+
+// Há quanto tempo: "agora", "há 3 min", "há 2 h", "há 3 dias".
+export function formatAgo(iso: string, now: Date = new Date()): string {
+  const min = Math.floor((now.getTime() - new Date(iso).getTime()) / 60000)
+  if (min < 1) return 'agora'
+  if (min < 60) return `há ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `há ${h} h`
+  const days = Math.floor(h / 24)
+  return days === 1 ? 'há 1 dia' : `há ${days} dias`
+}
+
+// Placa com traço na antiga (ABC-1234) e sem na Mercosul (ABC1D23).
+export function formatPlate(plate: string): string {
+  return /^[A-Z]{3}[0-9]{4}$/.test(plate) ? `${plate.slice(0, 3)}-${plate.slice(3)}` : plate
+}

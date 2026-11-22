@@ -41,7 +41,6 @@ type Store interface {
 // TxFunc abre uma transação e entrega um Store para usar dentro dela.
 type TxFunc func(ctx context.Context, fn func(Store) error) error
 
-
 // ---------------------------------------------------------------------------
 // Tipos da API
 // ---------------------------------------------------------------------------

@@ -546,6 +546,8 @@
                 "customers.edit",
                 "products.view",
                 "products.edit",
+                "fleet.view",
+                "fleet.edit",
                 "users.manage",
                 "company.edit",
                 "queues.view",
@@ -1097,6 +1099,259 @@
         ],
         "type": "object"
       },
+      "Driver": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/Driver.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "document": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "licenseCategory": {
+            "enum": [
+              "B",
+              "C",
+              "D",
+              "E",
+              "AB",
+              "AC",
+              "AD",
+              "AE"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "licenseExpiresOn": {
+            "description": "YYYY-MM-DD",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "licenseNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "vehicleCount": {
+            "description": "Active vehicles that have this driver as the usual one",
+            "format": "int64",
+            "type": "integer"
+          },
+          "version": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "document",
+          "licenseNumber",
+          "licenseCategory",
+          "licenseExpiresOn",
+          "active",
+          "notes",
+          "vehicleCount",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "DriverFields": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/DriverFields.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "active": {
+            "description": "Default true",
+            "type": "boolean"
+          },
+          "document": {
+            "description": "CPF, with or without mask",
+            "maxLength": 14,
+            "type": "string"
+          },
+          "licenseCategory": {
+            "enum": [
+              "B",
+              "C",
+              "D",
+              "E",
+              "AB",
+              "AC",
+              "AD",
+              "AE"
+            ],
+            "type": "string"
+          },
+          "licenseExpiresOn": {
+            "description": "YYYY-MM-DD",
+            "format": "date",
+            "type": "string"
+          },
+          "licenseNumber": {
+            "description": "Driver's license (CNH) number",
+            "maxLength": 20,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 2,
+            "type": "string"
+          },
+          "notes": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 20,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "DriverRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "DriverUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/DriverUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "active": {
+            "description": "Default true",
+            "type": "boolean"
+          },
+          "document": {
+            "description": "CPF, with or without mask",
+            "maxLength": 14,
+            "type": "string"
+          },
+          "licenseCategory": {
+            "enum": [
+              "B",
+              "C",
+              "D",
+              "E",
+              "AB",
+              "AC",
+              "AD",
+              "AE"
+            ],
+            "type": "string"
+          },
+          "licenseExpiresOn": {
+            "description": "YYYY-MM-DD",
+            "format": "date",
+            "type": "string"
+          },
+          "licenseNumber": {
+            "description": "Driver's license (CNH) number",
+            "maxLength": 20,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 2,
+            "type": "string"
+          },
+          "notes": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 20,
+            "type": "string"
+          },
+          "version": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "name"
+        ],
+        "type": "object"
+      },
       "ErrorDetail": {
         "additionalProperties": false,
         "properties": {
@@ -1233,6 +1488,30 @@
           "total",
           "limit",
           "offset"
+        ],
+        "type": "object"
+      },
+      "ListDriversOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/ListDriversOutputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Driver"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
         ],
         "type": "object"
       },
@@ -1422,6 +1701,109 @@
           "total",
           "limit",
           "offset"
+        ],
+        "type": "object"
+      },
+      "ListVehiclesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/ListVehiclesOutputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Vehicle"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "LiveOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/LiveOutputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "sync": {
+            "$ref": "#/components/schemas/SyncStatus"
+          },
+          "vehicles": {
+            "items": {
+              "$ref": "#/components/schemas/Vehicle"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sync",
+          "vehicles"
+        ],
+        "type": "object"
+      },
+      "LivePosition": {
+        "additionalProperties": false,
+        "properties": {
+          "course": {
+            "description": "Heading in degrees (0 = north)",
+            "format": "int32",
+            "maximum": 32767,
+            "minimum": -32768,
+            "type": "integer"
+          },
+          "fixAt": {
+            "description": "When the GPS measured it",
+            "format": "date-time",
+            "type": "string"
+          },
+          "ignition": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "latitude": {
+            "format": "double",
+            "type": "number"
+          },
+          "longitude": {
+            "format": "double",
+            "type": "number"
+          },
+          "motion": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "speedKmh": {
+            "format": "float",
+            "type": "number"
+          }
+        },
+        "required": [
+          "fixAt",
+          "latitude",
+          "longitude",
+          "speedKmh",
+          "course",
+          "ignition",
+          "motion"
         ],
         "type": "object"
       },
@@ -2377,6 +2759,8 @@
                 "customers.edit",
                 "products.view",
                 "products.edit",
+                "fleet.view",
+                "fleet.edit",
                 "users.manage",
                 "company.edit",
                 "queues.view",
@@ -2438,6 +2822,8 @@
                 "customers.edit",
                 "products.view",
                 "products.edit",
+                "fleet.view",
+                "fleet.edit",
                 "users.manage",
                 "company.edit",
                 "queues.view",
@@ -2507,6 +2893,8 @@
                 "customers.edit",
                 "products.view",
                 "products.edit",
+                "fleet.view",
+                "fleet.edit",
                 "users.manage",
                 "company.edit",
                 "queues.view",
@@ -3239,6 +3627,119 @@
         ],
         "type": "object"
       },
+      "SyncStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "configured": {
+            "description": "A Traccar server is configured (TRACCAR_URL)",
+            "type": "boolean"
+          },
+          "lastError": {
+            "description": "Already in Portuguese, for the screen",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastErrorAt": {
+            "description": "Since when this problem is happening",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastSuccessAt": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "configured",
+          "lastSuccessAt",
+          "lastError",
+          "lastErrorAt"
+        ],
+        "type": "object"
+      },
+      "TrackOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/TrackOutputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "distanceKm": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxSpeedKmh": {
+            "format": "float",
+            "type": "number"
+          },
+          "movingMinutes": {
+            "description": "Time with speed above 3 km/h",
+            "format": "int64",
+            "type": "integer"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/TrackPoint"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "points",
+          "distanceKm",
+          "maxSpeedKmh",
+          "movingMinutes"
+        ],
+        "type": "object"
+      },
+      "TrackPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "ignition": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "lat": {
+            "format": "double",
+            "type": "number"
+          },
+          "lng": {
+            "format": "double",
+            "type": "number"
+          },
+          "speedKmh": {
+            "format": "float",
+            "type": "number"
+          },
+          "t": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "t",
+          "lat",
+          "lng",
+          "speedKmh",
+          "ignition"
+        ],
+        "type": "object"
+      },
       "UpdateCompanyInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3491,6 +3992,250 @@
           "version",
           "createdAt",
           "updatedAt"
+        ],
+        "type": "object"
+      },
+      "Vehicle": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/Vehicle.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "capacityKg": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "driver": {
+            "$ref": "#/components/schemas/DriverRef"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "truck",
+              "van",
+              "pickup",
+              "car",
+              "motorcycle",
+              "other"
+            ],
+            "type": "string"
+          },
+          "lastPosition": {
+            "$ref": "#/components/schemas/LivePosition"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plate": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "moving",
+              "idle",
+              "stopped",
+              "offline",
+              "waiting",
+              "no_tracker"
+            ],
+            "type": "string"
+          },
+          "trackerImei": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "plate",
+          "description",
+          "kind",
+          "capacityKg",
+          "driver",
+          "trackerImei",
+          "active",
+          "notes",
+          "lastPosition",
+          "status",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "VehicleFields": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/VehicleFields.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "active": {
+            "description": "Default true",
+            "type": "boolean"
+          },
+          "capacityKg": {
+            "format": "int32",
+            "maximum": 100000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "description": {
+            "description": "Brand, model, body (e.g. Volvo VM 270 box truck)",
+            "maxLength": 150,
+            "type": "string"
+          },
+          "driverId": {
+            "description": "Usual driver",
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "kind": {
+            "default": "truck",
+            "enum": [
+              "truck",
+              "van",
+              "pickup",
+              "car",
+              "motorcycle",
+              "other"
+            ],
+            "type": "string"
+          },
+          "notes": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "plate": {
+            "description": "ABC1234 or ABC1D23, with or without dash",
+            "maxLength": 8,
+            "minLength": 7,
+            "type": "string"
+          },
+          "trackerImei": {
+            "description": "IMEI printed on the tracker; empty = no tracker",
+            "maxLength": 25,
+            "type": "string"
+          }
+        },
+        "required": [
+          "plate"
+        ],
+        "type": "object"
+      },
+      "VehicleUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/VehicleUpdate.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "active": {
+            "description": "Default true",
+            "type": "boolean"
+          },
+          "capacityKg": {
+            "format": "int32",
+            "maximum": 100000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "description": {
+            "description": "Brand, model, body (e.g. Volvo VM 270 box truck)",
+            "maxLength": 150,
+            "type": "string"
+          },
+          "driverId": {
+            "description": "Usual driver",
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "kind": {
+            "default": "truck",
+            "enum": [
+              "truck",
+              "van",
+              "pickup",
+              "car",
+              "motorcycle",
+              "other"
+            ],
+            "type": "string"
+          },
+          "notes": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "plate": {
+            "description": "ABC1234 or ABC1D23, with or without dash",
+            "maxLength": 8,
+            "minLength": 7,
+            "type": "string"
+          },
+          "trackerImei": {
+            "description": "IMEI printed on the tracker; empty = no tracker",
+            "maxLength": 25,
+            "type": "string"
+          },
+          "version": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "plate"
         ],
         "type": "object"
       }
@@ -4275,6 +5020,308 @@
         ],
         "x-permissions": [
           "customers.edit"
+        ]
+      }
+    },
+    "/drivers": {
+      "get": {
+        "operationId": "list-drivers",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "default": "all",
+              "enum": [
+                "active",
+                "inactive",
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDriversOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "List drivers",
+        "tags": [
+          "Fleet: drivers"
+        ],
+        "x-permissions": [
+          "fleet.view"
+        ]
+      },
+      "post": {
+        "operationId": "create-driver",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DriverFields"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Driver"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Create a driver",
+        "tags": [
+          "Fleet: drivers"
+        ],
+        "x-permissions": [
+          "fleet.edit"
+        ]
+      }
+    },
+    "/drivers/{id}": {
+      "delete": {
+        "operationId": "deactivate-driver",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Deactivate a driver",
+        "tags": [
+          "Fleet: drivers"
+        ],
+        "x-permissions": [
+          "fleet.edit"
+        ]
+      },
+      "get": {
+        "operationId": "get-driver",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Driver"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Get a driver",
+        "tags": [
+          "Fleet: drivers"
+        ],
+        "x-permissions": [
+          "fleet.view"
+        ]
+      },
+      "put": {
+        "operationId": "update-driver",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DriverUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Driver"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Update a driver",
+        "tags": [
+          "Fleet: drivers"
+        ],
+        "x-permissions": [
+          "fleet.edit"
+        ]
+      }
+    },
+    "/fleet/live": {
+      "get": {
+        "operationId": "get-fleet-live",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Live map: every active vehicle with its last position",
+        "tags": [
+          "Fleet: vehicles"
+        ],
+        "x-permissions": [
+          "fleet.view"
         ]
       }
     },
@@ -5651,6 +6698,346 @@
         ],
         "x-permissions": [
           "users.manage"
+        ]
+      }
+    },
+    "/vehicles": {
+      "get": {
+        "operationId": "list-vehicles",
+        "parameters": [
+          {
+            "description": "Plate, description or driver",
+            "explode": false,
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "description": "Plate, description or driver",
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "default": "all",
+              "enum": [
+                "active",
+                "inactive",
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListVehiclesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "List vehicles",
+        "tags": [
+          "Fleet: vehicles"
+        ],
+        "x-permissions": [
+          "fleet.view"
+        ]
+      },
+      "post": {
+        "operationId": "create-vehicle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VehicleFields"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Vehicle"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Create a vehicle",
+        "tags": [
+          "Fleet: vehicles"
+        ],
+        "x-permissions": [
+          "fleet.edit"
+        ]
+      }
+    },
+    "/vehicles/{id}": {
+      "delete": {
+        "operationId": "deactivate-vehicle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Deactivate a vehicle",
+        "tags": [
+          "Fleet: vehicles"
+        ],
+        "x-permissions": [
+          "fleet.edit"
+        ]
+      },
+      "get": {
+        "operationId": "get-vehicle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Vehicle"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Get a vehicle",
+        "tags": [
+          "Fleet: vehicles"
+        ],
+        "x-permissions": [
+          "fleet.view"
+        ]
+      },
+      "put": {
+        "operationId": "update-vehicle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VehicleUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Vehicle"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Update a vehicle",
+        "tags": [
+          "Fleet: vehicles"
+        ],
+        "x-permissions": [
+          "fleet.edit"
+        ]
+      }
+    },
+    "/vehicles/{id}/track": {
+      "get": {
+        "operationId": "get-vehicle-track",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Start (RFC 3339)",
+            "explode": false,
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "description": "Start (RFC 3339)",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "End (RFC 3339); at most 48 h after from",
+            "explode": false,
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "description": "End (RFC 3339); at most 48 h after from",
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Positions of a vehicle in a period (at most 48 h)",
+        "tags": [
+          "Fleet: vehicles"
+        ],
+        "x-permissions": [
+          "fleet.view"
         ]
       }
     }

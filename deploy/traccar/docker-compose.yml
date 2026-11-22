@@ -1,0 +1,62 @@
+# Traccar na nuvem: recebe as posições dos rastreadores 24 horas por dia.
+# Roda numa máquina virtual pequena (1 vCPU, 2 GB) com Docker. Ver LEIAME.md.
+#
+#   cp exemplo.env .env      # e preencha
+#   docker compose up -d
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: traccar
+      POSTGRES_USER: traccar
+      POSTGRES_PASSWORD: ${TRACCAR_DB_PASSWORD:?preencha TRACCAR_DB_PASSWORD no .env}
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traccar -d traccar"]
+      interval: 10s
+      retries: 10
+
+  traccar:
+    image: traccar/traccar:6.17
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # A configuração vem destas variáveis (em vez do traccar.xml).
+      CONFIG_USE_ENVIRONMENT_VARIABLES: "true"
+      DATABASE_DRIVER: org.postgresql.Driver
+      DATABASE_URL: jdbc:postgresql://db:5432/traccar
+      DATABASE_USER: traccar
+      DATABASE_PASSWORD: ${TRACCAR_DB_PASSWORD}
+      # Só o que é usado: Teltonika (FMC130/FMC920) e OsmAnd (o app Traccar
+      # Client, que transforma um celular em rastreador para testes).
+      PROTOCOLS_ENABLE: teltonika,osmand
+      # Sem cadastro aberto: o primeiro usuário vira o administrador.
+      WEB_REGISTRATION: "false"
+    ports:
+      - "5027:5027"   # Teltonika (TCP), configurado no rastreador
+      - "5055:5055"   # OsmAnd (HTTP), app Traccar Client
+    volumes:
+      - traccar-logs:/opt/traccar/logs
+
+  # HTTPS de verdade (Let's Encrypt) para a tela do Traccar e para a API que
+  # o servidor do box consulta.
+  caddy:
+    image: caddy:2.10.2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      TRACCAR_DOMAIN: ${TRACCAR_DOMAIN:?preencha TRACCAR_DOMAIN no .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+volumes:
+  db-data:
+  traccar-logs:
+  caddy-data:

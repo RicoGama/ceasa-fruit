@@ -1,0 +1,5 @@
+# HTTPS automático (Let's Encrypt) no domínio do .env.
+{$TRACCAR_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy traccar:8082
+}

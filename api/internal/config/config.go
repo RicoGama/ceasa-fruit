@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Config reúne tudo o que a API precisa para subir.
@@ -30,6 +31,18 @@ type Config struct {
 	// Padrão: a própria máquina (o Nuxt repassa /api/* para cá).
 	TrustedProxies []string
 	SMTP           SMTP
+	Fleet          Fleet
+}
+
+// Fleet: rastreamento dos caminhões pelo Traccar (servidor na nuvem).
+// Sem TraccarURL, a frota funciona só como cadastro (sem posições).
+type Fleet struct {
+	TraccarURL   string // ex.: https://rastreio.empresa.com.br
+	TraccarToken string // Traccar: Configurações > Preferências > Token
+	// SyncInterval: de quanto em quanto tempo busca posições novas.
+	SyncInterval time.Duration
+	// RetentionDays: quantos dias de trajeto guardar (0 = para sempre).
+	RetentionDays int
 }
 
 // SMTP: todo envio de e-mail do sistema sai por SMTP.
@@ -62,6 +75,12 @@ func Load() Config {
 			Password: getEnv("SMTP_PASSWORD", ""),
 			TLS:      getEnv("SMTP_TLS", "none"),
 			From:     getEnv("SMTP_FROM", "CEASA Fruit <nao-responda@ceasafruit.test>"),
+		},
+		Fleet: Fleet{
+			TraccarURL:    strings.TrimSuffix(getEnv("TRACCAR_URL", ""), "/"),
+			TraccarToken:  getEnv("TRACCAR_TOKEN", ""),
+			SyncInterval:  time.Duration(getEnvInt("FLEET_SYNC_SECONDS", 15)) * time.Second,
+			RetentionDays: getEnvInt("FLEET_RETENTION_DAYS", 180),
 		},
 	}
 }

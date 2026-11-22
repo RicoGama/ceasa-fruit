@@ -29,6 +29,7 @@ var notRealtime = map[string]string{
 var partialRealtime = map[string]struct{ ops, why string }{
 	"company":    {"IU", "registro único: nunca é apagado"},
 	"access_log": {"IU", "histórico: nunca é apagado"},
+	"fleet_sync": {"IU", "registro único da situação da sincronização"},
 	// A pessoa nasce junto com o papel (o INSERT de suppliers/customers avisa)
 	// e, se apagada, a cascata apaga o papel, que avisa o DELETE.
 	"parties": {"U", "avisa pelo papel (fornecedor/cliente)"},

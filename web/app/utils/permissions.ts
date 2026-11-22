@@ -39,6 +39,19 @@ export const permissionGroups = [
     ],
   },
   {
+    label: 'Frota',
+    resources: [
+      {
+        label: 'Frota',
+        description: 'Mapa com os caminhões, trajetos, veículos e motoristas',
+        actions: [
+          { permission: 'fleet.view', label: 'Ver' },
+          { permission: 'fleet.edit', label: 'Cadastrar e editar' },
+        ],
+      },
+    ],
+  },
+  {
     label: 'Administração',
     resources: [
       {
@@ -78,6 +91,7 @@ export const permissionImplies: Partial<Record<Permission, Permission>> = {
   'suppliers.edit': 'suppliers.view',
   'customers.edit': 'customers.view',
   'products.edit': 'products.view',
+  'fleet.edit': 'fleet.view',
 }
 
 // Marca/desmarca respeitando as dependências: marcar "editar" marca "ver";

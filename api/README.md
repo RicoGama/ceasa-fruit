@@ -25,6 +25,7 @@ na ordem abaixo; os comentários no código explicam cada conceito.
 | 15 | `internal/supplier/supplier.go` | Huma: struct tags, validação, interfaces, embedding, closures, transação com várias tabelas |
 | 15b | `internal/product/product.go` | cadastro com lista filha (embalagens): atualizar, criar e remover numa transação; papéis na rota |
 | 15a | `internal/customer/customer.go` + `internal/party/save.go` | o mesmo desenho do fornecedor; um papel novo em cima de uma pessoa que já existe (`party.Existing`) |
+| 15d | `internal/fleet/` | frota: cliente HTTP de outro sistema (Traccar), goroutine de sincronização com o banco, generics (`deref[T]`) |
 | 15c | `internal/supplierproduct/supplierproduct.go` | relação muitos-para-muitos com dados na ligação, rotas aninhadas (`/suppliers/{id}/products`), permissão dupla (`Protect` duas vezes = E) |
 | 16 | `internal/city/city.go` | uma rota pequena de consulta (municípios do IBGE) |
 | 17 | `internal/company/company.go` | registro único (singleton), `Resolve()` para validar, erro de chave estrangeira |
@@ -60,6 +61,10 @@ não existe "organização" nas tabelas: o banco inteiro é de uma empresa só.
 | Embalagem | `product_packagings` | pilha, pallet, caixa de 30: quantas unidades cabem (vazio = varia) |
 | Fornecedor × produto | `supplier_products` | o que cada fornecedor traz: nome na nota dele, safra (meses), modalidade própria, preferencial |
 | Cliente | `customers` | papel "cliente" de uma pessoa (tipo, box na CEASA, situação) |
+| Motorista | `drivers` | nome, CPF, CNH (categoria e validade) |
+| Veículo | `vehicles` | placa, tipo, motorista habitual, IMEI do rastreador e a última posição |
+| Posição | `vehicle_positions` | o que o rastreador mandou (via Traccar): hora do GPS, lugar, velocidade, ignição |
+| Sincronização | `fleet_sync` | situação da conexão com o Traccar (o mapa avisa quando cai) |
 | Municípios/UFs | `cities`, `states` | lista oficial do IBGE |
 
 ### Papéis e permissões
@@ -72,6 +77,7 @@ não existe "organização" nas tabelas: o banco inteiro é de uma empresa só.
   | `suppliers.view` / `suppliers.edit` | ver / cadastrar, editar e inativar fornecedores |
   | `customers.view` / `customers.edit` | ver / cadastrar, editar e inativar clientes |
   | `products.view` / `products.edit` | ver / cadastrar, editar e inativar produtos |
+  | `fleet.view` / `fleet.edit` | ver o mapa da frota / cadastrar veículos e motoristas |
   | `users.manage` | usuários, papéis e permissões |
   | `company.edit` | alterar os dados da empresa |
   | `queues.view` | painel da fila de tarefas (River UI) |
@@ -369,3 +375,26 @@ make help
   "esqueci a senha" responde igual exista o e-mail ou não.
 - **Sem multi-tenant**: um servidor e um banco por cliente, dentro do box.
   Novo cliente = nova instalação (mesmo código, outro servidor).
+
+## Frota (rastreamento)
+
+```text
+caminhão (FMC130) -> Traccar na nuvem -> fleet.Syncer (a cada 15 s) -> vehicle_positions -> tempo real -> mapa
+```
+
+- **Por que o Traccar fica na nuvem**: o rastreador precisa de um endereço
+  fixo no ar 24 h; o box não tem. Como subir: `deploy/traccar/LEIAME.md`.
+- **Configuração**: `TRACCAR_URL`, `TRACCAR_TOKEN` (sem eles, frota só como
+  cadastro), `FLEET_SYNC_SECONDS` (15), `FLEET_RETENTION_DAYS` (180).
+- **O sincronizador (`internal/fleet/sync.go`)**:
+  - cadastra no Traccar o aparelho de cada veículo com IMEI (nome = placa);
+  - só pede posições de quem tem novidade (`lastUpdate` do aparelho);
+  - busca **a partir da última posição gravada**: posições guardadas sem sinal
+    chegam depois, com o horário antigo; com a internet do box fora, o
+    Traccar acumula e a primeira rodada boa traz tudo;
+  - continua conferindo por 30 s depois de cada novidade, porque o Traccar
+    marca o aparelho como atualizado um instante antes de gravar a posição;
+  - posição repetida não duplica (`UNIQUE (vehicle_id, traccar_position_id)`).
+- **Testes**: `internal/server/fleet_test.go` usa um Traccar falso (posições
+  atrasadas, internet caindo, token errado). O teste de ponta a ponta usou um
+  Traccar 6.17 de verdade com o rastreador simulado pelo protocolo OsmAnd.
