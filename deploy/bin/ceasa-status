@@ -106,6 +106,31 @@ else
   check restore-test ok "teste de restauração: $(cut -d' ' -f3- "$STATE_DIR/status/restore-test")"
 fi
 
+# --- E-mails do sistema (convites, troca de senha) --------------------------------------
+# A fila tenta cada e-mail 10 vezes, com espera crescente (cerca de 1 dia no
+# total). Depois disso desiste ("discarded"): a pessoa não recebeu e ninguém
+# fica sabendo, a não ser por aqui. Dá para reenviar em Administração > Filas.
+sep=$'\x1f'
+IFS=$sep read -r failed stuck recipients last_error < <(psql_app -F "$sep" -c "
+  SELECT count(*) FILTER (WHERE state = 'discarded' AND finalized_at > now() - interval '24 hours'),
+         count(*) FILTER (WHERE state = 'retryable' AND attempt >= 3),
+         coalesce(string_agg(DISTINCT args -> 'message' ->> 'to', ', ')
+                    FILTER (WHERE state = 'discarded' AND finalized_at > now() - interval '24 hours'), ''),
+         coalesce((array_agg(errors[array_length(errors, 1)] ->> 'error' ORDER BY id DESC)
+                    FILTER (WHERE state IN ('discarded', 'retryable') AND errors IS NOT NULL))[1], '')
+  FROM river_job WHERE kind = 'send_email'" 2>/dev/null || echo "0${sep}0${sep}${sep}")
+failed=${failed:-0} stuck=${stuck:-0}
+last_error=${last_error:0:200}
+if (( failed > 0 )); then
+  (( ${#recipients} > 120 )) && recipients="${recipients:0:117}..."
+  check emails-failed falhou "$failed e-mail(s) do sistema NÃO foram enviados nas últimas 24h (para: $recipients). Último erro: $last_error. Reenvie em Administração > Filas depois de corrigir."
+else
+  check emails-failed ok "e-mails do sistema: nenhum perdido nas últimas 24h"
+fi
+if (( stuck > 0 )); then
+  check emails-stuck falhou "$stuck e-mail(s) presos tentando de novo (servidor de e-mail fora do ar ou senha errada?). Último erro: $last_error"
+fi
+
 # --- Rastreamento da frota ------------------------------------------------------------
 if [[ -n ${TRACCAR_URL:-} ]]; then
   read -r last_ok last_err < <(psql_app -F ' ' -c "SELECT coalesce(extract(epoch FROM last_success_at)::bigint, 0), coalesce(replace(last_error, ' ', '_'), '-') FROM fleet_sync" 2>/dev/null || echo "0 -")
@@ -152,24 +177,28 @@ if [[ $quiet != yes ]]; then
 fi
 
 # --- Avisos por e-mail --------------------------------------------------------------------------------
+# Um arquivo por problema avisado (com a hora do aviso). Só é gravado DEPOIS
+# que o e-mail sai: se o envio falhar (servidor de e-mail fora), a próxima
+# verificação, em 5 minutos, tenta de novo.
 if [[ $alert == yes ]]; then
   adir=$STATE_DIR/alerts
   install -d -m 0700 "$adir"
-  new=() reminder=() solved=()
+  new=() reminder=() solved=() mark=() unmark=()
   for r in "${results[@]}"; do
     IFS='|' read -r name status msg <<<"$r"
     f=$adir/$name
     if [[ $status == ok ]]; then
-      if [[ -f $f ]]; then solved+=("$msg"); rm -f "$f"; fi
+      if [[ -f $f ]]; then solved+=("$msg"); unmark+=("$f"); fi
     elif [[ ! -f $f ]]; then
-      new+=("$msg"); now_epoch >"$f"
+      new+=("$msg"); mark+=("$f")
     elif (( $(now_epoch) - $(cat "$f") >= 86400 )); then
-      reminder+=("$msg"); now_epoch >"$f"
+      reminder+=("$msg"); mark+=("$f")
     fi
   done
   list() { printf -- '- %s\n' "$@"; }
+  subject='' body=''
   if ((${#new[@]} + ${#reminder[@]} > 0)); then
-    body=""
+    subject="$(( ${#new[@]} + ${#reminder[@]} )) problema(s) no servidor"
     ((${#new[@]})) && body+="Problemas novos:
 $(list "${new[@]}")
 
@@ -181,10 +210,14 @@ $(list "${reminder[@]}")
     ((${#solved[@]})) && body+="Resolvidos:
 $(list "${solved[@]}")
 "
-    notify "$(( ${#new[@]} + ${#reminder[@]} )) problema(s) no servidor" "$body" || true
   elif ((${#solved[@]})); then
-    notify "Problema resolvido" "Voltou ao normal:
-$(list "${solved[@]}")" || true
+    subject="Problema resolvido"
+    body="Voltou ao normal:
+$(list "${solved[@]}")"
+  fi
+  if [[ -n $subject ]] && notify "$subject" "$body"; then
+    for f in "${mark[@]}"; do now_epoch >"$f"; done
+    rm -f "${unmark[@]}"
   fi
 fi
 

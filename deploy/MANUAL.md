@@ -209,6 +209,8 @@ dos discos e no-break. Os mesmos itens geram os e-mails de aviso.
 | Disco com mais de 85% | apague arquivos que não são do sistema ou troque o disco por um maior |
 | Espelhamento DEGRADADO / disco com defeito (SMART) | troque o disco com defeito **logo**: o servidor está sem cópia |
 | SEM ENERGIA no box | nada: o no-break segura e, se a bateria acabar, o servidor desliga sozinho com segurança |
+| E-mails do sistema NÃO foram enviados | convites ou trocas de senha não chegaram: confira o `SMTP_*` em `/etc/ceasa-fruit/ceasa.env` (senha trocada no provedor?) e reenvie em **Administração → Filas** |
+| E-mails presos tentando de novo | o servidor de e-mail está recusando ou fora do ar: mesma conferência acima |
 | Teste de restauração FALHOU | `sudo ceasa-restore-test` e leia a mensagem; os backups podem não estar servindo |
 
 ## 8. Frota (rastreamento)
