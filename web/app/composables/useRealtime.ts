@@ -33,6 +33,7 @@ export function useLiveRecord(opts: {
   reload: () => unknown
 }) {
   const remoteChange = ref<'updated' | 'deleted' | null>(null)
+  let remoteVersion = 0
 
   async function check() {
     if (!opts.id()) return
@@ -42,9 +43,23 @@ export function useLiveRecord(opts: {
       return
     }
     if (current <= opts.version()) return // é a nossa própria gravação
-    if (opts.dirty()) remoteChange.value = 'updated'
-    else await opts.reload()
+    if (!opts.dirty()) {
+      await opts.reload()
+      return
+    }
+    // Uma gravação desta tela ficou sem resposta (Wi-Fi caiu na volta): a
+    // mudança que chegou é, quase sempre, ela mesma. Não assusta a pessoa
+    // com "outra pessoa alterou"; ao tentar de novo, a API devolve o
+    // resultado daquela gravação (idempotência).
+    if (hasUncertainWrite()) return
+    remoteVersion = current
+    remoteChange.value = 'updated'
   }
+
+  // Salvou e ficou com a versão mais nova: o aviso não vale mais.
+  watch(opts.version, (v) => {
+    if (remoteChange.value === 'updated' && v >= remoteVersion) remoteChange.value = null
+  })
 
   useRealtime(opts.topic, (ev) => {
     if (ev.topic === 'resync' || ev.id === opts.id()) check()

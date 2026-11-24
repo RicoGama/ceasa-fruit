@@ -224,9 +224,9 @@ func (c CNPJa) Lookup(ctx context.Context, cnpj string) (CNPJData, error) {
 		base = "https://open.cnpja.com/office"
 	}
 	var r struct {
-		TaxID    string `json:"taxId"`
-		Alias    string `json:"alias"`
-		Founded  string `json:"founded"`
+		TaxID   string `json:"taxId"`
+		Alias   string `json:"alias"`
+		Founded string `json:"founded"`
 		Company struct {
 			Name    string `json:"name"`
 			Simples *struct {

@@ -97,6 +97,19 @@ type FleetSync struct {
 	LastErrorAt   *time.Time
 }
 
+type IdempotencyKey struct {
+	Key          string
+	UserID       *int64
+	Method       string
+	Path         string
+	RequestHash  []byte
+	Status       *int16
+	ContentType  *string
+	ResponseBody []byte
+	CreatedAt    time.Time
+	CompletedAt  *time.Time
+}
+
 type Party struct {
 	ID                        int64
 	PersonType                string

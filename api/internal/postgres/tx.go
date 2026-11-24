@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/rand/v2"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -89,23 +90,74 @@ func ActorFrom(ctx context.Context) (int64, bool) {
 	return id, ok
 }
 
+// IdempotencyClaim é a chave de idempotência do pedido atual (cabeçalho
+// Idempotency-Key), colocada no context pelo middleware internal/idempotency.
+type IdempotencyClaim struct {
+	Key    string
+	UserID *int64
+	Method string
+	Path   string
+	Hash   []byte
+
+	claimed atomic.Bool
+}
+
+// Claimed diz se a chave já foi gravada (uma transação de escrita do pedido
+// terminou com COMMIT).
+func (c *IdempotencyClaim) Claimed() bool { return c.claimed.Load() }
+
+func (c *IdempotencyClaim) markClaimed() { c.claimed.Store(true) }
+
+type idempotencyKey struct{}
+
+// WithIdempotency marca o context com a chave do pedido.
+func WithIdempotency(ctx context.Context, c *IdempotencyClaim) context.Context {
+	return context.WithValue(ctx, idempotencyKey{}, c)
+}
+
+// IdempotencyFrom devolve a chave do pedido (nil se não houver).
+func IdempotencyFrom(ctx context.Context) *IdempotencyClaim {
+	c, _ := ctx.Value(idempotencyKey{}).(*IdempotencyClaim)
+	return c
+}
+
 // maxAttempts: quantas vezes uma transação é tentada em caso de deadlock.
 const maxAttempts = 3
 
 func (d DB) run(ctx context.Context, opts pgx.TxOptions, fn func(Tx) error) error {
 	var err error
 	actor, hasActor := ActorFrom(ctx)
+	claim := IdempotencyFrom(ctx)
+	write := opts.AccessMode != pgx.ReadOnly
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		claimedNow := false
 		err = pgx.BeginTxFunc(ctx, d.pool, opts, func(tx pgx.Tx) error {
+			// Pedido com Idempotency-Key: a chave entra na mesma transação da
+			// gravação (só na primeira transação de escrita do pedido).
+			if write && claim != nil && !claim.Claimed() {
+				n, err := db.New(tx).ClaimIdempotencyKey(ctx, db.ClaimIdempotencyKeyParams{
+					Key: claim.Key, UserID: claim.UserID, Method: claim.Method, Path: claim.Path, RequestHash: claim.Hash,
+				})
+				if err != nil {
+					return err
+				}
+				if n == 0 {
+					return AlreadyProcessingError()
+				}
+				claimedNow = true
+			}
 			// Quem está gravando: o gatilho do histórico (audit_row, migration
 			// 00013) lê daqui. "true" = só vale nesta transação.
-			if hasActor && opts.AccessMode != pgx.ReadOnly {
+			if hasActor && write {
 				if _, err := tx.Exec(ctx, "SELECT set_config('app.actor_id', $1, true)", strconv.FormatInt(actor, 10)); err != nil {
 					return err
 				}
 			}
 			return fn(Tx{Queries: db.New(tx), Raw: tx})
 		})
+		if err == nil && claimedNow {
+			claim.markClaimed()
+		}
 		if !isRetryable(err) || attempt == maxAttempts {
 			break
 		}
@@ -151,6 +203,13 @@ func isLockTimeout(err error) bool { return pgCode(err) == codeLockNotAvailable 
 // front oferece recarregar os dados.
 func StaleError() error {
 	return huma.Error409Conflict("this record was changed by someone else")
+}
+
+// AlreadyProcessingError: chegou outro pedido com a mesma Idempotency-Key ao
+// mesmo tempo (clique duplo, tentativa automática); um deles grava, o outro
+// recebe 409 e a tela, ao tentar de novo, recebe a resposta do primeiro.
+func AlreadyProcessingError() error {
+	return huma.Error409Conflict("this request is already being processed")
 }
 
 // BusyError: a trava de um registro demorou demais (lock_timeout). Vira 503,

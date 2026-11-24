@@ -169,6 +169,7 @@ ferramentas, de acordo com o problema:
 | Deadlock / falha de serialização | `InTx` **repete a transação sozinho** (até 3 vezes). Por isso a função dentro do `InTx` só mexe no banco: SEFAZ, banco e e-mail vão pela fila | todas as transações |
 | Trava presa por muito tempo | `lock_timeout` 5s → **503** "tente de novo"; `statement_timeout` 30s; transação esquecida aberta cai em 60s | conexão (`postgres.Connect`) |
 | Mesmo documento cadastrado duas vezes ao mesmo tempo | **índice único** no banco: a segunda recebe 409 | CPF/CNPJ, e-mail |
+| Resposta perdida no Wi-Fi: a pessoa clica de novo e grava duas vezes | **`Idempotency-Key`**: a mesma chave grava uma vez só (ver "Pedido repetido") | todo POST/PUT/PATCH/DELETE das telas |
 | Disputa de memória dentro do Go | testes com **`-race`** (`make test`, `make test-integration`) | sempre |
 
 Testes que provam cada caso: `internal/user/concurrency_test.go` (corrida do
@@ -178,6 +179,41 @@ Testes que provam cada caso: `internal/user/concurrency_test.go` (corrida do
 
 Ao criar uma tela de edição nova: devolva `version` no GET, exija no PUT e use
 `ClaimPartyVersion` (pessoas) ou `WHERE version = @version` na query.
+
+## Pedido repetido (idempotência)
+
+O Wi-Fi do box falha. A pessoa salva, a gravação acontece, mas a resposta se
+perde: a tela mostra "sem conexão" e a pessoa tenta de novo. Sem proteção,
+isso vira duas vendas, dois pagamentos, duas baixas no estoque.
+
+```
+tela: Idempotency-Key: <chave aleatória>  ──►  middleware (internal/idempotency)
+  já vi a chave?  sim, terminou ──► devolve a MESMA resposta (Idempotent-Replayed: true)
+                  sim, rodando  ──► 409 + Retry-After: 1 ("aguarde")
+                  não           ──► executa; a chave é gravada DENTRO da
+                                    transação da gravação (postgres.run)
+```
+
+- **A chave entra na mesma transação da gravação**: ou ficam as duas, ou
+  nenhuma. Dois pedidos iguais ao mesmo tempo: o `INSERT ... ON CONFLICT DO
+  NOTHING` deixa só um gravar; o outro recebe 409 "em andamento".
+- **Erro antes de gravar não gasta a chave** (validação, permissão): a tela
+  corrige e manda de novo com a mesma chave.
+- **A chave vale por usuário, rota e conteúdo**: mesma chave com outro
+  conteúdo = 422 (erro de programa). Chave inválida = 400.
+- **API caiu entre gravar e responder** (chave sem resposta há mais de 1 min):
+  409 "já registrado, recarregue". Nada é gravado de novo.
+- Chaves ficam 7 dias (`idempotency.Cleanup`, de hora em hora).
+- Fora da regra: `/auth/*` (a resposta traz o cookie da sessão), `/admin/*`
+  (painel da fila) e `/events`. Pedido **sem** o cabeçalho funciona como antes
+  (scripts, testes).
+- **No front** (`web/app/plugins/api.ts`, `utils/idempotency.ts`): toda
+  gravação leva uma chave nova. Só quando o resultado ficou **incerto**
+  (sem conexão, 502/503/504, ou "em andamento") a próxima tentativa do mesmo
+  pedido reaproveita a chave. Assim uma edição repetida devolve o sucesso,
+  e não um falso "outra pessoa alterou".
+- Testes: `internal/server/idempotency_test.go` (repetição, 10 pedidos
+  simultâneos gravam 1, chave de outro usuário, chave presa, validação).
 
 ## Registro de acessos
 

@@ -21,6 +21,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/config"
 	"github.com/RicoGama/ceasa-fruit/api/internal/fleet"
 	"github.com/RicoGama/ceasa-fruit/api/internal/fleet/traccar"
+	"github.com/RicoGama/ceasa-fruit/api/internal/idempotency"
 	"github.com/RicoGama/ceasa-fruit/api/internal/mail"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
@@ -106,6 +107,8 @@ func run(logger *slog.Logger) error {
 		}
 	}
 	go hub.Run(ctx)
+	// Apaga as chaves de idempotência com mais de 7 dias.
+	go idempotency.Cleanup(ctx, database, logger)
 
 	// Frota: busca as posições dos caminhões no Traccar (se configurado).
 	if cfg.Fleet.TraccarURL != "" {

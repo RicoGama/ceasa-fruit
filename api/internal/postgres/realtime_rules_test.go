@@ -23,6 +23,7 @@ var notRealtime = map[string]string{
 	"sessions":              "sessões de login; quem vê os acessos é o access_log",
 	"password_reset_tokens": "links de troca de senha, nunca aparecem em tela",
 	"goose_db_version":      "controle das migrations",
+	"idempotency_keys":      "controle de pedidos repetidos, nunca aparece em tela",
 }
 
 // Tabelas que avisam só em parte das operações, de propósito.
@@ -131,6 +132,7 @@ var notAudited = map[string]string{
 	"vehicle_positions":     "posições do GPS, não são alterações de cadastro",
 	"fleet_sync":            "situação da sincronização, muda a cada rodada",
 	"audit_log":             "é o próprio histórico",
+	"idempotency_keys":      "controle de pedidos repetidos",
 }
 
 func TestEveryTableIsAudited(t *testing.T) {

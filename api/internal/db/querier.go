@@ -23,10 +23,15 @@ type Querier interface {
 	// Soma 1 na versão sem conferir (ações que não vêm de um formulário, como
 	// inativar): quem estiver com a tela aberta recebe 409 ao salvar.
 	BumpPartyVersion(ctx context.Context, id int64) error
+	// Grava a chave na transação da gravação de verdade. ON CONFLICT: se outro
+	// pedido com a mesma chave chegou junto, este espera aquele terminar e não
+	// grava (0 linhas).
+	ClaimIdempotencyKey(ctx context.Context, arg ClaimIdempotencyKeyParams) (int64, error)
 	// "Reserva" a edição da pessoa: só passa se ninguém salvou depois que a tela
 	// leu (version igual) e já soma 1. 0 linhas = alterada por outra pessoa (ou
 	// inexistente). Toda gravação de fornecedor/cliente começa por aqui.
 	ClaimPartyVersion(ctx context.Context, arg ClaimPartyVersionParams) (int64, error)
+	CompleteIdempotencyKey(ctx context.Context, arg CompleteIdempotencyKeyParams) error
 	// Marca o token como usado e devolve o usuário, numa operação só: dois
 	// pedidos simultâneos com o mesmo link não conseguem usá-lo duas vezes.
 	ConsumePasswordResetToken(ctx context.Context, tokenHash []byte) (int64, error)
@@ -65,6 +70,7 @@ type Querier interface {
 	DeactivateProduct(ctx context.Context, id int64) (int64, error)
 	DeactivateSupplier(ctx context.Context, partyID int64) (int64, error)
 	DeactivateVehicle(ctx context.Context, id int64) (int64, error)
+	DeleteOldIdempotencyKeys(ctx context.Context, before time.Time) (int64, error)
 	// Limpeza do histórico antigo (FLEET_RETENTION_DAYS).
 	DeleteOldVehiclePositions(ctx context.Context, before time.Time) (int64, error)
 	DeletePartyContact(ctx context.Context, id int64) error
@@ -88,6 +94,8 @@ type Querier interface {
 	GetCustomer(ctx context.Context, id int64) (GetCustomerRow, error)
 	GetDriver(ctx context.Context, id int64) (Driver, error)
 	GetFleetSync(ctx context.Context) (FleetSync, error)
+	// Idempotência (migration 00014).
+	GetIdempotencyKey(ctx context.Context, key string) (IdempotencyKey, error)
 	// Pessoa pelo CPF/CNPJ, com os papéis que ela já tem. Usado ao cadastrar um
 	// cliente que já é fornecedor (ou o contrário): aproveita o mesmo cadastro.
 	GetPartyByDocument(ctx context.Context, document *string) (GetPartyByDocumentRow, error)

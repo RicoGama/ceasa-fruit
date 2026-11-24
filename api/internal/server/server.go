@@ -28,6 +28,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/customer"
 	"github.com/RicoGama/ceasa-fruit/api/internal/db"
 	"github.com/RicoGama/ceasa-fruit/api/internal/fleet"
+	"github.com/RicoGama/ceasa-fruit/api/internal/idempotency"
 	"github.com/RicoGama/ceasa-fruit/api/internal/party"
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/product"
@@ -114,7 +115,8 @@ func build(d Deps) (http.Handler, huma.API) {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: d.CORSOrigins,
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Content-Type"},
+		AllowedHeaders: []string{"Accept", "Content-Type", idempotency.Header},
+		ExposedHeaders: []string{idempotency.ReplayedHeader, "Retry-After"},
 		// Necessário para o navegador enviar o cookie de sessão em requisições
 		// vindas do front (outra porta/subdomínio).
 		AllowCredentials: true,
@@ -139,6 +141,8 @@ func build(d Deps) (http.Handler, huma.API) {
 		return row, err
 	}
 	r.Use(auth.LoadSession(loadSession, d.Logger))
+	// Pedido repetido (resposta perdida no Wi-Fi) não grava duas vezes.
+	r.Use(idempotency.Middleware(database, d.Logger))
 
 	// Tempo real (Server-Sent Events). Exige login; cada pessoa só recebe os
 	// avisos dos assuntos que pode ver (ver internal/realtime).
