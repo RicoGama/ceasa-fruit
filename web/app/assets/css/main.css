@@ -2,6 +2,8 @@
 @import "@nuxt/ui";
 /* Fonte servida pelo próprio app (sem depender da internet no servidor do box). */
 @import "@fontsource-variable/plus-jakarta-sans";
+/* Fonte das telas de acesso (layout do designer). */
+@import "@fontsource-variable/montserrat/wght.css";
 
 /*
  * TEMAS DE COR
@@ -124,4 +126,34 @@
   --canvas: var(--base-950);
   --accent-soft: color-mix(in oklab, var(--brand-400) 18%, transparent);
   --accent-strong: color-mix(in oklab, var(--brand-300) 55%, transparent);
+}
+
+/*
+ * Telas de acesso (login e senha): cores e fonte do layout do designer.
+ * Fixas, sem tema azul/verde e sem modo escuro (o layout é um só).
+ * As variáveis do Nuxt UI são trocadas só dentro de .auth-skin.
+ */
+.auth-skin {
+  --auth-green: #123b2b;
+  --auth-green-dark: #0c2a1e;
+  --auth-ink: #0f3324;
+  --auth-cream: #f7f4ef;
+  --auth-orange: #db853c;
+
+  --ui-primary: var(--auth-green);
+  --ui-bg: var(--auth-cream);
+  --ui-bg-elevated: #efebe3;
+  --ui-text: #3b3a37;
+  --ui-text-highlighted: var(--auth-ink);
+  --ui-text-toned: #4a4945;
+  --ui-text-muted: #5d5c58;
+  --ui-text-dimmed: #7c7a76;
+  --ui-border: #d9d5cc;
+  --ui-border-accented: #9a9b95;
+  --ui-radius: 0.5rem;
+
+  font-family: "Montserrat Variable", ui-sans-serif, system-ui, sans-serif;
+  color: var(--ui-text);
+  background: var(--auth-cream);
+  color-scheme: light;
 }

@@ -11,6 +11,7 @@
     "api:types": "openapi-typescript ../api/openapi.json -o app/types/api.d.ts"
   },
   "dependencies": {
+    "@fontsource-variable/montserrat": "5.3.0",
     "@fontsource-variable/plus-jakarta-sans": "5.3.0",
     "@iconify-json/lucide": "1.2.152",
     "@nuxt/ui": "4.12.0",

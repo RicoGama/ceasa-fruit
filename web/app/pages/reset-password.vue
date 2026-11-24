@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
+import type { FormSubmitEvent } from '@nuxt/ui'
 
 definePageMeta({ layout: 'auth' })
 useHead({ title: 'Nova senha · CEASA Fruit' })
@@ -9,27 +9,26 @@ const api = useApi()
 const toast = useToast()
 const route = useRoute()
 const errorMessage = ref('')
+const loading = ref(false)
 
 // O token vem no link do e-mail: /reset-password?token=...
 const token = computed(() => (typeof route.query.token === 'string' ? route.query.token : ''))
 // Convite de usuário novo (?invite=1): mesma tela, outros textos.
 const isInvite = computed(() => route.query.invite === '1')
 
-const fields: AuthFormField[] = [
-  { name: 'password', type: 'password', label: 'Nova senha', description: 'Pelo menos 8 caracteres', required: true },
-  { name: 'confirm', type: 'password', label: 'Repita a nova senha', required: true },
-]
-
 const schema = z.object({
   password: z.string().min(8, 'A senha precisa de pelo menos 8 caracteres').max(128),
   confirm: z.string(),
 }).refine(v => v.password === v.confirm, { path: ['confirm'], message: 'As senhas não conferem' })
+const state = reactive({ password: '', confirm: '' })
 
 async function onSubmit(event: FormSubmitEvent<z.output<typeof schema>>) {
   errorMessage.value = ''
+  loading.value = true
   const { error } = await api.POST('/auth/password/reset', {
     body: { token: token.value, password: event.data.password },
   })
+  loading.value = false
   if (error) {
     errorMessage.value = apiErrorMessage(error)
     return
@@ -44,36 +43,38 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof schema>>) {
 </script>
 
 <template>
-  <div v-if="!token" class="space-y-4 text-center">
-    <UIcon name="i-lucide-link-2-off" class="size-10 text-warning mx-auto" />
-    <h1 class="text-xl font-semibold text-highlighted">
-      Link incompleto
-    </h1>
-    <p class="text-sm text-muted">
-      Abra o link exatamente como chegou no e-mail, ou peça um novo.
-    </p>
-    <UButton label="Pedir novo link" to="/forgot-password" block />
+  <div v-if="!token">
+    <AuthTitle title="Link incompleto" description="Abra o link exatamente como chegou no e-mail, ou peça um novo." />
+    <UButton label="Pedir novo link" to="/forgot-password" block class="mt-10 h-14 rounded-[8px] text-lg font-bold" />
   </div>
 
-  <UAuthForm
-    v-else
-    :title="isInvite ? 'Criar sua senha' : 'Criar nova senha'"
-    :description="isInvite
-      ? 'Bem-vindo ao CEASA Fruit! Escolha a senha que você vai usar para entrar.'
-      : 'Depois de salvar, você vai entrar de novo em todos os aparelhos.'"
-    icon="i-lucide-lock-keyhole"
-    :fields="fields"
-    :schema="schema"
-    :submit="{ label: isInvite ? 'Criar senha' : 'Salvar nova senha', block: true }"
-    loading-auto
-    @submit="onSubmit"
-  >
-    <template #validation>
-      <UAlert v-if="errorMessage" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="errorMessage">
+  <div v-else>
+    <AuthTitle
+      :title="isInvite ? 'Criar sua senha' : 'Criar nova senha'"
+      :description="isInvite
+        ? 'Escolha a senha que você vai usar para entrar.'
+        : 'Depois de salvar, você vai entrar de novo em todos os aparelhos.'"
+    />
+
+    <UForm :schema="schema" :state="state" class="mt-6 sm:mt-7" @submit="onSubmit">
+      <UAlert v-if="errorMessage" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="errorMessage" class="mb-6">
         <template v-if="errorMessage.includes('expirou')" #actions>
           <UButton label="Pedir novo link" to="/forgot-password" size="xs" color="error" variant="outline" />
         </template>
       </UAlert>
-    </template>
-  </UAuthForm>
+      <UFormField name="password" label="Nova senha" hint="Pelo menos 8 caracteres" :ui="{ ...authFieldUi, hint: 'text-sm text-muted' }">
+        <AuthPasswordInput v-model="state.password" placeholder="Digite a nova senha" autocomplete="new-password" />
+      </UFormField>
+      <UFormField name="confirm" label="Repita a nova senha" class="mt-6" :ui="authFieldUi">
+        <AuthPasswordInput v-model="state.confirm" placeholder="Digite de novo" autocomplete="new-password" />
+      </UFormField>
+      <UButton
+        type="submit"
+        :label="isInvite ? 'Criar senha' : 'Salvar nova senha'"
+        block
+        :loading="loading"
+        class="mt-9 h-14 rounded-[8px] text-lg font-bold sm:text-xl"
+      />
+    </UForm>
+  </div>
 </template>
