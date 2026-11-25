@@ -150,6 +150,20 @@
   --ui-text-dimmed: #7c7a76;
   --ui-border: #d9d5cc;
   --ui-border-accented: #9a9b95;
+  --ui-border-muted: #e6e2d9;
+  --ui-border-inverted: var(--auth-ink);
+  --ui-bg-muted: #f1ede6;
+  --ui-bg-accented: #e6e2d9;
+  --ui-bg-inverted: var(--auth-ink);
+  /* Texto sobre fundo escuro (botão "Entrar"): sempre branco. No modo escuro
+     o Nuxt UI troca esta cor por uma escura, por isso fica fixa aqui. */
+  --ui-text-inverted: #ffffff;
+  /* Avisos (erro de senha, campo inválido) nos tons do modo claro. */
+  --ui-error: var(--ui-color-error-600);
+  --ui-success: var(--ui-color-success-600);
+  --ui-warning: var(--ui-color-warning-600);
+  --ui-info: var(--ui-color-info-600);
+  --ui-neutral: var(--auth-ink);
   --ui-radius: 0.5rem;
 
   font-family: "Montserrat Variable", ui-sans-serif, system-ui, sans-serif;

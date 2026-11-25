@@ -75,7 +75,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         label="Entrar"
         block
         :loading="loading"
-        class="mt-9 h-14 rounded-[8px] text-lg font-bold sm:text-[1.35rem]"
+        class="mt-9 h-14 rounded-[8px] hover:bg-(--auth-green-dark) text-lg font-bold sm:text-[1.35rem]"
       />
     </UForm>
 

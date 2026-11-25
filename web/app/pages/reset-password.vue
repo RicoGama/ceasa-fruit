@@ -45,7 +45,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof schema>>) {
 <template>
   <div v-if="!token">
     <AuthTitle title="Link incompleto" description="Abra o link exatamente como chegou no e-mail, ou peça um novo." />
-    <UButton label="Pedir novo link" to="/forgot-password" block class="mt-10 h-14 rounded-[8px] text-lg font-bold" />
+    <UButton label="Pedir novo link" to="/forgot-password" block class="mt-10 h-14 rounded-[8px] hover:bg-(--auth-green-dark) text-lg font-bold" />
   </div>
 
   <div v-else>
@@ -73,7 +73,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof schema>>) {
         :label="isInvite ? 'Criar senha' : 'Salvar nova senha'"
         block
         :loading="loading"
-        class="mt-9 h-14 rounded-[8px] text-lg font-bold sm:text-xl"
+        class="mt-9 h-14 rounded-[8px] hover:bg-(--auth-green-dark) text-lg font-bold sm:text-xl"
       />
     </UForm>
   </div>

@@ -33,7 +33,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof schema>>) {
       title="Verifique seu e-mail"
       description="Se houver uma conta com esse e-mail, enviamos um link para criar uma nova senha. Ele vale por 1 hora. Confira também a caixa de spam."
     />
-    <UButton label="Voltar para o login" to="/login" block class="mt-10 h-14 rounded-[8px] text-lg font-bold" />
+    <UButton label="Voltar para o login" to="/login" block class="mt-10 h-14 rounded-[8px] hover:bg-(--auth-green-dark) text-lg font-bold" />
   </div>
 
   <div v-else>
@@ -44,7 +44,7 @@ async function onSubmit(event: FormSubmitEvent<z.output<typeof schema>>) {
       <UFormField name="email" label="E-mail" :ui="authFieldUi">
         <UInput v-model="state.email" type="email" placeholder="seu@email.com" autocomplete="username" size="xl" :ui="authInputUi" />
       </UFormField>
-      <UButton type="submit" label="Enviar link" block :loading="loading" class="mt-9 h-14 rounded-[8px] text-lg font-bold sm:text-xl" />
+      <UButton type="submit" label="Enviar link" block :loading="loading" class="mt-9 h-14 rounded-[8px] hover:bg-(--auth-green-dark) text-lg font-bold sm:text-xl" />
     </UForm>
 
     <p class="mt-7 text-center text-base text-muted sm:text-lg">
