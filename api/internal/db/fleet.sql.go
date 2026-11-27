@@ -286,7 +286,7 @@ const listDrivers = `-- name: ListDrivers :many
 SELECT d.id, d.name, d.phone, d.document, d.license_number, d.license_category, d.license_expires_on, d.active, d.notes, d.version, d.created_at, d.updated_at,
        (SELECT count(*) FROM vehicles v WHERE v.driver_id = d.id AND v.active) AS vehicle_count
 FROM drivers d
-WHERE ($1::text IS NULL OR unaccent(d.name) ILIKE '%' || unaccent($1) || '%')
+WHERE ($1::text IS NULL OR unaccent(d.name) ILIKE '%' || like_escape(unaccent($1)) || '%')
   AND ($2::boolean IS NULL OR d.active = $2)
 ORDER BY d.active DESC, lower(d.name), d.id
 `
@@ -520,9 +520,9 @@ SELECT v.id, v.plate, v.description, v.kind, v.capacity_kg, v.driver_id, v.track
 FROM vehicles v
 LEFT JOIN drivers d ON d.id = v.driver_id
 WHERE ($1::text IS NULL
-       OR v.plate ILIKE '%' || $1 || '%'
-       OR unaccent(coalesce(v.description, '')) ILIKE '%' || unaccent($1) || '%'
-       OR unaccent(coalesce(d.name, '')) ILIKE '%' || unaccent($1) || '%')
+       OR v.plate ILIKE '%' || like_escape($1) || '%'
+       OR unaccent(coalesce(v.description, '')) ILIKE '%' || like_escape(unaccent($1)) || '%'
+       OR unaccent(coalesce(d.name, '')) ILIKE '%' || like_escape(unaccent($1)) || '%')
   AND ($2::boolean IS NULL OR v.active = $2)
 ORDER BY v.active DESC, v.plate
 `

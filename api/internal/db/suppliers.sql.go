@@ -51,9 +51,9 @@ SELECT count(*)
 FROM suppliers s
 JOIN parties p ON p.id = s.party_id
 WHERE ($1::text IS NULL
-       OR unaccent(p.legal_name) ILIKE '%' || unaccent($1) || '%'
-       OR unaccent(p.trade_name) ILIKE '%' || unaccent($1) || '%'
-       OR p.document LIKE upper($1) || '%')
+       OR unaccent(p.legal_name) ILIKE '%' || like_escape(unaccent($1)) || '%'
+       OR unaccent(p.trade_name) ILIKE '%' || like_escape(unaccent($1)) || '%'
+       OR p.document LIKE like_escape(upper($1)) || '%')
   AND ($2::text IS NULL OR s.status = $2)
   AND ($3::bigint IS NULL OR EXISTS (
         SELECT 1 FROM supplier_products sp
@@ -416,9 +416,9 @@ FROM suppliers s
 JOIN parties p ON p.id = s.party_id
 LEFT JOIN cities c ON c.id = p.city_id
 WHERE ($1::text IS NULL
-       OR unaccent(p.legal_name) ILIKE '%' || unaccent($1) || '%'
-       OR unaccent(p.trade_name) ILIKE '%' || unaccent($1) || '%'
-       OR p.document LIKE upper($1) || '%')
+       OR unaccent(p.legal_name) ILIKE '%' || like_escape(unaccent($1)) || '%'
+       OR unaccent(p.trade_name) ILIKE '%' || like_escape(unaccent($1)) || '%'
+       OR p.document LIKE like_escape(upper($1)) || '%')
   AND ($2::text IS NULL OR s.status = $2)
   AND ($3::bigint IS NULL OR EXISTS (
         SELECT 1 FROM supplier_products sp

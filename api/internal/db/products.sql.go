@@ -15,8 +15,8 @@ const countProducts = `-- name: CountProducts :one
 SELECT count(*) FROM products
 WHERE ($1::text IS NULL
        OR unaccent(name || ' ' || coalesce(variety, '') || ' ' || coalesce(grade, ''))
-          ILIKE '%' || unaccent($1) || '%'
-       OR upper(code) LIKE upper($1) || '%')
+          ILIKE '%' || like_escape(unaccent($1)) || '%'
+       OR upper(code) LIKE like_escape(upper($1)) || '%')
   AND ($2::text IS NULL OR category = $2)
   AND ($3::boolean IS NULL OR active = $3)
 `
@@ -200,8 +200,8 @@ const listProducts = `-- name: ListProducts :many
 SELECT id, code, name, variety, grade, category, stock_unit, nominal_weight_kg, sells_by_weight, ncm, origin, active, notes, version, created_at, updated_at FROM products
 WHERE ($1::text IS NULL
        OR unaccent(name || ' ' || coalesce(variety, '') || ' ' || coalesce(grade, ''))
-          ILIKE '%' || unaccent($1) || '%'
-       OR upper(code) LIKE upper($1) || '%')
+          ILIKE '%' || like_escape(unaccent($1)) || '%'
+       OR upper(code) LIKE like_escape(upper($1)) || '%')
   AND ($2::text IS NULL OR category = $2)
   AND ($3::boolean IS NULL OR active = $3)
 ORDER BY lower(name), lower(coalesce(variety, '')), lower(coalesce(grade, '')), id

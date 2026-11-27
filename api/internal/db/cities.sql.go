@@ -44,8 +44,8 @@ const searchCities = `-- name: SearchCities :many
 SELECT id, name, state_code
 FROM cities
 WHERE ($1::text IS NULL OR state_code = $1)
-  AND unaccent(lower(name)) LIKE '%' || unaccent(lower($2)) || '%'
-ORDER BY unaccent(lower(name)) LIKE unaccent(lower($2)) || '%' DESC,
+  AND unaccent(lower(name)) LIKE '%' || like_escape(unaccent(lower($2))) || '%'
+ORDER BY unaccent(lower(name)) LIKE like_escape(unaccent(lower($2))) || '%' DESC,
          length(name), name
 LIMIT $3
 `

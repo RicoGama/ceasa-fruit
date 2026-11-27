@@ -99,3 +99,115 @@ func TestEverythingGoesThroughTransactions(t *testing.T) {
 		t.Fatalf("only %d files scanned; is the root path right?", scanned)
 	}
 }
+
+// TestSQLIsNeverBuiltAtRuntime protege contra SQL injection: o texto de toda
+// consulta passada a Exec/Query/QueryRow tem que ser fixo no código (texto
+// entre aspas ou constante). Valores digitados pelo usuário vão sempre como
+// parâmetro ($1, @nome), nunca colados no texto.
+//
+// Reprova, por exemplo:
+//
+//	tx.Exec(ctx, "DELETE FROM x WHERE name = '"+name+"'")
+//	tx.Query(ctx, fmt.Sprintf("SELECT * FROM %s", table))
+//
+// As consultas geradas pelo sqlc (internal/db) também passam por aqui: são
+// constantes, então passam.
+func TestSQLIsNeverBuiltAtRuntime(t *testing.T) {
+	root := filepath.Join("..", "..")
+	fset := token.NewFileSet()
+
+	// 1ª passada: lê os arquivos e anota as constantes de cada pacote.
+	type parsed struct {
+		rel  string
+		dir  string
+		file *ast.File
+	}
+	var files []parsed
+	consts := map[string]map[string]bool{} // pasta -> nomes das constantes
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, path)
+		rel = filepath.ToSlash(rel)
+		if d.IsDir() {
+			if rel != "." && strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, path, nil, 0)
+		if err != nil {
+			return err
+		}
+		dir := filepath.ToSlash(filepath.Dir(rel))
+		if consts[dir] == nil {
+			consts[dir] = map[string]bool{}
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			if gd, ok := n.(*ast.GenDecl); ok && gd.Tok == token.CONST {
+				for _, spec := range gd.Specs {
+					for _, name := range spec.(*ast.ValueSpec).Names {
+						consts[dir][name.Name] = true
+					}
+				}
+			}
+			return true
+		})
+		files = append(files, parsed{rel, dir, file})
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// fixed diz se a expressão é texto fixo: "...", uma constante do pacote,
+	// ou a soma (+) de coisas fixas.
+	var fixed func(dir string, e ast.Expr) bool
+	fixed = func(dir string, e ast.Expr) bool {
+		switch v := e.(type) {
+		case *ast.BasicLit:
+			return v.Kind == token.STRING
+		case *ast.Ident:
+			return consts[dir][v.Name]
+		case *ast.ParenExpr:
+			return fixed(dir, v.X)
+		case *ast.BinaryExpr:
+			return v.Op == token.ADD && fixed(dir, v.X) && fixed(dir, v.Y)
+		}
+		return false
+	}
+
+	// 2ª passada: confere cada chamada.
+	checked := 0
+	for _, f := range files {
+		ast.Inspect(f.file, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok || len(call.Args) < 2 {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			switch sel.Sel.Name {
+			case "Exec", "Query", "QueryRow":
+			default:
+				return true
+			}
+			checked++
+			if !fixed(f.dir, call.Args[1]) {
+				pos := fset.Position(call.Args[1].Pos())
+				t.Errorf("%s:%d: SQL built at runtime in .%s(...); write a fixed query (sqlc) and pass values as parameters", f.rel, pos.Line, sel.Sel.Name)
+			}
+			return true
+		})
+	}
+	// Proteção contra o teste passar "em falso" sem conferir nada (o sqlc gera dezenas).
+	if checked < 50 {
+		t.Fatalf("only %d query calls checked; is the root path right?", checked)
+	}
+}

@@ -84,9 +84,9 @@ FROM suppliers s
 JOIN parties p ON p.id = s.party_id
 LEFT JOIN cities c ON c.id = p.city_id
 WHERE (sqlc.narg('search')::text IS NULL
-       OR unaccent(p.legal_name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
-       OR unaccent(p.trade_name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
-       OR p.document LIKE upper(sqlc.narg('search')) || '%')
+       OR unaccent(p.legal_name) ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%'
+       OR unaccent(p.trade_name) ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%'
+       OR p.document LIKE like_escape(upper(sqlc.narg('search'))) || '%')
   AND (sqlc.narg('status')::text IS NULL OR s.status = sqlc.narg('status'))
   AND (sqlc.narg('product_id')::bigint IS NULL OR EXISTS (
         SELECT 1 FROM supplier_products sp
@@ -99,9 +99,9 @@ SELECT count(*)
 FROM suppliers s
 JOIN parties p ON p.id = s.party_id
 WHERE (sqlc.narg('search')::text IS NULL
-       OR unaccent(p.legal_name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
-       OR unaccent(p.trade_name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
-       OR p.document LIKE upper(sqlc.narg('search')) || '%')
+       OR unaccent(p.legal_name) ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%'
+       OR unaccent(p.trade_name) ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%'
+       OR p.document LIKE like_escape(upper(sqlc.narg('search'))) || '%')
   AND (sqlc.narg('status')::text IS NULL OR s.status = sqlc.narg('status'))
   AND (sqlc.narg('product_id')::bigint IS NULL OR EXISTS (
         SELECT 1 FROM supplier_products sp

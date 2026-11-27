@@ -14,9 +14,9 @@ SELECT count(*)
 FROM customers cu
 JOIN parties p ON p.id = cu.party_id
 WHERE ($1::text IS NULL
-       OR unaccent(p.legal_name) ILIKE '%' || unaccent($1) || '%'
-       OR unaccent(p.trade_name) ILIKE '%' || unaccent($1) || '%'
-       OR p.document LIKE upper($1) || '%')
+       OR unaccent(p.legal_name) ILIKE '%' || like_escape(unaccent($1)) || '%'
+       OR unaccent(p.trade_name) ILIKE '%' || like_escape(unaccent($1)) || '%'
+       OR p.document LIKE like_escape(upper($1)) || '%')
   AND ($2::text IS NULL OR cu.status = $2)
   AND ($3::text IS NULL OR cu.customer_type = $3)
 `
@@ -152,9 +152,9 @@ FROM customers cu
 JOIN parties p ON p.id = cu.party_id
 LEFT JOIN cities c ON c.id = p.city_id
 WHERE ($1::text IS NULL
-       OR unaccent(p.legal_name) ILIKE '%' || unaccent($1) || '%'
-       OR unaccent(p.trade_name) ILIKE '%' || unaccent($1) || '%'
-       OR p.document LIKE upper($1) || '%')
+       OR unaccent(p.legal_name) ILIKE '%' || like_escape(unaccent($1)) || '%'
+       OR unaccent(p.trade_name) ILIKE '%' || like_escape(unaccent($1)) || '%'
+       OR p.document LIKE like_escape(upper($1)) || '%')
   AND ($2::text IS NULL OR cu.status = $2)
   AND ($3::text IS NULL OR cu.customer_type = $3)
 ORDER BY lower(coalesce(p.trade_name, p.legal_name)), cu.party_id

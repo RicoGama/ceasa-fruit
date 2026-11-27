@@ -27,8 +27,8 @@ SELECT * FROM products WHERE id = @id;
 SELECT * FROM products
 WHERE (sqlc.narg('search')::text IS NULL
        OR unaccent(name || ' ' || coalesce(variety, '') || ' ' || coalesce(grade, ''))
-          ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
-       OR upper(code) LIKE upper(sqlc.narg('search')) || '%')
+          ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%'
+       OR upper(code) LIKE like_escape(upper(sqlc.narg('search'))) || '%')
   AND (sqlc.narg('category')::text IS NULL OR category = sqlc.narg('category'))
   AND (sqlc.narg('active')::boolean IS NULL OR active = sqlc.narg('active'))
 ORDER BY lower(name), lower(coalesce(variety, '')), lower(coalesce(grade, '')), id
@@ -38,8 +38,8 @@ LIMIT @limit_rows OFFSET @offset_rows;
 SELECT count(*) FROM products
 WHERE (sqlc.narg('search')::text IS NULL
        OR unaccent(name || ' ' || coalesce(variety, '') || ' ' || coalesce(grade, ''))
-          ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
-       OR upper(code) LIKE upper(sqlc.narg('search')) || '%')
+          ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%'
+       OR upper(code) LIKE like_escape(upper(sqlc.narg('search'))) || '%')
   AND (sqlc.narg('category')::text IS NULL OR category = sqlc.narg('category'))
   AND (sqlc.narg('active')::boolean IS NULL OR active = sqlc.narg('active'));
 

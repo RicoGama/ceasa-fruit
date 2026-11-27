@@ -30,9 +30,9 @@ FROM customers cu
 JOIN parties p ON p.id = cu.party_id
 LEFT JOIN cities c ON c.id = p.city_id
 WHERE (sqlc.narg('search')::text IS NULL
-       OR unaccent(p.legal_name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
-       OR unaccent(p.trade_name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
-       OR p.document LIKE upper(sqlc.narg('search')) || '%')
+       OR unaccent(p.legal_name) ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%'
+       OR unaccent(p.trade_name) ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%'
+       OR p.document LIKE like_escape(upper(sqlc.narg('search'))) || '%')
   AND (sqlc.narg('status')::text IS NULL OR cu.status = sqlc.narg('status'))
   AND (sqlc.narg('customer_type')::text IS NULL OR cu.customer_type = sqlc.narg('customer_type'))
 ORDER BY lower(coalesce(p.trade_name, p.legal_name)), cu.party_id
@@ -43,9 +43,9 @@ SELECT count(*)
 FROM customers cu
 JOIN parties p ON p.id = cu.party_id
 WHERE (sqlc.narg('search')::text IS NULL
-       OR unaccent(p.legal_name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
-       OR unaccent(p.trade_name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
-       OR p.document LIKE upper(sqlc.narg('search')) || '%')
+       OR unaccent(p.legal_name) ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%'
+       OR unaccent(p.trade_name) ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%'
+       OR p.document LIKE like_escape(upper(sqlc.narg('search'))) || '%')
   AND (sqlc.narg('status')::text IS NULL OR cu.status = sqlc.narg('status'))
   AND (sqlc.narg('customer_type')::text IS NULL OR cu.customer_type = sqlc.narg('customer_type'));
 

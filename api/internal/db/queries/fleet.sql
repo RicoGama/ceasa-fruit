@@ -8,7 +8,7 @@
 SELECT d.*,
        (SELECT count(*) FROM vehicles v WHERE v.driver_id = d.id AND v.active) AS vehicle_count
 FROM drivers d
-WHERE (sqlc.narg('search')::text IS NULL OR unaccent(d.name) ILIKE '%' || unaccent(sqlc.narg('search')) || '%')
+WHERE (sqlc.narg('search')::text IS NULL OR unaccent(d.name) ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%')
   AND (sqlc.narg('active')::boolean IS NULL OR d.active = sqlc.narg('active'))
 ORDER BY d.active DESC, lower(d.name), d.id;
 
@@ -42,9 +42,9 @@ SELECT v.*, d.name AS driver_name
 FROM vehicles v
 LEFT JOIN drivers d ON d.id = v.driver_id
 WHERE (sqlc.narg('search')::text IS NULL
-       OR v.plate ILIKE '%' || sqlc.narg('search') || '%'
-       OR unaccent(coalesce(v.description, '')) ILIKE '%' || unaccent(sqlc.narg('search')) || '%'
-       OR unaccent(coalesce(d.name, '')) ILIKE '%' || unaccent(sqlc.narg('search')) || '%')
+       OR v.plate ILIKE '%' || like_escape(sqlc.narg('search')) || '%'
+       OR unaccent(coalesce(v.description, '')) ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%'
+       OR unaccent(coalesce(d.name, '')) ILIKE '%' || like_escape(unaccent(sqlc.narg('search'))) || '%')
   AND (sqlc.narg('active')::boolean IS NULL OR v.active = sqlc.narg('active'))
 ORDER BY v.active DESC, v.plate;
 

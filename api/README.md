@@ -157,6 +157,22 @@ err := h.db.InReadTx(ctx, func(tx postgres.Tx) error { ... })
   transação por conta própria (`pgx.BeginFunc`, `.Begin`), criar queries
   soltas (`db.New`) ou receber o `pgxpool` num pacote de negócio.
 
+## SQL injection
+
+Texto digitado pelo usuário nunca vira comando SQL:
+
+- **Consultas fixas, valores como parâmetro.** Toda consulta fica em
+  `internal/db/queries/*.sql`; o sqlc gera o Go. O valor vai como parâmetro
+  (`@search`, `$1`) e o pgx manda consulta e valores separados ao Postgres:
+  `'; DROP TABLE ...` na busca é só um texto a procurar.
+- **Regra no teste:** `TestSQLIsNeverBuiltAtRuntime` (`internal/postgres`)
+  reprova qualquer `Exec`/`Query`/`QueryRow` cujo SQL não seja texto fixo
+  ou constante (por exemplo, montado com `+` ou `fmt.Sprintf`).
+- **Busca:** `%` e `_` digitados valem como texto, não como coringa do LIKE:
+  use `like_escape(...)` em volta do parâmetro (migration `00015`). Ex.:
+  `name ILIKE '%' || like_escape(unaccent(@search)) || '%'`. Teste:
+  `internal/server/search_test.go`.
+
 ## Concorrência
 
 Muita gente mexendo ao mesmo tempo (vendedores, conferentes, financeiro). As

@@ -5,8 +5,8 @@
 SELECT id, name, state_code
 FROM cities
 WHERE (sqlc.narg('state')::text IS NULL OR state_code = sqlc.narg('state'))
-  AND unaccent(lower(name)) LIKE '%' || unaccent(lower(@search)) || '%'
-ORDER BY unaccent(lower(name)) LIKE unaccent(lower(@search)) || '%' DESC,
+  AND unaccent(lower(name)) LIKE '%' || like_escape(unaccent(lower(@search))) || '%'
+ORDER BY unaccent(lower(name)) LIKE like_escape(unaccent(lower(@search))) || '%' DESC,
          length(name), name
 LIMIT @limit_rows;
 
