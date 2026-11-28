@@ -138,7 +138,7 @@ func Middleware(database postgres.DB, logger *slog.Logger) func(http.Handler) ht
 			ct := rec.Header().Get("Content-Type")
 			if err := database.InTx(saveCtx, func(tx postgres.Tx) error {
 				return tx.CompleteIdempotencyKey(saveCtx, db.CompleteIdempotencyKeyParams{
-					Key: key, Status: ptr(int16(rec.status)), ContentType: &ct, ResponseBody: stored,
+					Key: key, Status: new(int16(rec.status)), ContentType: &ct, ResponseBody: stored,
 				})
 			}); err != nil {
 				// A gravação está feita; só a resposta não ficou guardada. Uma
@@ -239,5 +239,3 @@ func Cleanup(ctx context.Context, database postgres.DB, logger *slog.Logger) {
 		}
 	}
 }
-
-func ptr[T any](v T) *T { return &v }

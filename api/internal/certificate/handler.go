@@ -154,7 +154,7 @@ func (h *handler) upload(ctx context.Context, in *uploadInput) (*certificatesOut
 			NotBefore: parsed.NotBefore, NotAfter: parsed.NotAfter,
 			EncryptedPfx:      h.box.Seal(pfx, labelPFX),
 			EncryptedPassword: h.box.Seal([]byte(form.Password), labelPassword),
-			KeyID:             ptr(h.box.KeyID()),
+			KeyID:             new(h.box.KeyID()),
 			UploadedBy:        actor,
 		}); err != nil {
 			return err
@@ -235,5 +235,3 @@ func fileError(err error) error {
 	}
 	return err
 }
-
-func ptr[T any](v T) *T { return &v }

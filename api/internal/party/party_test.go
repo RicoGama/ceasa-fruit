@@ -7,8 +7,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-func ptr[T any](v T) *T { return &v } // função genérica: funciona com qualquer tipo
-
 // locations devolve os campos com erro, para comparar nos testes.
 func locations(errs []error) []string {
 	var out []string
@@ -23,18 +21,18 @@ func locations(errs []error) []string {
 func TestNormalizeCleansAndFormats(t *testing.T) {
 	f := Fields{
 		PersonType:        "individual",
-		Document:          ptr(" 529.982.247-25 "),
+		Document:          new(" 529.982.247-25 "),
 		LegalName:         "  José da Silva ",
-		TradeName:         ptr("   "), // vazio vira nil
-		Email:             ptr("ZE@Sitio.COM"),
-		Phone:             ptr("(21) 99999-0000"),
-		StateRegistration: ptr("isento"),
+		TradeName:         new("   "), // vazio vira nil
+		Email:             new("ZE@Sitio.COM"),
+		Phone:             new("(21) 99999-0000"),
+		StateRegistration: new("isento"),
 		Address: AddressInput{
-			PostalCode: ptr("25960-000"),
-			Street:     ptr(" Estrada da Barragem "),
+			PostalCode: new("25960-000"),
+			Street:     new(" Estrada da Barragem "),
 		},
-		Payment:  PaymentInput{PixKeyType: ptr("cpf"), PixKey: ptr("529.982.247-25")},
-		Contacts: []ContactInput{{Name: " Maria ", Phone: ptr("21 98888-7777"), Email: ptr("Maria@X.com")}},
+		Payment:  PaymentInput{PixKeyType: new("cpf"), PixKey: new("529.982.247-25")},
+		Contacts: []ContactInput{{Name: " Maria ", Phone: new("21 98888-7777"), Email: new("Maria@X.com")}},
 	}
 
 	if errs := f.Normalize(); len(errs) > 0 {
@@ -75,26 +73,26 @@ func TestNormalizeErrors(t *testing.T) {
 		modify func(f *Fields)
 		want   string // trecho esperado em "local: mensagem"
 	}{
-		{"invalid document", func(f *Fields) { f.Document = ptr("11.222.333/0001-80") }, "body.document: invalid CPF or CNPJ"},
-		{"company with CPF", func(f *Fields) { f.Document = ptr("529.982.247-25") }, "body.document: a company must have a CNPJ"},
+		{"invalid document", func(f *Fields) { f.Document = new("11.222.333/0001-80") }, "body.document: invalid CPF or CNPJ"},
+		{"company with CPF", func(f *Fields) { f.Document = new("529.982.247-25") }, "body.document: a company must have a CNPJ"},
 		{"individual with CNPJ", func(f *Fields) {
 			f.PersonType = "individual"
-			f.Document = ptr("11.222.333/0001-81")
+			f.Document = new("11.222.333/0001-81")
 		}, "body.document: an individual must have a CPF"},
 		{"short name after trim", func(f *Fields) { f.LegalName = "  A  " }, "body.legalName"},
-		{"bad postal code", func(f *Fields) { f.Address.PostalCode = ptr("2596-000") }, "body.address.postalCode: invalid postal code"},
-		{"bad phone", func(f *Fields) { f.Phone = ptr("123") }, "body.phone: invalid phone"},
-		{"pix key without type", func(f *Fields) { f.Payment.PixKey = ptr("x@y.com") }, "body.payment.pixKeyType"},
-		{"pix type without key", func(f *Fields) { f.Payment.PixKeyType = ptr("email") }, "body.payment.pixKey: pix key is required"},
+		{"bad postal code", func(f *Fields) { f.Address.PostalCode = new("2596-000") }, "body.address.postalCode: invalid postal code"},
+		{"bad phone", func(f *Fields) { f.Phone = new("123") }, "body.phone: invalid phone"},
+		{"pix key without type", func(f *Fields) { f.Payment.PixKey = new("x@y.com") }, "body.payment.pixKeyType"},
+		{"pix type without key", func(f *Fields) { f.Payment.PixKeyType = new("email") }, "body.payment.pixKey: pix key is required"},
 		{"pix cpf invalid", func(f *Fields) {
-			f.Payment.PixKeyType = ptr("cpf")
-			f.Payment.PixKey = ptr("11122233344")
+			f.Payment.PixKeyType = new("cpf")
+			f.Payment.PixKey = new("11122233344")
 		}, "body.payment.pixKey: invalid pix key"},
 		{"pix random not uuid", func(f *Fields) {
-			f.Payment.PixKeyType = ptr("random")
-			f.Payment.PixKey = ptr("abc")
+			f.Payment.PixKeyType = new("random")
+			f.Payment.PixKey = new("abc")
 		}, "body.payment.pixKey: invalid pix key"},
-		{"holder document invalid", func(f *Fields) { f.Payment.BankAccountHolderDocument = ptr("123") }, "body.payment.bankAccountHolderDocument"},
+		{"holder document invalid", func(f *Fields) { f.Payment.BankAccountHolderDocument = new("123") }, "body.payment.bankAccountHolderDocument"},
 		{"contact without name", func(f *Fields) { f.Contacts = []ContactInput{{Name: "ok"}, {Name: "   "}} }, "body.contacts[1].name"},
 	}
 
@@ -118,7 +116,7 @@ func TestNormalizeValidPixKeys(t *testing.T) {
 		{"random", "123E4567-E89B-12D3-A456-426614174000", "123e4567-e89b-12d3-a456-426614174000"},
 	}
 	for _, c := range cases {
-		f := Fields{PersonType: "company", LegalName: "Teste", Payment: PaymentInput{PixKeyType: &c.kind, PixKey: ptr(c.key)}}
+		f := Fields{PersonType: "company", LegalName: "Teste", Payment: PaymentInput{PixKeyType: &c.kind, PixKey: new(c.key)}}
 		if errs := f.Normalize(); len(errs) > 0 {
 			t.Errorf("%s: unexpected errors %v", c.kind, locations(errs))
 			continue
