@@ -65,6 +65,11 @@ export const permissionGroups = [
         actions: [{ permission: 'company.edit', label: 'Alterar' }],
       },
       {
+        label: 'Certificado digital',
+        description: 'Enviar e trocar o certificado A1, que assina as notas fiscais em nome da empresa',
+        actions: [{ permission: 'certificate.manage', label: 'Gerenciar' }],
+      },
+      {
         label: 'Registro de acessos e alterações',
         description: 'Quem entrou, quando e de onde; e o histórico de tudo o que foi alterado nos cadastros',
         actions: [{ permission: 'audit.view', label: 'Ver' }],

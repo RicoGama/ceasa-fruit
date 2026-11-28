@@ -114,10 +114,20 @@ SMTP_FROM=CEASA Fruit <nao-responda@exemplo.com.br>
 TRACCAR_URL=
 TRACCAR_TOKEN=
 FLEET_RETENTION_DAYS=180
+
+# Chave que criptografa o certificado digital guardado no banco. Gerada na
+# instalação e guardada também dentro dos backups (que são criptografados).
+# NÃO TROQUE: o certificado já enviado deixa de abrir e precisa ser enviado de novo.
+SECRETS_KEY=$(random_secret 48)
 ENV
   umask 022
 fi
 chown root:"$APP_USER" "$APP_ENV" && chmod 0640 "$APP_ENV"
+# Instalações anteriores ao certificado digital: cria a chave uma vez.
+if ! grep -qE '^SECRETS_KEY=.{32,}' "$APP_ENV"; then
+  info "criando a chave do certificado digital (SECRETS_KEY)"
+  set_env_value "$APP_ENV" SECRETS_KEY "$(random_secret 48)"
+fi
 
 if [[ ! -f $OPS_ENV ]]; then
   info "criando $OPS_ENV"
@@ -159,6 +169,8 @@ ALERT_BACKUP_REMOTE_HOURS=72
 ALERT_DISK_PERCENT=85
 # Rastreamento: avisar se as posições pararam de chegar por mais de (horas).
 ALERT_FLEET_HOURS=6
+# Certificado digital: avisar quantos dias antes de vencer (e todo dia depois).
+ALERT_CERTIFICATE_DAYS=30
 
 # No-break ligado no USB do servidor (install.sh --ups muda para yes).
 UPS_ENABLED=no

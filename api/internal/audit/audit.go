@@ -37,6 +37,8 @@ var entityPermissions = map[string][]auth.Permission{
 	"company": {auth.CompanyEdit},
 	"vehicle": {auth.FleetView},
 	"driver":  {auth.FleetView},
+	// certificado digital: só o arquivo e a senha ficam de fora do histórico
+	"certificate": {auth.CertificateManage},
 }
 
 // Campos que apontam para outro cadastro: a resposta traz o nome em refs.
@@ -47,6 +49,7 @@ var refFields = map[string]string{
 	"city_id":     "city",
 	"supplier_id": "party",
 	"party_id":    "party",
+	"uploaded_by": "user",
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +83,7 @@ type AuditEvent struct {
 	ID         int64         `json:"id" doc:"Id of the newest row of the event (for keys and pagination)"`
 	OccurredAt time.Time     `json:"occurredAt"`
 	Actor      *AuditRef     `json:"actor" doc:"null = the system (sync, seed, script)"`
-	EntityType string        `json:"entityType" enum:"party,product,user,role,company,vehicle,driver"`
+	EntityType string        `json:"entityType" enum:"party,product,user,role,company,vehicle,driver,certificate"`
 	EntityID   int64         `json:"entityId"`
 	EntityName string        `json:"entityName"`
 	Changes    []AuditChange `json:"changes"`
@@ -99,7 +102,7 @@ type historyBody struct {
 type historyOutput struct{ Body historyBody }
 
 type entityInput struct {
-	EntityType string `path:"entityType" enum:"party,product,user,role,company,vehicle,driver"`
+	EntityType string `path:"entityType" enum:"party,product,user,role,company,vehicle,driver,certificate"`
 	EntityID   int64  `path:"entityId" minimum:"1"`
 	Before     int64  `query:"before" minimum:"0" doc:"Only rows older than this id"`
 }
@@ -107,7 +110,7 @@ type entityInput struct {
 type listInput struct {
 	Days       int32  `query:"days" minimum:"1" maximum:"366" default:"7"`
 	ActorID    int64  `query:"actorId" minimum:"0" doc:"Only changes made by this user"`
-	EntityType string `query:"entityType" enum:"party,product,user,role,company,vehicle,driver,all" default:"all"`
+	EntityType string `query:"entityType" enum:"party,product,user,role,company,vehicle,driver,certificate,all" default:"all"`
 	Before     int64  `query:"before" minimum:"0"`
 }
 
@@ -341,6 +344,8 @@ func lookupNames(ctx context.Context, tx postgres.Tx, ids map[string]map[int64]b
 			err = collect(tx.AuditVehicleNames(ctx, list))(func(r db.AuditVehicleNamesRow) { add(r.ID, r.Name) })
 		case "company":
 			err = collect(tx.AuditCompanyNames(ctx, list))(func(r db.AuditCompanyNamesRow) { add(r.ID, r.Name) })
+		case "certificate":
+			err = collect(tx.AuditCertificateNames(ctx, list))(func(r db.AuditCertificateNamesRow) { add(r.ID, r.Name) })
 		case "city":
 			err = collect(tx.AuditCityNames(ctx, list))(func(r db.AuditCityNamesRow) { add(r.ID, r.Name) })
 		}

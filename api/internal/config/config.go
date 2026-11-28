@@ -35,6 +35,10 @@ type Config struct {
 	// CNPJ: endereços dos serviços de consulta (trocados nos testes).
 	CNPJBrasilAPIURL string
 	CNPJCNPJaURL     string
+	// SecretsKey criptografa segredos no banco (o certificado digital).
+	// Texto aleatório de pelo menos 32 caracteres; a instalação gera.
+	// Vazio: o sistema funciona, mas não aceita certificado.
+	SecretsKey string
 }
 
 // Fleet: rastreamento dos caminhões pelo Traccar (servidor na nuvem).
@@ -81,6 +85,7 @@ func Load() Config {
 		},
 		CNPJBrasilAPIURL: getEnv("CNPJ_BRASILAPI_URL", "https://brasilapi.com.br/api/cnpj/v1"),
 		CNPJCNPJaURL:     getEnv("CNPJ_CNPJA_URL", "https://open.cnpja.com/office"),
+		SecretsKey:       getEnv("SECRETS_KEY", ""),
 		Fleet: Fleet{
 			TraccarURL:    strings.TrimSuffix(getEnv("TRACCAR_URL", ""), "/"),
 			TraccarToken:  getEnv("TRACCAR_TOKEN", ""),

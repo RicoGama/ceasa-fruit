@@ -7,7 +7,7 @@ import type { Permission } from '~/types'
 // A API manda os nomes das colunas do banco (phone, consignment_commission).
 // Coluna nova sem texto aqui aparece com o nome técnico: acrescente abaixo.
 
-export type AuditEntityType = 'party' | 'product' | 'user' | 'role' | 'company' | 'vehicle' | 'driver'
+export type AuditEntityType = 'party' | 'product' | 'user' | 'role' | 'company' | 'vehicle' | 'driver' | 'certificate'
 
 export const auditEntityLabels: Record<AuditEntityType, string> = {
   party: 'Fornecedor / cliente',
@@ -17,6 +17,7 @@ export const auditEntityLabels: Record<AuditEntityType, string> = {
   company: 'Dados da empresa',
   vehicle: 'Veículo',
   driver: 'Motorista',
+  certificate: 'Certificado digital',
 }
 
 // Endereço da tela de cada cadastro (para o link no histórico geral).
@@ -28,6 +29,7 @@ export function auditEntityLink(type: AuditEntityType, id: number): string | und
     case 'user': return '/app/settings/users'
     case 'vehicle': return '/app/fleet/vehicles'
     case 'driver': return '/app/fleet/drivers'
+    case 'certificate': return '/app/settings/certificate'
     default: return undefined // pessoa: pode ser fornecedor e/ou cliente
   }
 }
@@ -47,6 +49,7 @@ export const auditTableLabels: Record<string, string> = {
   company: 'Empresa',
   drivers: 'Motorista',
   vehicles: 'Veículo',
+  digital_certificates: 'Certificado digital',
 }
 
 export const auditActionLabels = { created: 'incluído', updated: 'alterado', deleted: 'removido' } as const
@@ -125,6 +128,15 @@ const fieldLabels: Record<string, string> = {
   capacity_kg: 'Capacidade (kg)',
   driver_id: 'Motorista habitual',
   tracker_imei: 'IMEI do rastreador',
+  // certificado digital
+  holder_name: 'Titular',
+  issuer: 'Autoridade certificadora',
+  serial_number: 'Número de série',
+  fingerprint: 'Impressão digital (SHA-256)',
+  not_before: 'Válido a partir de',
+  not_after: 'Vencimento',
+  uploaded_by: 'Enviado por',
+  replaced_at: 'Substituído em',
 }
 
 // Campos da própria ligação que não interessam na tela.
@@ -142,7 +154,7 @@ export function auditFieldLabel(table: string, field: string) {
 
 // Campos que apontam para outro cadastro: o nome vem em refs ("product:12").
 const refKinds: Record<string, string> = {
-  product_id: 'product', role_id: 'role', driver_id: 'driver', city_id: 'city',
+  product_id: 'product', role_id: 'role', driver_id: 'driver', city_id: 'city', uploaded_by: 'user',
 }
 
 const enumLabels: Record<string, Record<string, string>> = {
@@ -200,6 +212,10 @@ export function auditValue(field: string, value: unknown, refs: Record<string, s
       return permissionText(s)
     case 'license_expires_on':
       return new Date(`${s}T12:00:00`).toLocaleDateString('pt-BR')
+    case 'not_before':
+    case 'not_after':
+    case 'replaced_at':
+      return new Date(s).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
   }
   if (typeof value === 'number') return value.toLocaleString('pt-BR')
   if (Array.isArray(value)) return value.join(', ')
@@ -215,7 +231,7 @@ export function auditRowTitle(table: string, fields: { name: string, old?: unkno
   const label = auditTableLabels[table] ?? table
   if (table === 'role_permissions') return `${label}: ${permissionText(String(get('permission')))}`
   if (table === 'supplier_products') return `${label}: ${auditValue('product_id', get('product_id'), refs)}`
-  const name = get('name') ?? get('plate') ?? get('legal_name')
+  const name = get('name') ?? get('plate') ?? get('legal_name') ?? get('holder_name')
   return name ? `${label}: ${String(name)}` : label
 }
 

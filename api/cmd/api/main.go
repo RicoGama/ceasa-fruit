@@ -26,6 +26,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/postgres"
 	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
 	"github.com/RicoGama/ceasa-fruit/api/internal/realtime"
+	"github.com/RicoGama/ceasa-fruit/api/internal/secrets"
 	"github.com/RicoGama/ceasa-fruit/api/internal/server"
 )
 
@@ -42,6 +43,16 @@ func main() {
 
 func run(logger *slog.Logger) error {
 	cfg := config.Load()
+
+	// Chave que criptografa o certificado digital no banco. Sem ela o sistema
+	// funciona, mas não aceita certificado; chave curta demais impede a subida.
+	box, err := secrets.New(cfg.SecretsKey)
+	switch {
+	case errors.Is(err, secrets.ErrNotConfigured):
+		logger.Warn("SECRETS_KEY not set: the digital certificate cannot be stored")
+	case err != nil:
+		return err
+	}
 
 	// ctx é cancelado quando o processo recebe Ctrl+C (SIGINT) ou SIGTERM
 	// (o que o Docker/Kubernetes enviam ao desligar).
@@ -134,6 +145,7 @@ func run(logger *slog.Logger) error {
 			QueueUI:           queueUI,
 			Realtime:          hub,
 			TraccarConfigured: cfg.Fleet.TraccarURL != "",
+			Secrets:           box,
 			CNPJProviders: []cnpj.Provider{
 				cnpj.BrasilAPI{BaseURL: cfg.CNPJBrasilAPIURL}, cnpj.CNPJa{BaseURL: cfg.CNPJCNPJaURL},
 			},

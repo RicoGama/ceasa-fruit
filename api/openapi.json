@@ -247,7 +247,8 @@
               "role",
               "company",
               "vehicle",
-              "driver"
+              "driver",
+              "certificate"
             ],
             "type": "string"
           },
@@ -444,6 +445,129 @@
           "phone",
           "email",
           "source"
+        ],
+        "type": "object"
+      },
+      "CertificateInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "daysLeft": {
+            "description": "Whole days until expiration (negative = expired)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "document": {
+            "description": "Holder CNPJ",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fingerprint": {
+            "description": "SHA-256 of the certificate",
+            "type": "string"
+          },
+          "holderName": {
+            "description": "Certificate holder (legal name)",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "issuer": {
+            "description": "Certificate authority",
+            "type": "string"
+          },
+          "notAfter": {
+            "description": "Expiration",
+            "format": "date-time",
+            "type": "string"
+          },
+          "notBefore": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "replacedAt": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "serialNumber": {
+            "type": "string"
+          },
+          "status": {
+            "description": "expiring = less than 30 days left",
+            "enum": [
+              "valid",
+              "expiring",
+              "expired"
+            ],
+            "type": "string"
+          },
+          "uploadedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "uploadedBy": {
+            "$ref": "#/components/schemas/UserRef"
+          }
+        },
+        "required": [
+          "id",
+          "active",
+          "holderName",
+          "document",
+          "issuer",
+          "serialNumber",
+          "fingerprint",
+          "notBefore",
+          "notAfter",
+          "daysLeft",
+          "status",
+          "uploadedAt",
+          "uploadedBy",
+          "replacedAt"
+        ],
+        "type": "object"
+      },
+      "CertificatesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/CertificatesOutputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "current": {
+            "$ref": "#/components/schemas/CertificateInfo",
+            "description": "The certificate in use (null = none)"
+          },
+          "history": {
+            "description": "Previous certificates (metadata only), newest first",
+            "items": {
+              "$ref": "#/components/schemas/CertificateInfo"
+            },
+            "type": "array"
+          },
+          "keyConfigured": {
+            "description": "false = the server has no SECRETS_KEY and cannot receive a certificate",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "current",
+          "history",
+          "keyConfigured"
         ],
         "type": "object"
       },
@@ -815,6 +939,7 @@
                 "fleet.edit",
                 "users.manage",
                 "company.edit",
+                "certificate.manage",
                 "queues.view",
                 "audit.view"
               ],
@@ -3067,6 +3192,7 @@
                 "fleet.edit",
                 "users.manage",
                 "company.edit",
+                "certificate.manage",
                 "queues.view",
                 "audit.view"
               ],
@@ -3130,6 +3256,7 @@
                 "fleet.edit",
                 "users.manage",
                 "company.edit",
+                "certificate.manage",
                 "queues.view",
                 "audit.view"
               ],
@@ -3201,6 +3328,7 @@
                 "fleet.edit",
                 "users.manage",
                 "company.edit",
+                "certificate.manage",
                 "queues.view",
                 "audit.view"
               ],
@@ -4299,6 +4427,23 @@
         ],
         "type": "object"
       },
+      "UserRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
       "Vehicle": {
         "additionalProperties": false,
         "properties": {
@@ -4704,6 +4849,7 @@
                 "company",
                 "vehicle",
                 "driver",
+                "certificate",
                 "all"
               ],
               "type": "string"
@@ -4773,7 +4919,8 @@
                 "role",
                 "company",
                 "vehicle",
-                "driver"
+                "driver",
+                "certificate"
               ],
               "type": "string"
             }
@@ -4834,6 +4981,7 @@
         ],
         "x-permissions": [
           "audit.view",
+          "certificate.manage",
           "company.edit",
           "customers.view",
           "fleet.view",
@@ -5249,6 +5397,147 @@
         ],
         "x-permissions": [
           "company.edit"
+        ]
+      }
+    },
+    "/company/certificate": {
+      "delete": {
+        "operationId": "delete-certificate",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Remove the certificate in use (e.g. it leaked)",
+        "tags": [
+          "Certificate"
+        ],
+        "x-permissions": [
+          "certificate.manage"
+        ]
+      },
+      "get": {
+        "operationId": "get-certificate",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificatesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Digital certificate in use and previous ones",
+        "tags": [
+          "Certificate"
+        ],
+        "x-permissions": [
+          "certificate.manage"
+        ]
+      },
+      "post": {
+        "description": "The file is checked (password, private key, validity, CNPJ of the company) and stored encrypted. The previous certificate is kept only as history.",
+        "operationId": "upload-certificate",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "encoding": {
+                "file": {
+                  "contentType": "application/octet-stream"
+                },
+                "password": {
+                  "contentType": "text/plain"
+                }
+              },
+              "schema": {
+                "properties": {
+                  "file": {
+                    "contentEncoding": "binary",
+                    "contentMediaType": "application/octet-stream",
+                    "description": "The A1 certificate file (.pfx or .p12)",
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "password": {
+                    "description": "The certificate password",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file",
+                  "password"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificatesOutputBody"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Send (or replace) the A1 digital certificate",
+        "tags": [
+          "Certificate"
+        ],
+        "x-permissions": [
+          "certificate.manage"
         ]
       }
     },

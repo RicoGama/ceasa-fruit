@@ -44,3 +44,7 @@ SELECT id::bigint AS id, coalesce(trade_name, name)::text AS name FROM company W
 
 -- name: AuditCityNames :many
 SELECT id::bigint AS id, (name || '/' || state_code)::text AS name FROM cities WHERE id::bigint = ANY (@ids::bigint[]);
+
+-- name: AuditCertificateNames :many
+SELECT id, ('Certificado de ' || holder_name || ', vence em ' || to_char(not_after AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY'))::text AS name
+FROM digital_certificates WHERE id = ANY (@ids::bigint[]);

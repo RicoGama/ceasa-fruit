@@ -144,6 +144,22 @@ if [[ -n ${TRACCAR_URL:-} ]]; then
   fi
 fi
 
+# --- Certificado digital ------------------------------------------------------------------------
+# Sem certificado enviado, nada a conferir (a emissão de notas ainda não começou).
+cert=$(psql_app -F ' ' -c "SELECT extract(epoch FROM not_after)::bigint FROM digital_certificates WHERE active" 2>/dev/null || true)
+if [[ -n $cert ]]; then
+  now=$(now_epoch)
+  days=$(( (cert - now) / 86400 ))
+  until_txt=$(date -d "@$cert" '+%d/%m/%Y')
+  if (( cert <= now )); then
+    check certificate falhou "certificado digital VENCIDO em $until_txt: as notas fiscais não podem ser emitidas. Envie o renovado em Administração > Certificado digital"
+  elif (( days < ${ALERT_CERTIFICATE_DAYS:-30} )); then
+    check certificate falhou "certificado digital vence em $days dia(s), em $until_txt: renove com a certificadora e envie o novo em Administração > Certificado digital"
+  else
+    check certificate ok "certificado digital válido até $until_txt"
+  fi
+fi
+
 # --- No-break -------------------------------------------------------------------------------------
 if [[ ${UPS_ENABLED:-no} == yes ]]; then
   ups=$(upsc nobreak@localhost ups.status 2>/dev/null || echo "?")

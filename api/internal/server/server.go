@@ -22,6 +22,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/access"
 	"github.com/RicoGama/ceasa-fruit/api/internal/audit"
 	"github.com/RicoGama/ceasa-fruit/api/internal/auth"
+	"github.com/RicoGama/ceasa-fruit/api/internal/certificate"
 	"github.com/RicoGama/ceasa-fruit/api/internal/city"
 	"github.com/RicoGama/ceasa-fruit/api/internal/cnpj"
 	"github.com/RicoGama/ceasa-fruit/api/internal/company"
@@ -34,6 +35,7 @@ import (
 	"github.com/RicoGama/ceasa-fruit/api/internal/product"
 	"github.com/RicoGama/ceasa-fruit/api/internal/queue"
 	"github.com/RicoGama/ceasa-fruit/api/internal/role"
+	"github.com/RicoGama/ceasa-fruit/api/internal/secrets"
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplier"
 	"github.com/RicoGama/ceasa-fruit/api/internal/supplierproduct"
 	"github.com/RicoGama/ceasa-fruit/api/internal/user"
@@ -76,6 +78,9 @@ type Deps struct {
 	// CNPJProviders: serviços de consulta de CNPJ, em ordem. Vazio = os
 	// padrões (BrasilAPI e CNPJá).
 	CNPJProviders []cnpj.Provider
+	// Secrets criptografa o certificado digital no banco (SECRETS_KEY).
+	// nil: o servidor não aceita certificado (a tela explica).
+	Secrets *secrets.Box
 }
 
 // New devolve o http.Handler raiz da aplicação.
@@ -211,6 +216,7 @@ func build(d Deps) (http.Handler, huma.API) {
 	})
 	fleet.Register(authed, database, fleet.Options{TraccarConfigured: d.TraccarConfigured})
 	audit.Register(authed, database)
+	certificate.Register(authed, database, d.Secrets)
 	providers := d.CNPJProviders
 	if len(providers) == 0 {
 		providers = []cnpj.Provider{cnpj.BrasilAPI{}, cnpj.CNPJa{}}

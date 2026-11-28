@@ -10,6 +10,36 @@ import (
 	"time"
 )
 
+const auditCertificateNames = `-- name: AuditCertificateNames :many
+SELECT id, ('Certificado de ' || holder_name || ', vence em ' || to_char(not_after AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY'))::text AS name
+FROM digital_certificates WHERE id = ANY ($1::bigint[])
+`
+
+type AuditCertificateNamesRow struct {
+	ID   int64
+	Name string
+}
+
+func (q *Queries) AuditCertificateNames(ctx context.Context, ids []int64) ([]AuditCertificateNamesRow, error) {
+	rows, err := q.db.Query(ctx, auditCertificateNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AuditCertificateNamesRow
+	for rows.Next() {
+		var i AuditCertificateNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const auditCityNames = `-- name: AuditCityNames :many
 SELECT id::bigint AS id, (name || '/' || state_code)::text AS name FROM cities WHERE id::bigint = ANY ($1::bigint[])
 `

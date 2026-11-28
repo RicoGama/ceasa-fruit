@@ -211,6 +211,7 @@ dos discos e no-break. Os mesmos itens geram os e-mails de aviso.
 | SEM ENERGIA no box | nada: o no-break segura e, se a bateria acabar, o servidor desliga sozinho com segurança |
 | E-mails do sistema NÃO foram enviados | convites ou trocas de senha não chegaram: confira o `SMTP_*` em `/etc/ceasa-fruit/ceasa.env` (senha trocada no provedor?) e reenvie em **Administração → Filas** |
 | E-mails presos tentando de novo | o servidor de e-mail está recusando ou fora do ar: mesma conferência acima |
+| Certificado digital vence em N dias / VENCIDO | renove com a certificadora e envie o novo arquivo em **Administração → Certificado digital** |
 | Teste de restauração FALHOU | `sudo ceasa-restore-test` e leia a mensagem; os backups podem não estar servindo |
 
 ## 8. Frota (rastreamento)
@@ -224,7 +225,27 @@ Se as posições pararem de chegar por mais de 6 horas (internet do box fora
 muito tempo, token trocado, Traccar fora do ar), chega um e-mail. Nada se
 perde: quando a conexão volta, o box busca tudo o que faltou.
 
-## 9. Comandos
+## 9. Certificado digital
+
+O certificado A1 (arquivo `.pfx`/`.p12` + senha) é enviado pela tela, em
+**Administração → Certificado digital** (permissão "Certificado digital").
+Ao enviar, o sistema confere a senha, a validade e se o CNPJ é o da empresa.
+
+- **Onde fica:** no banco do sistema, **criptografado**. A chave fica em
+  `SECRETS_KEY`, no `/etc/ceasa-fruit/ceasa.env` (a instalação gera). Quem
+  copiar só o banco não consegue usar o certificado.
+- **Backup:** vai junto com o banco, e a chave também (dentro do backup, que é
+  criptografado pela senha do item 2). Restaurando num servidor novo, o
+  certificado volta funcionando.
+- **Não troque a `SECRETS_KEY`.** Se ela for perdida ou trocada, o certificado
+  já enviado deixa de abrir: basta enviar o arquivo de novo pela tela.
+- **Vencimento:** 30 dias antes chega um e-mail (e outro por dia até a troca),
+  e quem gerencia o certificado vê o aviso ao entrar no sistema. Para mudar o
+  prazo: `ALERT_CERTIFICATE_DAYS` em `/etc/ceasa-fruit/ops.env`.
+- **Trocar:** envie o novo pela mesma tela. O antigo fica só como histórico
+  (titular, validade, quem enviou); o arquivo e a senha dele são apagados.
+
+## 10. Comandos
 
 | Comando | Para quê |
 |---|---|
@@ -243,12 +264,12 @@ Senha de um usuário esquecida, sem e-mail funcionando:
 sudo -u ceasa env $(sudo grep ^DATABASE_URL /etc/ceasa-fruit/ceasa.env) /opt/ceasa-fruit/current/bin/ceasa-set-password -email pessoa@empresa.com.br
 ```
 
-## 10. Onde fica cada coisa
+## 11. Onde fica cada coisa
 
 | Caminho | O que é |
 |---|---|
 | `/opt/ceasa-fruit/current` | versão em uso (as anteriores ficam em `releases/`) |
-| `/etc/ceasa-fruit/ceasa.env` | configuração do sistema (banco, e-mail, endereço) |
+| `/etc/ceasa-fruit/ceasa.env` | configuração do sistema (banco, e-mail, endereço, chave do certificado) |
 | `/etc/ceasa-fruit/ops.env` | backup, avisos e no-break (só o administrador lê) |
 | `/var/backups/ceasa-fruit` | backups no disco do servidor |
 | `/var/lib/ceasa-fruit` | situação das rotinas, avisos enviados, certificado |

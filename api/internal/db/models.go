@@ -74,6 +74,24 @@ type Customer struct {
 	UpdatedAt     time.Time
 }
 
+type DigitalCertificate struct {
+	ID                int64
+	Active            bool
+	HolderName        string
+	Document          *string
+	Issuer            string
+	SerialNumber      string
+	Fingerprint       string
+	NotBefore         time.Time
+	NotAfter          time.Time
+	EncryptedPfx      []byte
+	EncryptedPassword []byte
+	KeyID             *string
+	UploadedBy        *int64
+	CreatedAt         time.Time
+	ReplacedAt        *time.Time
+}
+
 type Driver struct {
 	ID               int64
 	Name             string

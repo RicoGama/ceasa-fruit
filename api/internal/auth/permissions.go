@@ -29,8 +29,11 @@ const (
 	ProductsEdit  Permission = "products.edit"  // cadastrar, editar e inativar produtos
 	UsersManage   Permission = "users.manage"   // usuários, papéis e permissões
 	CompanyEdit   Permission = "company.edit"   // alterar os dados da empresa
-	QueuesView    Permission = "queues.view"    // painel da fila de tarefas
-	AuditView     Permission = "audit.view"     // registro de acessos (quem entrou, quando, de onde)
+	// CertificateManage: enviar, trocar e remover o certificado digital A1.
+	// Separada de company.edit porque o certificado assina notas em nome da empresa.
+	CertificateManage Permission = "certificate.manage"
+	QueuesView        Permission = "queues.view" // painel da fila de tarefas
+	AuditView         Permission = "audit.view"  // registro de acessos (quem entrou, quando, de onde)
 )
 
 // All é o catálogo completo, na ordem em que aparece na tela.
@@ -39,7 +42,7 @@ var All = []Permission{
 	CustomersView, CustomersEdit,
 	ProductsView, ProductsEdit,
 	FleetView, FleetEdit,
-	UsersManage, CompanyEdit, QueuesView, AuditView,
+	UsersManage, CompanyEdit, CertificateManage, QueuesView, AuditView,
 }
 
 // Implies: quem tem a permissão da esquerda também precisa da da direita

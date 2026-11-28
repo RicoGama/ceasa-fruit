@@ -204,6 +204,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/company/certificate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Digital certificate in use and previous ones */
+        get: operations["get-certificate"];
+        put?: never;
+        /**
+         * Send (or replace) the A1 digital certificate
+         * @description The file is checked (password, private key, validity, CNPJ of the company) and stored encrypted. The previous certificate is kept only as history.
+         */
+        post: operations["upload-certificate"];
+        /** Remove the certificate in use (e.g. it leaked) */
+        delete: operations["delete-certificate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers": {
         parameters: {
             query?: never;
@@ -668,7 +690,7 @@ export interface components {
             entityId: number;
             entityName: string;
             /** @enum {string} */
-            entityType: "party" | "product" | "user" | "role" | "company" | "vehicle" | "driver";
+            entityType: "party" | "product" | "user" | "role" | "company" | "vehicle" | "driver" | "certificate";
             /**
              * Format: int64
              * @description Id of the newest row of the event (for keys and pagination)
@@ -726,6 +748,56 @@ export interface components {
             status: string;
             /** @description Nome fantasia */
             tradeName: string | null;
+        };
+        CertificateInfo: {
+            active: boolean;
+            /**
+             * Format: int64
+             * @description Whole days until expiration (negative = expired)
+             */
+            daysLeft: number;
+            /** @description Holder CNPJ */
+            document: string | null;
+            /** @description SHA-256 of the certificate */
+            fingerprint: string;
+            /** @description Certificate holder (legal name) */
+            holderName: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Certificate authority */
+            issuer: string;
+            /**
+             * Format: date-time
+             * @description Expiration
+             */
+            notAfter: string;
+            /** Format: date-time */
+            notBefore: string;
+            /** Format: date-time */
+            replacedAt: string | null;
+            serialNumber: string;
+            /**
+             * @description expiring = less than 30 days left
+             * @enum {string}
+             */
+            status: "valid" | "expiring" | "expired";
+            /** Format: date-time */
+            uploadedAt: string;
+            uploadedBy: components["schemas"]["UserRef"];
+        };
+        CertificatesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CertificatesOutputBody.json
+             */
+            readonly $schema?: string;
+            /** @description The certificate in use (null = none) */
+            current: components["schemas"]["CertificateInfo"];
+            /** @description Previous certificates (metadata only), newest first */
+            history: components["schemas"]["CertificateInfo"][];
+            /** @description false = the server has no SECRETS_KEY and cannot receive a certificate */
+            keyConfigured: boolean;
         };
         City: {
             /**
@@ -836,7 +908,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "certificate.manage" | "queues.view" | "audit.view")[];
             role: components["schemas"]["RoleName"];
         };
         Customer: {
@@ -1594,7 +1666,7 @@ export interface components {
             isAdmin: boolean;
             name: string;
             /** @description For the admin role, the whole catalog */
-            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "certificate.manage" | "queues.view" | "audit.view")[];
             /** Format: date-time */
             updatedAt: string;
             /** Format: int32 */
@@ -1609,7 +1681,7 @@ export interface components {
             readonly $schema?: string;
             description?: string;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "certificate.manage" | "queues.view" | "audit.view")[];
         };
         RoleName: {
             /** Format: int64 */
@@ -1627,7 +1699,7 @@ export interface components {
             readonly $schema?: string;
             description?: string;
             name: string;
-            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "queues.view" | "audit.view")[];
+            permissions: ("suppliers.view" | "suppliers.edit" | "customers.view" | "customers.edit" | "products.view" | "products.edit" | "fleet.view" | "fleet.edit" | "users.manage" | "company.edit" | "certificate.manage" | "queues.view" | "audit.view")[];
             /**
              * Format: int32
              * @description The version read; 409 if someone saved in between
@@ -2024,6 +2096,11 @@ export interface components {
              */
             version: number;
         };
+        UserRef: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
         Vehicle: {
             /**
              * Format: uri
@@ -2166,7 +2243,7 @@ export interface operations {
                 days?: number;
                 /** @description Only changes made by this user */
                 actorId?: number;
-                entityType?: "party" | "product" | "user" | "role" | "company" | "vehicle" | "driver" | "all";
+                entityType?: "party" | "product" | "user" | "role" | "company" | "vehicle" | "driver" | "certificate" | "all";
                 before?: number;
             };
             header?: never;
@@ -2203,7 +2280,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                entityType: "party" | "product" | "user" | "role" | "company" | "vehicle" | "driver";
+                entityType: "party" | "product" | "user" | "role" | "company" | "vehicle" | "driver" | "certificate";
                 entityId: number;
             };
             cookie?: never;
@@ -2502,6 +2579,103 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Company"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-certificate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificatesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "upload-certificate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description The A1 certificate file (.pfx or .p12)
+                     */
+                    file: string;
+                    /** @description The certificate password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificatesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "delete-certificate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

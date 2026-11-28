@@ -39,6 +39,9 @@ const registryLinks = computed<NavigationMenuItem[]>(() => [
   ...(auth.can('customers.view') ? [{ label: 'Clientes', icon: 'i-lucide-users', to: '/app/customers' }] : []),
 ])
 
+// Certificado digital: selo "vence em N dias" no menu e aviso uma vez por sessão.
+const { current: certificate, badge: certificateBadge } = useCertificateStatus()
+
 const adminLinks = computed<NavigationMenuItem[]>(() => {
   const items: NavigationMenuItem[] = []
   if (auth.can('users.manage')) {
@@ -54,6 +57,14 @@ const adminLinks = computed<NavigationMenuItem[]>(() => {
     )
   }
   if (auth.can('company.edit')) items.push({ label: 'Dados da empresa', icon: 'i-lucide-building-2', to: '/app/settings/company' })
+  if (auth.can('certificate.manage')) {
+    items.push({
+      label: 'Certificado digital', icon: 'i-lucide-file-key-2', to: '/app/settings/certificate',
+      badge: certificateBadge.value
+        ? { label: certificateBadge.value, color: certificate.value?.status === 'expired' ? 'error' : 'warning', variant: 'subtle', size: 'sm' }
+        : undefined,
+    })
+  }
   // Painel do River (fora do Nuxt): abre em outra aba.
   if (auth.can('queues.view')) items.push({ label: 'Filas', icon: 'i-lucide-list-checks', to: '/admin/queues', external: true, target: '_blank' })
   return items.length ? [{ label: 'Administração', type: 'label' }, ...items] : []

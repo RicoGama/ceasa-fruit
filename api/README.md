@@ -429,6 +429,31 @@ make help
 - **Sem multi-tenant**: um servidor e um banco por cliente, dentro do box.
   Novo cliente = nova instalação (mesmo código, outro servidor).
 
+## Certificado digital (A1)
+
+`internal/certificate`: a tela envia o `.pfx` e a senha
+(`POST /company/certificate`, multipart, permissão `certificate.manage`).
+
+- **Conferência** (`certificate.Parse`): senha, chave privada (e se é a do
+  certificado), validade e CNPJ. O CNPJ sai do campo próprio da ICP-Brasil
+  (OID 2.16.76.1.3.3) ou do fim do nome ("RAZÃO:CNPJ"). A raiz do CNPJ (8
+  primeiros dígitos) tem que ser a da empresa: a matriz assina pelas filiais.
+- **Onde fica:** tabela `digital_certificates` (migration `00016`), com o
+  arquivo e a senha **criptografados** (`internal/secrets`, AES-256-GCM, chave
+  em `SECRETS_KEY`). Só um ativo por vez; ao trocar, o antigo vira histórico e
+  perde o arquivo e a senha. O histórico de alterações registra o envio, nunca
+  o arquivo nem a senha.
+- **Para assinar** (notas fiscais, SEFAZ): `certificate.Load(ctx, tx, box, now)`
+  devolve o certificado, a cadeia e a chave (`crypto.Signer`). Recusa se a
+  chave do servidor não for a que criptografou (`ErrOtherKey`) ou se venceu.
+- **Sem `SECRETS_KEY`** o sistema sobe, mas a tela avisa e não aceita o envio.
+  Desenvolvimento: `export SECRETS_KEY=$(openssl rand -base64 36)`.
+- **Certificado de teste:** `go run ./cmd/dev-certificate -days 12 -o teste.pfx`
+  gera um `.pfx` no formato da ICP-Brasil (senha `senha-teste`). Não entra no
+  pacote do servidor.
+- **Vencimento:** a tela mostra os dias que faltam (aviso com menos de 30) e o
+  `ceasa-status` manda e-mail (deploy/MANUAL.md, item 9).
+
 ## Frota (rastreamento)
 
 ```text

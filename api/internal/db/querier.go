@@ -11,6 +11,7 @@ import (
 
 type Querier interface {
 	AddRolePermissions(ctx context.Context, arg AddRolePermissionsParams) error
+	AuditCertificateNames(ctx context.Context, ids []int64) ([]AuditCertificateNamesRow, error)
 	AuditCityNames(ctx context.Context, ids []int64) ([]AuditCityNamesRow, error)
 	AuditCompanyNames(ctx context.Context, ids []int64) ([]AuditCompanyNamesRow, error)
 	AuditDriverNames(ctx context.Context, ids []int64) ([]AuditDriverNamesRow, error)
@@ -88,6 +89,9 @@ type Querier interface {
 	EnsureCompany(ctx context.Context, name string) error
 	// Município pelo nome e UF, sem acento nem maiúsculas ("SAO GONCALO", "RJ").
 	FindCityByName(ctx context.Context, arg FindCityByNameParams) (City, error)
+	GetActiveCertificate(ctx context.Context) (GetActiveCertificateRow, error)
+	// O arquivo e a senha (criptografados): só para quem vai assinar.
+	GetActiveCertificateSecret(ctx context.Context) (GetActiveCertificateSecretRow, error)
 	GetCity(ctx context.Context, id int32) (City, error)
 	// Empresa desta instalação (um registro só, id = 1).
 	GetCompany(ctx context.Context) (GetCompanyRow, error)
@@ -112,6 +116,7 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserWithRole(ctx context.Context, id int64) (GetUserWithRoleRow, error)
 	GetVehicle(ctx context.Context, id int64) (GetVehicleRow, error)
+	InsertCertificate(ctx context.Context, arg InsertCertificateParams) (int64, error)
 	InsertVehiclePosition(ctx context.Context, arg InsertVehiclePositionParams) (int64, error)
 	// Depois de redefinir, os outros links pendentes deixam de valer.
 	InvalidatePasswordResetTokens(ctx context.Context, userID int64) error
@@ -123,6 +128,7 @@ type Querier interface {
 	// Histórico de um cadastro, do mais novo para o mais antigo.
 	// before_id: paginação ("carregar mais" a partir do último que a tela tem).
 	ListAuditForEntity(ctx context.Context, arg ListAuditForEntityParams) ([]AuditLog, error)
+	ListCertificates(ctx context.Context) ([]ListCertificatesRow, error)
 	ListCustomers(ctx context.Context, arg ListCustomersParams) ([]ListCustomersRow, error)
 	// Frota: motoristas, veículos, posições e a sincronização com o Traccar.
 	// ---------------------------------------------------------------------------
@@ -161,6 +167,8 @@ type Querier interface {
 	// Quem chegar depois ESPERA, e só então enxerga o que mudou. Ordenado por id
 	// para todas as transações travarem na mesma ordem (evita deadlock).
 	LockActiveAdmins(ctx context.Context) ([]int64, error)
+	// Uma troca de certificado por vez: quem chegar depois espera.
+	LockCompany(ctx context.Context) (LockCompanyRow, error)
 	// Enfileira as tentativas de login do MESMO e-mail até o fim da transação:
 	// 50 tentativas disparadas juntas são checadas uma de cada vez, e não passam
 	// todas pela contagem antes de alguma falha ser gravada.
@@ -173,6 +181,7 @@ type Querier interface {
 	// Deixa o papel com exatamente estas permissões, mexendo só no que mudou
 	// (o histórico mostra "ganhou X, perdeu Y", e não "apagou tudo e criou tudo").
 	RemoveRolePermissionsNotIn(ctx context.Context, arg RemoveRolePermissionsNotInParams) error
+	RetireActiveCertificate(ctx context.Context) (int64, error)
 	SaveFleetSync(ctx context.Context, arg SaveFleetSyncParams) error
 	// Municípios do IBGE (tabela de referência, sem organização).
 	// Busca sem acento; quem começa com o texto aparece primeiro.

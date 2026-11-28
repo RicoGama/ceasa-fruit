@@ -76,6 +76,9 @@ if [[ -n $file ]]; then
 else
   info "baixando o backup do $label"
   run_restic "$repo" dump --host ceasa-fruit "$snapshot" "$spool/ceasa.dump" >"$work/ceasa.dump"
+  # Backups antigos não têm a chave do certificado: segue sem ela.
+  run_restic "$repo" dump --host ceasa-fruit "$snapshot" "$spool/secrets.env" >"$work/secrets.env" 2>/dev/null ||
+    rm -f "$work/secrets.env"
 fi
 
 info "parando o sistema"
@@ -88,6 +91,14 @@ sudo -u postgres pg_dump --format=custom -d "$DB_NAME" >"$safety"
 chmod 0600 "$safety"
 
 restore_database "$work/ceasa.dump"
+
+# O certificado digital no banco restaurado foi criptografado com a chave da
+# época do backup: se ela for outra (servidor novo), passa a valer a do backup.
+backup_key=$(sed -n 's/^SECRETS_KEY=//p' "$work/secrets.env" 2>/dev/null | head -1)
+if [[ -n $backup_key ]] && [[ $backup_key != "$(sed -n 's/^SECRETS_KEY=//p' "$APP_ENV" | head -1)" ]]; then
+  set_env_value "$APP_ENV" SECRETS_KEY "$backup_key"
+  info "chave do certificado digital trazida do backup"
+fi
 
 info "subindo o sistema"
 systemctl start ceasa-api ceasa-web

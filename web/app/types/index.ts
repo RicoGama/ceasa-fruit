@@ -10,6 +10,8 @@ export type Permission = Schemas['CurrentUser']['permissions'][number]
 export type Role = Schemas['Role']
 export type User = Schemas['User']
 export type Company = Schemas['Company']
+export type CertificateInfo = Schemas['CertificateInfo']
+export type CertificatesState = Schemas['CertificatesOutputBody']
 export type Supplier = Schemas['Supplier']
 export type SupplierSummary = Schemas['SupplierSummary']
 // Campos editáveis (o corpo do cadastro, sem a pessoa reaproveitada).

@@ -77,6 +77,11 @@ cat >"$work/manifest.json" <<JSON
 }
 JSON
 
+# A chave do certificado digital vai junto (o backup inteiro é criptografado
+# pelo restic): restaurado num servidor novo, o certificado volta funcionando.
+grep -E '^SECRETS_KEY=' "$APP_ENV" >"$work/secrets.env" 2>/dev/null || true
+chmod 0600 "$work/secrets.env"
+
 # A foto nova substitui a anterior na pasta de envio.
 rm -rf "$SPOOL_DIR/current" && mv "$work" "$SPOOL_DIR/current"
 size=$(du -h "$SPOOL_DIR/current/ceasa.dump" | cut -f1)
